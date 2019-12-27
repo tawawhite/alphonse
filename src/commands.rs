@@ -33,7 +33,7 @@ impl CliArg {
 
 /// Construct a new clap root command
 pub fn new_root_command<'a>() -> clap::App<'a, 'static> {
-    let root_cmd = App::new("liar")
+    let root_cmd = App::new(crate_name!())
         .version(crate_version!())
         .author(crate_authors!())
         .args(&[
