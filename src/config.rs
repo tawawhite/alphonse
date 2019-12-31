@@ -13,14 +13,14 @@ use commands::CliArg;
 
 #[derive(Default)]
 pub struct Config {
-    debug_mode: bool,
-    delete: bool,
-    dry_run: bool,
-    pcap_file: String,
-    pcap_dir: String,
-    quiet: bool,
-    recursive: bool,
-    tags: Vec<String>,
+    pub debug_mode: bool,
+    pub delete: bool,
+    pub dry_run: bool,
+    pub pcap_file: String,
+    pub pcap_dir: String,
+    pub quiet: bool,
+    pub recursive: bool,
+    pub tags: Vec<String>,
 }
 
 /// Parse command line arguments and set configuration
