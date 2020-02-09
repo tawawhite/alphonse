@@ -1,5 +1,7 @@
 use std::marker::PhantomData;
+use std::path::Path;
 
+use super::super::error;
 use super::{capture, link, network, packet, Error, LayerProto};
 
 /// 仅解析协议在数据包中的开始位置和协议长度的 parser
@@ -32,13 +34,33 @@ pub struct Parser<B: capture::Backend> {
 }
 
 impl Parser<capture::Offline> {
-    pub fn from_pcap_file(cap: &pcap::Capture<pcap::Offline>) -> Parser<capture::Offline> {
-        Parser::<capture::Offline> {
-            link_parser: link::Parser::from_pcap_file(cap),
+    pub fn from_pcap_file<P: AsRef<Path>>(
+        path: &P,
+    ) -> Result<Parser<capture::Offline>, error::Error> {
+        if !path.as_ref().exists() {
+            // check pcap file's existence
+            return Err(error::Error::ParserError(String::from(format!(
+                "{} does not exists!",
+                path.as_ref().display()
+            ))));
+        }
+
+        let result = pcap::Capture::from_file(path);
+        let pcap_file;
+        match result {
+            Err(e) => {
+                eprintln!("{}", e);
+                std::process::exit(-1);
+            }
+            Ok(v) => pcap_file = v,
+        }
+
+        Ok(Parser::<capture::Offline> {
+            link_parser: link::Parser::from_pcap_file(&pcap_file),
             network_parser: network::Parser::new(),
             snap_len: 65535,
             _marker: PhantomData,
-        }
+        })
     }
 }
 
