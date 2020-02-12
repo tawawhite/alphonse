@@ -17,6 +17,8 @@ ExternalProject_Add(libpcap
                 -D DISABLE_SNF=ON
                 -D DISABLE_TC=ON
                 -D CMAKE_POSITION_INDEPENDENT_CODE=ON
+    INSTALL_COMMAND make install
+    COMMAND ${CMAKE_COMMAND} -E copy <INSTALL_DIR>/lib/pkgconfig/libpcap.pc <INSTALL_DIR>/lib/pkgconfig/pcap.pc
 )
 
 # apt-get install flex byacc

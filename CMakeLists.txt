@@ -16,7 +16,8 @@ find_library(libpcap_LIBRARY pcap
     PATHS /usr/lib/x86_64-linux-gnu/
 )
 
-if(NOT libpcap_LIBRARY)
+set(BUILD_LIBPCAP ON CACHE BOOL "")
+if(NOT libpcap_LIBRARY OR BUILD_LIBPCAP)
     add_dependencies(alphonse libpcap)
 endif()
 
@@ -27,3 +28,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 endif()
 
 add_dependencies(alphonse llhttp)
+
+message(STATUS "  OFFLINE_ENVIRONMENT ..............: ${OFFLINE_ENVIRONMENT}")
+message(STATUS "  BUILD_LIBPCAP ....................: ${OFFLINE_ENVIRONMENT}")
+message(STATUS "")
