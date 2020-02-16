@@ -36,7 +36,7 @@ matrix:
 
       before_script:
         - pip3 install meson
-        - cmake -S . -B ./build
+        - mkdir build && cmake -S . -B ./build
         - cd build && make install
       script:
         - cargo build --verbose --all
