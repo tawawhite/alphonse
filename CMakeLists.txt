@@ -28,6 +28,5 @@ endif()
 
 add_dependencies(alphonse llhttp)
 
-message(STATUS "  OFFLINE_ENVIRONMENT ..............: ${OFFLINE_ENVIRONMENT}")
-message(STATUS "  BUILD_LIBPCAP ....................: ${OFFLINE_ENVIRONMENT}")
+message(STATUS "  BUILD_LIBPCAP ....................: ${BUILD_LIBPCAP}")
 message(STATUS "")
