@@ -15,7 +15,7 @@ endmacro(set_build_type)
 
 macro(set_default_configuration)
     set_build_type()
-    set(OFFLINE_ENVIRONMENT ON CACHE BOOL "")
+    set(OFFLINE_ENVIRONMENT OFF CACHE BOOL "")
     include(GNUInstallDirs)
     if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
         set(CMAKE_INSTALL_PREFIX "${CMAKE_CURRENT_SOURCE_DIR}/dist" CACHE PATH "parsers/plugins install location" FORCE)
