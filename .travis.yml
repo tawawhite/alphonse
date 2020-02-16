@@ -15,7 +15,6 @@ addons:
       - flex
       - byacc
       - libnuma-dev
-      - linux-headers-$(uname -r)
 
 branches:
   only:
