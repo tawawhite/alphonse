@@ -4,7 +4,6 @@ project(alphonse VERSION 0.1.0)
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 include(macros)
 include(projects)
-include(packaging)
 
 add_custom_target(alphonse ALL
     # COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR} && cargo build
