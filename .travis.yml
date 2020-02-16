@@ -19,7 +19,7 @@ addons:
 
 branches:
   only:
-  - dev
+    - dev
 
 matrix:
   include:
@@ -36,6 +36,8 @@ matrix:
 
       before_script:
         - pip3 install meson
+        - cmake -S . -B ./build
+        - cd build && make install
       script:
         - cargo build --verbose --all
         - cargo test --verbose --all
