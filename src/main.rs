@@ -4,15 +4,26 @@ extern crate clap;
 mod capture;
 mod commands;
 mod config;
+#[cfg(all(target_os = "linux", feature = "dpdk"))]
 mod dpdk;
 mod error;
 mod packet;
 mod protocols;
 
-fn main() {
+#[cfg(all(target_os = "linux", feature = "dpdk"))]
+fn main_with_dpdk() {
     let root_cmd = commands::new_root_command();
 
-    let config = config::parse_args(root_cmd);
+    let mut config = config::parse_args(root_cmd);
+
+    match dpdk::eal_init(&mut config.dpdk_eal_args) {
+        Err(e) => {
+            eprintln!("alphonse: {}", e);
+            dpdk::eal_cleanup();
+            std::process::exit(-1);
+        }
+        Ok(_) => {}
+    }
 
     let parser_result = protocols::Parser::from_pcap_file(&config.pcap_file);
     let mut parser;
@@ -42,5 +53,18 @@ fn main() {
         }
     }
 
-    println!("Hello, world!");
+    dpdk::eal_cleanup();
+}
+
+#[cfg(not(feature = "dpdk"))]
+fn main_plain() {}
+
+fn main() {
+    if cfg!(feature = "dpdk") {
+        #[cfg(all(target_os = "linux", feature = "dpdk"))]
+        main_with_dpdk();
+    } else {
+        #[cfg(not(feature = "dpdk"))]
+        main_plain();
+    }
 }

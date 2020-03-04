@@ -7,7 +7,7 @@ use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 
-use yaml_rust::YamlLoader;
+use yaml_rust::{Yaml, YamlLoader};
 
 use commands::CliArg;
 
@@ -15,6 +15,7 @@ use commands::CliArg;
 pub struct Config {
     pub debug_mode: bool,
     pub delete: bool,
+    pub dpdk_eal_args: Vec<String>,
     pub dry_run: bool,
     pub pcap_file: String,
     pub pcap_dir: String,
@@ -54,6 +55,22 @@ fn parse_config_file(config_file: &str, _config: &mut Config) {
     let doc = &docs[0];
 
     doc["some-key"].as_str().unwrap_or("value");
+
+    match *&doc["dpdk"] {
+        Yaml::Array(ref array) => {
+            for v in array {
+                let result = v.as_str();
+                match result {
+                    Some(s) => {
+                        let arg = String::from(s);
+                        _config.dpdk_eal_args.push(arg);
+                    }
+                    None => panic!(format!("")),
+                }
+            }
+        }
+        _ => panic!(format!("Invalid dpdk args in {}", config_file)),
+    }
 }
 
 /// Use command arguments overrides config file settings
