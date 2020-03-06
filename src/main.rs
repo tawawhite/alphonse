@@ -11,7 +11,7 @@ mod packet;
 mod protocols;
 
 #[cfg(all(target_os = "linux", feature = "dpdk"))]
-fn main_with_dpdk() {
+fn main() {
     let root_cmd = commands::new_root_command();
 
     let mut config = config::parse_args(root_cmd);
@@ -57,14 +57,4 @@ fn main_with_dpdk() {
 }
 
 #[cfg(not(feature = "dpdk"))]
-fn main_plain() {}
-
-fn main() {
-    if cfg!(feature = "dpdk") {
-        #[cfg(all(target_os = "linux", feature = "dpdk"))]
-        main_with_dpdk();
-    } else {
-        #[cfg(not(feature = "dpdk"))]
-        main_plain();
-    }
-}
+fn main() {}

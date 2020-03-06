@@ -3,6 +3,17 @@ use std::env::var;
 extern crate bindgen;
 extern crate cpp_build;
 
+fn build_llhttp() {
+    let llhttp_bindings = bindgen::Builder::default()
+        .header("build/install/include/llhttp.h")
+        .rust_target(bindgen::LATEST_STABLE_RUST)
+        .generate()
+        .expect("Unable to generate llhttp bindings");
+    llhttp_bindings
+        .write_to_file("src/llhttp/raw.rs")
+        .expect("Unable to generate llhttp bindings");
+}
+
 fn build_dpdk() {
     let dpdk_bindings = bindgen::Builder::default()
         .header("src/ffi/dpdk.h")
@@ -27,14 +38,12 @@ fn build_dpdk() {
     dpdk_bindings
         .write_to_file("src/dpdk/raw.rs")
         .expect("Unable to generate dpdk bindings");
-    println!("cargo:rustc-link-lib=rte_eal");
-    println!("cargo:rustc-link-lib=rte_kvargs");
 
-    let manifest_dir = var("CARGO_MANIFEST_DIR").unwrap();
     cpp_build::Config::new()
         .include("src")
         .include("build/install/include/dpdk")
         .include("build/install/include/dpdk/generic/")
+        // .flag("-mavx2")
         .build("src/dpdk/header.rs");
 }
 
@@ -54,15 +63,12 @@ fn main() {
         manifest_dir
     );
 
-    let llhttp_bindings = bindgen::Builder::default()
-        .header("build/install/include/llhttp.h")
-        .rust_target(bindgen::LATEST_STABLE_RUST)
-        .generate()
-        .expect("Unable to generate llhttp bindings");
-    llhttp_bindings
-        .write_to_file("src/llhttp/raw.rs")
-        .expect("Unable to generate llhttp bindings");
+    build_llhttp();
 
     #[cfg(all(target_os = "linux", feature = "dpdk"))]
-    build_dpdk();
+    {
+        build_dpdk();
+        println!("cargo:rustc-link-lib=rte_eal");
+        println!("cargo:rustc-link-lib=rte_kvargs");
+    };
 }

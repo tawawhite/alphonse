@@ -14,12 +14,14 @@ ExternalProject_Add(dpdk
         LIBRARY_PATH=${CMAKE_CURRENT_BINARY_DIR}/install/lib:${CMAKE_CURRENT_BINARY_DIR}/install/lib64
         C_INCLUDE_PATH=${CMAKE_CURRENT_BINARY_DIR}/install/include
         PKG_CONFIG_PATH=${CMAKE_CURRENT_BINARY_DIR}/install/lib/pkgconfig
-        meson  -Dprefix=<INSTALL_DIR> --includedir=${CMAKE_INSTALL_INCLUDEDIR}/dpdk <BINARY_DIR> <SOURCE_DIR>
+        meson -Dprefix=<INSTALL_DIR> --includedir=${CMAKE_INSTALL_INCLUDEDIR}/dpdk --default-library=shared <BINARY_DIR> <SOURCE_DIR>
     BUILD_COMMAND ${CMAKE_COMMAND} -E env
         LIBRARY_PATH=${CMAKE_CURRENT_BINARY_DIR}/install/lib:${CMAKE_CURRENT_BINARY_DIR}/install/lib64
         C_INCLUDE_PATH=${CMAKE_CURRENT_BINARY_DIR}/install/include
         ninja
-    # BUILD_COMMAND echo
+        # echo
     INSTALL_COMMAND ninja install
     # INSTALL_COMMAND echo
 )
+
+# yum install numactl-devel elfutils-libelf-devel jansson-devel libfdt-devel bcc-devel
