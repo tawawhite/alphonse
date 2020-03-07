@@ -63,7 +63,7 @@ fn main() {
         manifest_dir
     );
 
-    build_llhttp();
+    // build_llhttp();
 
     #[cfg(all(target_os = "linux", feature = "dpdk"))]
     {
