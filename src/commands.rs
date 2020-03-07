@@ -5,7 +5,6 @@ use clap::{App, Arg};
 /// Avaliable command line arguments
 pub enum CliArg {
     Config,
-    Debug,
     Delete,
     DryRun,
     PcapDir,
@@ -13,13 +12,13 @@ pub enum CliArg {
     Quiet,
     Recursive,
     Tags,
+    Verbose,
 }
 
 impl CliArg {
     pub fn as_str(&self) -> &str {
         match self {
             &CliArg::Config => "config",
-            &CliArg::Debug => "debug",
             &CliArg::Delete => "delete",
             &CliArg::DryRun => "dry-run",
             &CliArg::PcapDir => "pcap-dir",
@@ -27,6 +26,7 @@ impl CliArg {
             &CliArg::Quiet => "quiet",
             &CliArg::Recursive => "recursive",
             &CliArg::Tags => "tags",
+            &CliArg::Verbose => "verbose",
         }
     }
 }
@@ -42,10 +42,6 @@ pub fn new_root_command<'a>() -> clap::App<'a, 'static> {
                 .value_name("FILE")
                 .help("Use a specific config file")
                 .takes_value(true),
-            Arg::with_name(CliArg::Debug.as_str())
-                .short("d")
-                .long("debug")
-                .help("Turn on all debugging"),
             Arg::with_name(CliArg::Delete.as_str())
                 .long("delete")
                 .help("In offline mode delete files once processed"),
@@ -75,6 +71,10 @@ pub fn new_root_command<'a>() -> clap::App<'a, 'static> {
                 .help("Extra tags to add to all packets")
                 .takes_value(true)
                 .multiple(true),
+            Arg::with_name(CliArg::Verbose.as_str())
+                .short("v")
+                .long("verbose")
+                .help("Turn on all debugging"),
         ]);
 
     return root_cmd;

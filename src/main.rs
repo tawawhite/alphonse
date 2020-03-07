@@ -11,26 +11,25 @@ mod packet;
 mod protocols;
 
 #[cfg(all(target_os = "linux", feature = "dpdk"))]
-fn main() {
+fn main() -> Result<(), error::Error> {
     let root_cmd = commands::new_root_command();
 
-    let mut config = config::parse_args(root_cmd);
+    let mut config = config::parse_args(root_cmd)?;
 
     match dpdk::eal_init(&mut config.dpdk_eal_args) {
         Err(e) => {
-            eprintln!("alphonse: {}", e);
             dpdk::eal_cleanup();
-            std::process::exit(-1);
+            return Err(e);
         }
         Ok(_) => {}
-    }
+    };
 
     let parser_result = protocols::Parser::from_pcap_file(&config.pcap_file);
     let mut parser;
     match parser_result {
         Err(e) => {
-            println!("{:?}", e);
-            return;
+            dpdk::eal_cleanup();
+            return Err(e);
         }
         Ok(p) => parser = p,
     }
@@ -39,8 +38,8 @@ fn main() {
     let mut cap;
     match cap_result {
         Err(e) => {
-            println!("{:?}", e);
-            return;
+            dpdk::eal_cleanup();
+            return Err(e);
         }
         Ok(c) => cap = c,
     }
@@ -54,6 +53,8 @@ fn main() {
     }
 
     dpdk::eal_cleanup();
+
+    Ok(())
 }
 
 #[cfg(not(feature = "dpdk"))]

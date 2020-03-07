@@ -1,19 +1,19 @@
-extern crate clap;
-extern crate yaml_rust;
-
-use crate::commands;
-
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 
+extern crate clap;
+extern crate yaml_rust;
+
 use yaml_rust::{Yaml, YamlLoader};
 
-use commands::CliArg;
+use super::commands::CliArg;
+use super::error::Error;
 
 #[derive(Default)]
 pub struct Config {
-    pub debug_mode: bool,
+    pub backend: String,
+    pub verbose_mode: bool,
     pub delete: bool,
     pub dpdk_eal_args: Vec<String>,
     pub dry_run: bool,
@@ -25,20 +25,20 @@ pub struct Config {
 }
 
 /// Parse command line arguments and set configuration
-pub fn parse_args(root_cmd: clap::App) -> Config {
+pub fn parse_args(root_cmd: clap::App) -> Result<Config, Error> {
     let mut config: Config = Default::default();
     let matches = root_cmd.get_matches();
 
     if let Some(config_file) = matches.value_of("config") {
-        parse_config_file(config_file, &mut config);
+        parse_config_file(config_file, &mut config)?;
     }
 
     set_config_by_cli_args(&mut config, &matches);
 
-    config
+    Ok(config)
 }
 
-fn parse_config_file(config_file: &str, _config: &mut Config) {
+fn parse_config_file(config_file: &str, config: &mut Config) -> Result<(), Error> {
     let cfg_path = Path::new(config_file);
     if !cfg_path.exists() {
         eprintln!(
@@ -47,39 +47,51 @@ fn parse_config_file(config_file: &str, _config: &mut Config) {
         );
     }
 
-    let mut f = File::open(cfg_path).unwrap();
     let mut s = String::new();
-    f.read_to_string(&mut s).unwrap();
+    File::open(cfg_path)?.read_to_string(&mut s)?;
 
-    let docs = YamlLoader::load_from_str(&s).unwrap();
+    let docs = YamlLoader::load_from_str(&s)?;
     let doc = &docs[0];
 
     doc["some-key"].as_str().unwrap_or("value");
 
+    match doc["backend"].as_str() {
+        None => panic!(""),
+        Some(s) => match s {
+            "dpdk" | "libpcap" => {
+                config.backend = String::from(s);
+            }
+            _ => return Err(Error::CommonError(format!("Invalid backend option: {}", s))),
+        },
+    };
+
+    // 处理 DPDK EAL 启动参数
     match *&doc["dpdk"] {
         Yaml::Array(ref array) => {
             for v in array {
-                let result = v.as_str();
-                match result {
-                    Some(s) => {
-                        let arg = String::from(s);
-                        _config.dpdk_eal_args.push(arg);
-                    }
-                    None => panic!(format!("")),
-                }
+                let s = v.as_str().ok_or(Error::CommonError(format!(
+                    "Failed to convert Yaml into &str"
+                )))?;
+                config.dpdk_eal_args.push(String::from(s));
             }
+            Ok(())
         }
-        _ => panic!(format!("Invalid dpdk args in {}", config_file)),
+        _ => {
+            return Err(Error::CommonError(format!(
+                "Invalid dpdk args in {}",
+                config_file
+            )))
+        }
     }
 }
 
 /// Use command arguments overrides config file settings
 fn set_config_by_cli_args(config: &mut Config, matches: &clap::ArgMatches) {
-    config.debug_mode = matches.is_present(CliArg::Debug.as_str());
     config.delete = matches.is_present(CliArg::Delete.as_str());
     config.dry_run = matches.is_present(CliArg::DryRun.as_str());
     config.quiet = matches.is_present(CliArg::Quiet.as_str());
     config.recursive = matches.is_present(CliArg::Recursive.as_str());
+    config.verbose_mode = matches.is_present(CliArg::Verbose.as_str());
 
     if let Some(pcap_file) = matches.value_of(CliArg::PcapFile.as_str()) {
         config.pcap_file = String::from(pcap_file);
