@@ -15,7 +15,7 @@ find_library(libpcap_LIBRARY pcap
     PATHS /usr/lib/x86_64-linux-gnu/
 )
 
-set(BUILD_LIBPCAP ON CACHE BOOL "")
+option(BUILD_LIBPCAP "build libpcap" ON)
 if(NOT libpcap_LIBRARY OR BUILD_LIBPCAP)
     add_dependencies(alphonse libpcap)
 endif()
@@ -28,5 +28,4 @@ endif()
 
 add_dependencies(alphonse llhttp)
 
-message(STATUS "  BUILD_LIBPCAP ....................: ${BUILD_LIBPCAP}")
-message(STATUS "")
+print_configuration()
