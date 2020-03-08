@@ -1,5 +1,4 @@
 if(OFFLINE_ENVIRONMENT)
-    message(STATUS "${OFFLINE_ENVIRONTMENT}")
     set(libpcap_url ${CMAKE_CURRENT_SOURCE_DIR}/third_party/libpcap-1.9.1.tar.gz)
 else()
     set(libpcap_url https://github.com/the-tcpdump-group/libpcap/archive/libpcap-1.9.1.tar.gz)
