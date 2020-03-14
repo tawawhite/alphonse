@@ -1,6 +1,8 @@
 build/
 vendor/
 third_party/
+.python-version
+pcap
 
 src/dpdk/raw.rs
 src/llhttp/raw.rs
