@@ -4,7 +4,6 @@
 //!
 //!
 
-use super::capture;
 use super::packet;
 
 pub mod link;
@@ -82,4 +81,4 @@ pub struct Layer {
     pub start_pos: u16,
 }
 
-pub type Parser<B> = parser::Parser<B>;
+pub type Parser = parser::Parser;

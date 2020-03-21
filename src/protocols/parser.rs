@@ -1,8 +1,7 @@
-use std::marker::PhantomData;
 use std::path::Path;
 
 use super::super::error;
-use super::{capture, link, network, packet, Error, LayerProto};
+use super::{link, network, packet, Error, LayerProto};
 
 /// 仅解析协议在数据包中的开始位置和协议长度的 parser
 pub trait SimpleProtocolParser {
@@ -23,20 +22,26 @@ pub trait SimpleProtocolParser {
     ) -> Result<Option<LayerProto>, Error>;
 }
 
-pub struct Parser<B: capture::Backend> {
+pub struct Parser {
     /// SnapLen, Snap Length, or snapshot length is the amount of data for each frame
     /// that is actually captured by the network capturing tool and stored into the CaptureFile.
     /// https://wiki.wireshark.org/SnapLen
     snap_len: u32,
     pub link_parser: link::Parser,
     pub network_parser: network::Parser,
-    _marker: PhantomData<B>,
 }
 
-impl Parser<capture::Offline> {
-    pub fn from_pcap_file<P: AsRef<Path>>(
-        path: &P,
-    ) -> Result<Parser<capture::Offline>, error::Error> {
+impl Parser {
+    /// create a new protocol parser
+    pub fn new(link_type: u16) -> Parser {
+        Parser {
+            link_parser: link::Parser::new(link_type),
+            network_parser: network::Parser::new(),
+            snap_len: 65535,
+        }
+    }
+
+    pub fn from_pcap_file<P: AsRef<Path>>(path: &P) -> Result<Parser, error::Error> {
         if !path.as_ref().exists() {
             // check pcap file's existence
             return Err(error::Error::ParserError(String::from(format!(
@@ -55,16 +60,15 @@ impl Parser<capture::Offline> {
             Ok(v) => pcap_file = v,
         }
 
-        Ok(Parser::<capture::Offline> {
+        Ok(Parser {
             link_parser: link::Parser::from_pcap_file(&pcap_file),
             network_parser: network::Parser::new(),
             snap_len: 65535,
-            _marker: PhantomData,
         })
     }
 }
 
-impl<B: capture::Backend> Parser<B> {
+impl Parser {
     /// 解析单个数据包
     pub fn parse_pkt(&mut self, pkt: &mut packet::Packet) -> Result<(), Error> {
         // 解析数据链路层数据包
