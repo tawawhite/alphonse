@@ -4,22 +4,13 @@
 //!
 //!
 
+use super::error;
 use super::packet;
 
 pub mod link;
 pub mod network;
 mod parser;
 pub mod transport;
-
-#[derive(Clone, Copy, Debug)]
-pub enum Error {
-    /// Parsing this kind of Protocol is not supported by alphonse
-    UnsupportProtocol,
-    /// The packet is a corrupt packet, either too short or just broken
-    CorruptPacket,
-    /// Alphonse has no idea about this kind of protocol
-    UnknownProtocol,
-}
 
 #[derive(Clone, Copy, Debug)]
 pub enum DataLinkProto {

@@ -3,5 +3,5 @@ use super::{packet, Error};
 
 #[inline]
 pub fn parse(_pkt: &mut packet::Packet) -> Result<LayerProto, Error> {
-    return Err(Error::UnsupportProtocol);
+    return Err(Error::ParserError(format!("Unsupport protocol: IPV6")));
 }

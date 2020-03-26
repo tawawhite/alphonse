@@ -1,5 +1,6 @@
 use super::super::packet;
-use super::{Error, LayerProto, NetworkProto, TransProto};
+use super::error::Error;
+use super::{LayerProto, NetworkProto, TransProto};
 
 mod icmp;
 mod ipv4;
@@ -25,13 +26,19 @@ impl Parser {
             NetworkProto::IPv4 => ipv4::parse(pkt),
             NetworkProto::IPv6 => ipv6::parse(pkt),
             NetworkProto::ICMP => icmp::parse(pkt),
-            _ => Err(Error::UnsupportProtocol),
+            _ => Err(Error::ParserError(format!(
+                "Unsupport network layer protocol, link type: {:?}",
+                self.net_type
+            ))),
         };
 
         match result {
             Ok(lp) => match lp {
                 LayerProto::Transport(tp) => Ok(tp),
-                _ => Err(Error::UnsupportProtocol),
+                _ => Err(Error::ParserError(format!(
+                    "Unsupport network layer protocol, link type: {:?}",
+                    lp
+                ))),
             },
             Err(e) => Err(e),
         }

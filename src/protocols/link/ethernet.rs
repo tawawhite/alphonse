@@ -195,7 +195,9 @@ pub fn parse(pkt: &mut packet::Packet) -> Result<LayerProto, Error> {
     let proto_len = pkt.len() - cspos;
 
     if proto_len < 14 {
-        return Err(Error::CorruptPacket);
+        return Err(Error::ParserError(format!(
+            "The packet is a corrupt packet, packet too short"
+        )));
     }
 
     let mut pos = (pkt.layers[clayer].start_pos + 12) as usize;
@@ -215,6 +217,9 @@ pub fn parse(pkt: &mut packet::Packet) -> Result<LayerProto, Error> {
         PPP => Ok(LayerProto::DataLink(DataLinkProto::PPP)),
         MPLSuc => Ok(LayerProto::DataLink(DataLinkProto::Mpls)),
         PPPoES => Ok(LayerProto::DataLink(DataLinkProto::PPPoE)),
-        _ => Err(Error::UnsupportProtocol),
+        _ => Err(Error::ParserError(format!(
+            "Unsupport protocol, ether type: {}",
+            etype
+        ))),
     }
 }

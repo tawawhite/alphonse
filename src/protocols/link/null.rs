@@ -8,7 +8,9 @@ pub fn parse(pkt: &mut packet::Packet) -> Result<LayerProto, Error> {
     let proto_len = pkt.len() - cspos;
 
     if proto_len < 4 {
-        return Err(Error::CorruptPacket);
+        return Err(Error::ParserError(format!(
+            "The packet is a corrupt packet, packet too short"
+        )));
     }
 
     // 计算下一层协议的开始位置, 并暂存在当前 layer 的信息中
@@ -18,10 +20,13 @@ pub fn parse(pkt: &mut packet::Packet) -> Result<LayerProto, Error> {
     match pkt.data()[cspos as usize] {
         2 => Ok(LayerProto::Network(NetworkProto::IPv4)),
         // OSI packets
-        7 => Err(Error::UnsupportProtocol),
+        7 => Err(Error::ParserError(format!("Does not support OSI packet"))),
         // IPX packets
-        23 => Err(Error::UnsupportProtocol),
+        23 => Err(Error::ParserError(format!("Does not support IPX packet"))),
         24 | 28 | 30 => Ok(LayerProto::Network(NetworkProto::IPv6)),
-        _ => Err(Error::UnknownProtocol),
+        _ => Err(Error::ParserError(format!(
+            "Unknown protocol {}",
+            pkt.data()[cspos as usize],
+        ))),
     }
 }

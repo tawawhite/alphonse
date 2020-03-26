@@ -1,7 +1,8 @@
 #![allow(non_camel_case_types)]
 
 use super::super::packet;
-use super::{network, Error, LayerProto, NetworkProto};
+use super::error::Error;
+use super::{network, LayerProto, NetworkProto};
 
 mod ethernet;
 mod null;
@@ -162,7 +163,12 @@ impl Parser {
             NULL => null::parse(pkt),
             ETHERNET => ethernet::parse(pkt),
             RAW | IPV4 => return Ok(NetworkProto::IPv4),
-            _ => return Err(Error::UnsupportProtocol),
+            _ => {
+                return Err(Error::ParserError(format!(
+                    "Unsupport data link layer protocol, link type: {}",
+                    self.link_type
+                )))
+            }
         };
 
         // 如果解析出下层为数据链路层协议，继续解析
@@ -181,7 +187,9 @@ impl Parser {
                     pkt.last_layer_index = pkt.last_layer_index + 1;
                     Ok(nw)
                 }
-                _ => Err(Error::CorruptPacket),
+                _ => Err(Error::ParserError(format!(
+                    "The packet is a corrupt packet, either too short or just broken"
+                ))),
             },
             Err(e) => Err(e),
         }

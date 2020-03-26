@@ -1,10 +1,11 @@
 use std::fmt::{Display, Formatter};
 
+extern crate pcap;
 extern crate yaml_rust;
 
 #[derive(Debug)]
 pub enum Error {
-    CaptureError(String),
+    CaptureError(pcap::Error),
     CommonError(String),
     ConfigParseError(yaml_rust::ScanError),
     DpdkError(String),
@@ -15,9 +16,7 @@ pub enum Error {
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match &self {
-            Error::CaptureError(ref e) | Error::CommonError(ref e) | Error::ParserError(ref e) => {
-                e.fmt(f)
-            }
+            Error::CommonError(ref e) | Error::ParserError(ref e) => e.fmt(f),
             _ => self.fmt(f),
         }
     }

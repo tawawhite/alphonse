@@ -1,7 +1,7 @@
 use std::path::Path;
 
-use super::super::error;
-use super::{link, network, packet, Error, LayerProto};
+use super::error::Error;
+use super::{link, network, packet, LayerProto};
 
 /// 仅解析协议在数据包中的开始位置和协议长度的 parser
 pub trait SimpleProtocolParser {
@@ -41,10 +41,10 @@ impl Parser {
         }
     }
 
-    pub fn from_pcap_file<P: AsRef<Path>>(path: &P) -> Result<Parser, error::Error> {
+    pub fn from_pcap_file<P: AsRef<Path>>(path: &P) -> Result<Parser, Error> {
         if !path.as_ref().exists() {
             // check pcap file's existence
-            return Err(error::Error::ParserError(String::from(format!(
+            return Err(Error::ParserError(String::from(format!(
                 "{} does not exists!",
                 path.as_ref().display()
             ))));

@@ -29,7 +29,9 @@ pub fn parse(pkt: &mut packet::Packet) -> Result<LayerProto, Error> {
     if proto_len < 4 * 5 {
         // 如果报文内容长度小于IP报文最短长度(IP协议头长度)
         // 数据包有错误
-        return Err(Error::CorruptPacket);
+        return Err(Error::ParserError(format!(
+            "The packet is a corrupt packet, packet too short"
+        )));
     }
 
     let ip_vhl = pkt.data()[cspos as usize];
@@ -37,14 +39,17 @@ pub fn parse(pkt: &mut packet::Packet) -> Result<LayerProto, Error> {
 
     if ip_version != 4 {
         // 如果报文中实际的 IP 版本号不是 IPv4，数据包有错误
-        return Err(Error::CorruptPacket);
+        return Err(Error::ParserError(format!(
+            "The packet is a corrupt packet, expecting ip vesrion is 4, actual version is: {}",
+            ip_version
+        )));
     }
 
     let ip_hdr_len = ((ip_vhl & 0b00001111) * 4) as u16;
 
     if ip_hdr_len < 4 * 5 || proto_len < ip_hdr_len {
         // 如果报文中的IP头长度小于20字节或报文长度小于报文中声明的IP头长度, 数据包有错误
-        return Err(Error::CorruptPacket);
+        return Err(Error::ParserError(format!("The packet is a corrupt packet, ip header too short nor payload length is less then claimed length")));
     }
 
     let ip_len =
@@ -52,7 +57,9 @@ pub fn parse(pkt: &mut packet::Packet) -> Result<LayerProto, Error> {
 
     if proto_len < ip_len {
         // 如果报文的长度小于 IP 报文中声明的数据报长度，数据包有错误
-        return Err(Error::CorruptPacket);
+        return Err(Error::ParserError(format!(
+            "The packet is a corrupt packet, payload length is less then claimed length"
+        )));
     }
 
     // 计算下一层协议的开始位置
@@ -69,6 +76,9 @@ pub fn parse(pkt: &mut packet::Packet) -> Result<LayerProto, Error> {
         IPV6 => Ok(LayerProto::Network(NetworkProto::IPv6)),
         GRE => Ok(LayerProto::Tunnel(TunnelProto::GRE)),
         SCTP => Ok(LayerProto::Transport(TransProto::SCTP)),
-        _ => Err(Error::UnsupportProtocol),
+        _ => Err(Error::ParserError(format!(
+            "Unsupport ipv4 protocol, ipv4 protocol: {}",
+            ip_proto
+        ))),
     }
 }
