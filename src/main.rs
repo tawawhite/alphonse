@@ -58,4 +58,35 @@ fn main() -> Result<(), error::Error> {
 }
 
 #[cfg(not(feature = "dpdk"))]
-fn main() {}
+fn main() -> Result<(), error::Error> {
+    let root_cmd = commands::new_root_command();
+    let config = config::parse_args(root_cmd)?;
+
+    let parser_result = protocols::Parser::from_pcap_file(&config.pcap_file);
+    let mut parser;
+    match parser_result {
+        Err(e) => {
+            return Err(e);
+        }
+        Ok(p) => parser = p,
+    }
+
+    let cap_result = capture::Capture::from_pcap_file(&config.pcap_file);
+    let mut cap;
+    match cap_result {
+        Err(e) => {
+            return Err(e);
+        }
+        Ok(c) => cap = c,
+    }
+
+    while let Ok(mut pkt) = cap.next() {
+        let result = parser.parse_pkt(&mut pkt);
+        match result {
+            Ok(_) => {}
+            Err(e) => println!("{:?}", e),
+        }
+    }
+
+    Ok(())
+}
