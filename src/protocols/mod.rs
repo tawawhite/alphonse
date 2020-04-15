@@ -12,21 +12,23 @@ pub mod network;
 mod parser;
 pub mod transport;
 
-#[derive(Clone, Copy, Debug)]
-pub enum DataLinkProto {
-    Null,
-    Ethernet,
-    Raw,
-    IPv4,
+#[repr(u8)]
+#[derive(Clone, Copy)]
+pub enum Protocol {
+    // Data link layer protocols
+    NULL,
+    ETHERNET,
+    RAW,
     PPP,
-    Mpls,
-    PPPoE,
-}
+    MPLS,
+    PPPOE,
 
-#[derive(Clone, Copy, Debug)]
-pub enum NetworkProto {
-    IPv4,
-    IPv6,
+    // Tunnel protocols
+    GRE,
+
+    // Network layer protocols
+    IPV4,
+    IPV6,
     ICMP,
     CLNS,
     DDP,
@@ -39,36 +41,29 @@ pub enum NetworkProto {
     PIM,
     RIP,
     WIREGUARD,
-}
 
-#[derive(Clone, Copy, Debug)]
-pub enum TunnelProto {
-    GRE,
-}
-
-#[derive(Clone, Copy, Debug)]
-pub enum TransProto {
+    // Transport layer protocols
     TCP,
     UDP,
     SCTP,
-}
 
-#[derive(Clone, Copy, Debug)]
-pub enum ApplicationProto {
+    // Application layer protocols
     HTTP,
+
+    // Unknown protocol
+    UNKNOWN,
 }
 
-#[derive(Clone, Copy, Debug)]
-pub enum LayerProto {
-    DataLink(DataLinkProto),
-    Network(NetworkProto),
-    Tunnel(TunnelProto),
-    Transport(TransProto),
-    Application(ApplicationProto),
+impl Default for Protocol {
+    #[inline]
+    fn default() -> Self {
+        Protocol::UNKNOWN
+    }
 }
 
 #[derive(Default, Clone, Copy)]
 pub struct Layer {
+    pub protocol: Protocol,
     pub start_pos: u16,
 }
 

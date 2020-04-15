@@ -1,7 +1,5 @@
-use std::path::Path;
-
 use super::error::Error;
-use super::{link, network, packet, LayerProto};
+use super::{link, network, packet, Protocol};
 
 /// 仅解析协议在数据包中的开始位置和协议长度的 parser
 pub trait SimpleProtocolParser {
@@ -14,12 +12,7 @@ pub trait SimpleProtocolParser {
     /// * `nlayer` - 下一层协议的对应的层级
     ///
     /// * `pkt` - 数据包
-    fn parse(
-        &self,
-        clayer: u8,
-        nlayer: u8,
-        pkt: &mut packet::Packet,
-    ) -> Result<Option<LayerProto>, Error>;
+    fn parse(&self, clayer: u8, nlayer: u8, pkt: &mut packet::Packet) -> Result<Protocol, Error>;
 }
 
 pub struct Parser {
@@ -39,32 +32,6 @@ impl Parser {
             network_parser: network::Parser::new(),
             snap_len: 65535,
         }
-    }
-
-    pub fn from_pcap_file<P: AsRef<Path>>(path: &P) -> Result<Parser, Error> {
-        if !path.as_ref().exists() {
-            // check pcap file's existence
-            return Err(Error::ParserError(String::from(format!(
-                "{} does not exists!",
-                path.as_ref().display()
-            ))));
-        }
-
-        let result = pcap::Capture::from_file(path);
-        let pcap_file;
-        match result {
-            Err(e) => {
-                eprintln!("{}", e);
-                std::process::exit(-1);
-            }
-            Ok(v) => pcap_file = v,
-        }
-
-        Ok(Parser {
-            link_parser: link::Parser::from_pcap_file(&pcap_file),
-            network_parser: network::Parser::new(),
-            snap_len: 65535,
-        })
     }
 }
 
