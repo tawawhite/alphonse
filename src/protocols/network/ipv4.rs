@@ -1,5 +1,5 @@
 use super::Protocol;
-use super::{packet, Error};
+use super::{packet, ParserError};
 
 // const IP: u8 = 0;
 const ICMP: u8 = 1;
@@ -21,7 +21,7 @@ const ESP: u8 = 50;
 const SCTP: u8 = 132;
 
 #[inline]
-pub fn parse(pkt: &mut packet::Packet) -> Result<Protocol, Error> {
+pub fn parse(pkt: &mut packet::Packet) -> Result<Protocol, ParserError> {
     let clayer = pkt.last_layer_index as usize; // current layer index
     let cspos = pkt.layers[clayer].start_pos; // current layer start position
     let proto_len = pkt.len() - cspos;
@@ -29,7 +29,7 @@ pub fn parse(pkt: &mut packet::Packet) -> Result<Protocol, Error> {
     if proto_len < 4 * 5 {
         // 如果报文内容长度小于IP报文最短长度(IP协议头长度)
         // 数据包有错误
-        return Err(Error::ParserError(format!(
+        return Err(ParserError::CorruptPacket(format!(
             "The packet is a corrupt packet, packet too short"
         )));
     }
@@ -39,7 +39,7 @@ pub fn parse(pkt: &mut packet::Packet) -> Result<Protocol, Error> {
 
     if ip_version != 4 {
         // 如果报文中实际的 IP 版本号不是 IPv4，数据包有错误
-        return Err(Error::ParserError(format!(
+        return Err(ParserError::CorruptPacket(format!(
             "The packet is a corrupt packet, expecting ip vesrion is 4, actual version is: {}",
             ip_version
         )));
@@ -49,7 +49,7 @@ pub fn parse(pkt: &mut packet::Packet) -> Result<Protocol, Error> {
 
     if ip_hdr_len < 4 * 5 || proto_len < ip_hdr_len {
         // 如果报文中的IP头长度小于20字节或报文长度小于报文中声明的IP头长度, 数据包有错误
-        return Err(Error::ParserError(format!("The packet is a corrupt packet, ip header too short nor payload length is less then claimed length")));
+        return Err(ParserError::CorruptPacket(format!("The packet is a corrupt packet, ip header too short nor payload length is less then claimed length")));
     }
 
     let ip_len =
@@ -57,7 +57,7 @@ pub fn parse(pkt: &mut packet::Packet) -> Result<Protocol, Error> {
 
     if proto_len < ip_len {
         // 如果报文的长度小于 IP 报文中声明的数据报长度，数据包有错误
-        return Err(Error::ParserError(format!(
+        return Err(ParserError::CorruptPacket(format!(
             "The packet is a corrupt packet, payload length is less then claimed length"
         )));
     }
@@ -76,7 +76,7 @@ pub fn parse(pkt: &mut packet::Packet) -> Result<Protocol, Error> {
         IPV6 => Ok(Protocol::IPV6),
         GRE => Ok(Protocol::GRE),
         SCTP => Ok(Protocol::SCTP),
-        _ => Err(Error::ParserError(format!(
+        _ => Err(ParserError::UnsupportProtocol(format!(
             "Unsupport ipv4 protocol, ipv4 protocol: {}",
             ip_proto
         ))),

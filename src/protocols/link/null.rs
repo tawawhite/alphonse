@@ -1,14 +1,14 @@
 use super::super::Protocol;
-use super::{packet, Error};
+use super::{error::ParserError, packet};
 
 #[inline]
-pub fn parse(pkt: &mut packet::Packet) -> Result<Protocol, Error> {
+pub fn parse(pkt: &mut packet::Packet) -> Result<Protocol, ParserError> {
     let clayer = pkt.last_layer_index as usize;
     let cspos = pkt.layers[clayer].start_pos; // current layer start position
     let proto_len = pkt.len() - cspos;
 
     if proto_len < 4 {
-        return Err(Error::ParserError(format!(
+        return Err(ParserError::CorruptPacket(format!(
             "The packet is a corrupt packet, packet too short"
         )));
     }
@@ -20,11 +20,15 @@ pub fn parse(pkt: &mut packet::Packet) -> Result<Protocol, Error> {
     match pkt.data[cspos as usize] {
         2 => Ok(Protocol::IPV4),
         // OSI packets
-        7 => Err(Error::ParserError(format!("Does not support OSI packet"))),
+        7 => Err(ParserError::UnsupportProtocol(format!(
+            "Does not support OSI packet"
+        ))),
         // IPX packets
-        23 => Err(Error::ParserError(format!("Does not support IPX packet"))),
+        23 => Err(ParserError::UnsupportProtocol(format!(
+            "Does not support IPX packet"
+        ))),
         24 | 28 | 30 => Ok(Protocol::IPV6),
-        _ => Err(Error::ParserError(format!(
+        _ => Err(ParserError::UnsupportProtocol(format!(
             "Unknown protocol {}",
             pkt.data[cspos as usize],
         ))),

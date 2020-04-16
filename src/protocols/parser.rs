@@ -1,4 +1,4 @@
-use super::error::Error;
+use super::error::ParserError;
 use super::{link, network, packet, Protocol};
 
 /// 仅解析协议在数据包中的开始位置和协议长度的 parser
@@ -12,7 +12,12 @@ pub trait SimpleProtocolParser {
     /// * `nlayer` - 下一层协议的对应的层级
     ///
     /// * `pkt` - 数据包
-    fn parse(&self, clayer: u8, nlayer: u8, pkt: &mut packet::Packet) -> Result<Protocol, Error>;
+    fn parse(
+        &self,
+        clayer: u8,
+        nlayer: u8,
+        pkt: &mut packet::Packet,
+    ) -> Result<Protocol, ParserError>;
 }
 
 pub struct Parser {
@@ -35,7 +40,7 @@ impl Parser {
 
 impl Parser {
     /// 解析单个数据包
-    pub fn parse_pkt(&mut self, pkt: &mut packet::Packet) -> Result<(), Error> {
+    pub fn parse_pkt(&mut self, pkt: &mut packet::Packet) -> Result<(), ParserError> {
         let mut protocol;
 
         // 根据 link type 解析数据链路层协议
@@ -44,7 +49,7 @@ impl Parser {
             link::ETHERNET => link::ethernet::parse(pkt),
             link::RAW | link::IPV4 => Ok(Protocol::IPV4),
             link::IPV6 => Ok(Protocol::IPV6),
-            _ => Err(Error::ParserError(format!(
+            _ => Err(ParserError::UnsupportProtocol(format!(
                 "Unsupport data link layer protocol, link type: {}",
                 self.link_type
             ))),
@@ -64,8 +69,13 @@ impl Parser {
                 Protocol::NULL => link::null::parse(pkt),
                 Protocol::RAW | Protocol::IPV4 => network::ipv4::parse(pkt),
                 Protocol::IPV6 => network::ipv6::parse(pkt),
+                Protocol::VLAN => network::vlan::parse(pkt),
                 Protocol::ICMP => network::icmp::parse(pkt),
-                _ => return Err(Error::ParserError(String::from("Unsupport protocol"))),
+                _ => {
+                    return Err(ParserError::UnsupportProtocol(String::from(
+                        "Unsupport protocol",
+                    )))
+                }
             };
 
             match result {

@@ -40,6 +40,7 @@ pub enum Protocol {
     OSPF,
     PIM,
     RIP,
+    VLAN,
     WIREGUARD,
 
     // Transport layer protocols

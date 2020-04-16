@@ -1,7 +1,7 @@
 #![allow(non_camel_case_types)]
 
 use super::super::packet;
-use super::error::Error;
+use super::error;
 
 pub mod ethernet;
 pub mod null;

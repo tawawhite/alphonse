@@ -1,5 +1,6 @@
 use super::super::Protocol;
-use super::{packet, Error};
+use super::error::ParserError;
+use super::packet;
 
 /// ETHER TYPES
 ///
@@ -7,7 +8,7 @@ use super::{packet, Error};
 /// https://github.com/wireshark/wireshark/blob/master/epan/etypes.h
 
 // const XNS_IDP: u16 = 0x0600;
-const IPV4: u16 = 0x0800;
+pub const IPV4: u16 = 0x0800;
 // const X25L3: u16 = 0x0805;
 // const ARP: u16 = 0x0806;
 // const WoL: u16 = 0x0842;
@@ -46,7 +47,7 @@ const IPV4: u16 = 0x0800;
 // const SNA: u16 = 0x80D5;
 // const DLR: u16 = 0x80E1;
 // const AARP: u16 = 0x80F3;
-// const VLAN: u16 = 0x8100;
+pub const VLAN: u16 = 0x8100;
 // const NSRP: u16 = 0x8133;
 // const IPX: u16 = 0x8137;
 // const SNMP: u16 = 0x814C;
@@ -55,21 +56,21 @@ const IPV4: u16 = 0x0800;
 // const ISMP: u16 = 0x81FD;
 // const ISMP_TBFLOOD: u16 = 0x81FF;
 // const QNX_QNET6: u16 = 0x8204;
-const IPV6: u16 = 0x86DD;
+pub const IPV6: u16 = 0x86DD;
 // const WLCCP: u16 = 0x872D;
 /// Flow Control Protocol
 // const MAC_CONTROL: u16 = 0x8808;
 /// Ethernet Slow Protocols[11] such as the Link Aggregation Control Protocol
 // const SLOW_PROTOCOLS: u16 = 0x8809;
 /// Point-to-Point Protocol (PPP)
-const PPP: u16 = 0x880B;
+pub const PPP: u16 = 0x880B;
 // const CobraNet: u16 = 0x8819;
-const MPLSUC: u16 = 0x8847;
+pub const MPLSUC: u16 = 0x8847;
 // const MPLSmc: u16 = 0x8848;
 /// Some Foundry proprietary protocol
 // const FOUNDRY: u16 = 0x885A;
 // const PPPoEd: u16 = 0x8863;
-const PPPOES: u16 = 0x8864;
+pub const PPPOES: u16 = 0x8864;
 /// Intel Advanced Networking Services
 // const INTEL_ANS: u16 = 0x886D;
 /// MS Network Load Balancing heartbeat http://www.microsoft.com/technet/treeview/default.asp?url:u16=/TechNet/prodtechnol/windows2000serv/deploy/confeat/nlbovw.asp
@@ -124,7 +125,7 @@ const PPPOES: u16 = 0x8864;
 // const LLDP: u16 = 0x88CC;
 /// SERCOS interface real-time protocol for motion control
 // const SERCOS: u16 = 0x88CD;
-const _3GPP2: u16 = 0x88D2;
+pub const _3GPP2: u16 = 0x88D2;
 // const CESOETH: u16 = 0x88D8;
 /// Link Layer Topology Discovery
 // const LLTD: u16 = 0x88D9;
@@ -189,27 +190,21 @@ const _3GPP2: u16 = 0x88D2;
 // const ROCE: u16 = 0x8915;
 
 #[inline]
-pub fn parse(pkt: &mut packet::Packet) -> Result<Protocol, Error> {
+pub fn parse(pkt: &mut packet::Packet) -> Result<Protocol, ParserError> {
     let clayer = pkt.last_layer_index as usize;
     let cspos = pkt.layers[clayer].start_pos; // current layer start position
     let proto_len = pkt.len() - cspos;
 
     if proto_len < 14 {
-        return Err(Error::ParserError(format!(
+        return Err(ParserError::CorruptPacket(format!(
             "The packet is a corrupt packet, packet too short"
         )));
     }
 
-    let mut pos = (pkt.layers[clayer].start_pos + 12) as usize;
-    let mut etype = (pkt.data[pos] as u16) << 8 | pkt.data[pos + 1] as u16;
+    let pos = (pkt.layers[clayer].start_pos + 12) as usize;
+    let etype = (pkt.data[pos] as u16) << 8 | pkt.data[pos + 1] as u16;
 
     pkt.layers[clayer].start_pos = cspos + 6 + 6 + 2;
-
-    if etype == 0x8100 {
-        pos = pos + 4;
-        etype = (pkt.data[pos] as u16) << 8 | pkt.data[pos + 1] as u16;
-        pkt.layers[clayer].start_pos = cspos + 4;
-    }
 
     match etype {
         IPV4 => Ok(Protocol::IPV4),
@@ -217,7 +212,8 @@ pub fn parse(pkt: &mut packet::Packet) -> Result<Protocol, Error> {
         PPP => Ok(Protocol::PPP),
         MPLSUC => Ok(Protocol::MPLS),
         PPPOES => Ok(Protocol::PPPOE),
-        _ => Err(Error::ParserError(format!(
+        VLAN => Ok(Protocol::VLAN),
+        _ => Err(ParserError::UnsupportProtocol(format!(
             "Unsupport protocol, ether type: {}",
             etype
         ))),
