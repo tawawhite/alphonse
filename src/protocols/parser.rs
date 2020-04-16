@@ -20,17 +20,15 @@ pub struct Parser {
     /// that is actually captured by the network capturing tool and stored into the CaptureFile.
     /// https://wiki.wireshark.org/SnapLen
     snap_len: u32,
-    pub link_parser: link::Parser,
-    pub network_parser: network::Parser,
+    link_type: u16,
 }
 
 impl Parser {
     /// create a new protocol parser
     pub fn new(link_type: u16) -> Parser {
         Parser {
-            link_parser: link::Parser::new(link_type),
-            network_parser: network::Parser::new(),
             snap_len: 65535,
+            link_type,
         }
     }
 }
@@ -38,26 +36,44 @@ impl Parser {
 impl Parser {
     /// 解析单个数据包
     pub fn parse_pkt(&mut self, pkt: &mut packet::Packet) -> Result<(), Error> {
-        // 解析数据链路层数据包
-        let result = self.link_parser.parse(pkt);
-        let nwproto;
+        let mut protocol;
+
+        // 根据 link type 解析数据链路层协议
+        let mut result = match self.link_type {
+            link::NULL => link::null::parse(pkt),
+            link::ETHERNET => link::ethernet::parse(pkt),
+            link::RAW | link::IPV4 => Ok(Protocol::IPV4),
+            link::IPV6 => Ok(Protocol::IPV6),
+            _ => Err(Error::ParserError(format!(
+                "Unsupport data link layer protocol, link type: {}",
+                self.link_type
+            ))),
+        };
+
         match result {
-            Ok(p) => {
-                nwproto = p;
-            }
+            Ok(p) => protocol = p,
             Err(e) => return Err(e),
         };
 
-        // 解析网络层数据包
-        let transproto;
-        self.network_parser.net_type(nwproto);
-        match self.network_parser.parse(pkt) {
-            Err(e) => Err(e),
-            Ok(p) => {
-                transproto = p;
-                Ok(())
-            }
-        };
+        loop {
+            result = match protocol {
+                Protocol::UNKNOWN => {
+                    break;
+                }
+                Protocol::ETHERNET => link::ethernet::parse(pkt),
+                Protocol::NULL => link::null::parse(pkt),
+                Protocol::RAW | Protocol::IPV4 => network::ipv4::parse(pkt),
+                Protocol::IPV6 => network::ipv6::parse(pkt),
+                Protocol::ICMP => network::icmp::parse(pkt),
+                _ => return Err(Error::ParserError(String::from("Unsupport protocol"))),
+            };
+
+            match result {
+                Ok(p) => protocol = p,
+                Err(_) => {}
+            };
+        }
+
         Ok(())
     }
 }

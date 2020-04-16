@@ -9,7 +9,7 @@ use super::packet;
 
 pub mod link;
 pub mod network;
-mod parser;
+pub mod parser;
 pub mod transport;
 
 #[repr(u8)]

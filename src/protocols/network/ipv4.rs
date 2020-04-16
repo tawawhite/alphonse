@@ -1,19 +1,19 @@
-use super::super::{LayerProto, NetworkProto, TransProto, TunnelProto};
+use super::Protocol;
 use super::{packet, Error};
 
-const IP: u8 = 0;
+// const IP: u8 = 0;
 const ICMP: u8 = 1;
-const IGMP: u8 = 2;
-const GGP: u8 = 3;
+// const IGMP: u8 = 2;
+// const GGP: u8 = 3;
 const IPV4: u8 = 4;
 const TCP: u8 = 6;
-const ST: u8 = 7;
-const EGP: u8 = 8;
-const PIGP: u8 = 9;
-const RCCMON: u8 = 10;
-const NVPII: u8 = 11;
-const PUP: u8 = 12;
-const ARGUS: u8 = 13;
+// const ST: u8 = 7;
+// const EGP: u8 = 8;
+// const PIGP: u8 = 9;
+// const RCCMON: u8 = 10;
+// const NVPII: u8 = 11;
+// const PUP: u8 = 12;
+// const ARGUS: u8 = 13;
 const UDP: u8 = 17;
 const IPV6: u8 = 41;
 const GRE: u8 = 47;
@@ -21,9 +21,9 @@ const ESP: u8 = 50;
 const SCTP: u8 = 132;
 
 #[inline]
-pub fn parse(pkt: &mut packet::Packet) -> Result<LayerProto, Error> {
-    let clayer = pkt.last_layer_index as usize;
-    let cspos = pkt.layers[clayer].start_pos;
+pub fn parse(pkt: &mut packet::Packet) -> Result<Protocol, Error> {
+    let clayer = pkt.last_layer_index as usize; // current layer index
+    let cspos = pkt.layers[clayer].start_pos; // current layer start position
     let proto_len = pkt.len() - cspos;
 
     if proto_len < 4 * 5 {
@@ -34,7 +34,7 @@ pub fn parse(pkt: &mut packet::Packet) -> Result<LayerProto, Error> {
         )));
     }
 
-    let ip_vhl = pkt.data()[cspos as usize];
+    let ip_vhl = pkt.data[cspos as usize];
     let ip_version = ip_vhl >> 4;
 
     if ip_version != 4 {
@@ -53,7 +53,7 @@ pub fn parse(pkt: &mut packet::Packet) -> Result<LayerProto, Error> {
     }
 
     let ip_len =
-        (pkt.data()[(cspos + 2) as usize] as u16) << 8 | (pkt.data()[(cspos + 3) as usize] as u16);
+        (pkt.data[(cspos + 2) as usize] as u16) << 8 | (pkt.data[(cspos + 3) as usize] as u16);
 
     if proto_len < ip_len {
         // 如果报文的长度小于 IP 报文中声明的数据报长度，数据包有错误
@@ -65,17 +65,17 @@ pub fn parse(pkt: &mut packet::Packet) -> Result<LayerProto, Error> {
     // 计算下一层协议的开始位置
     pkt.layers[clayer].start_pos = cspos + ip_len;
 
-    let ip_proto = pkt.data()[(cspos + 9) as usize];
+    let ip_proto = pkt.data[(cspos + 9) as usize];
 
     match ip_proto {
-        ICMP => Ok(LayerProto::Network(NetworkProto::ICMP)),
-        IPV4 => Ok(LayerProto::Network(NetworkProto::IPv4)),
-        TCP => Ok(LayerProto::Transport(TransProto::TCP)),
-        UDP => Ok(LayerProto::Transport(TransProto::UDP)),
-        ESP => Ok(LayerProto::Network(NetworkProto::ESP)),
-        IPV6 => Ok(LayerProto::Network(NetworkProto::IPv6)),
-        GRE => Ok(LayerProto::Tunnel(TunnelProto::GRE)),
-        SCTP => Ok(LayerProto::Transport(TransProto::SCTP)),
+        ICMP => Ok(Protocol::ICMP),
+        IPV4 => Ok(Protocol::IPV4),
+        TCP => Ok(Protocol::TCP),
+        UDP => Ok(Protocol::UDP),
+        ESP => Ok(Protocol::ESP),
+        IPV6 => Ok(Protocol::IPV6),
+        GRE => Ok(Protocol::GRE),
+        SCTP => Ok(Protocol::SCTP),
         _ => Err(Error::ParserError(format!(
             "Unsupport ipv4 protocol, ipv4 protocol: {}",
             ip_proto

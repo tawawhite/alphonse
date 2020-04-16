@@ -1,3 +1,4 @@
+extern crate libc;
 extern crate pcap;
 
 /// 最大协议层数
@@ -10,26 +11,33 @@ extern crate pcap;
 /// 没有必要去知晓这些内容
 pub const PACKET_MAX_LAYERS: usize = 4;
 
+pub const DIRECTION_LEFT: bool = false;
+pub const DIRECTION_RIGHT: bool = true;
+
 #[derive(Default, Clone, Copy)]
 pub struct Layer {
     pub start_pos: u16,
 }
 
-pub struct Packet<'a> {
-    /// Raw packet data using libpcap's definition
-    raw: pcap::Packet<'a>,
-
+pub struct Packet {
+    /// timestamp
+    pub ts: libc::timeval,
+    /// capture length
+    pub caplen: u32,
+    /// actual length
+    pub data: Vec<u8>,
     /// All layer's basic info
     pub layers: [Layer; PACKET_MAX_LAYERS],
-
     /// How much layers does the packet contain
     pub last_layer_index: u8,
+    /// Direction
+    pub direction: bool,
 }
 
-impl<'a> Packet<'a> {
+impl Packet {
     #[inline]
     pub fn len(&self) -> u16 {
-        self.raw.len() as u16
+        self.data.len() as u16
     }
 
     #[inline]
@@ -41,16 +49,14 @@ impl<'a> Packet<'a> {
         }
     }
 
-    #[inline]
-    pub fn data(&self) -> &'a [u8] {
-        self.raw.data
-    }
-
-    pub fn new(raw_pkt: pcap::Packet<'a>) -> Packet<'a> {
+    pub fn from(raw_pkt: pcap::Packet) -> Packet {
         Packet {
-            raw: raw_pkt,
+            ts: raw_pkt.header.ts,
+            caplen: raw_pkt.header.caplen,
+            data: Vec::from(raw_pkt.data),
             last_layer_index: 0,
             layers: [Layer { start_pos: 0 }; PACKET_MAX_LAYERS],
+            direction: DIRECTION_LEFT,
         }
     }
 }
