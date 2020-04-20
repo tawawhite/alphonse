@@ -6,6 +6,7 @@
 
 use super::error;
 use super::packet;
+use super::packet::Layer;
 
 pub mod link;
 pub mod network;
@@ -13,7 +14,8 @@ pub mod parser;
 pub mod transport;
 
 #[repr(u8)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
+/// Protocol collection, 1 byte
 pub enum Protocol {
     // Data link layer protocols
     NULL,
@@ -60,12 +62,6 @@ impl Default for Protocol {
     fn default() -> Self {
         Protocol::UNKNOWN
     }
-}
-
-#[derive(Default, Clone, Copy)]
-pub struct Layer {
-    pub protocol: Protocol,
-    pub start_pos: u16,
 }
 
 pub type Parser = parser::Parser;

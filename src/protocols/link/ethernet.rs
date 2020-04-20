@@ -1,6 +1,5 @@
-use super::super::Protocol;
 use super::error::ParserError;
-use super::packet;
+use super::{Layer, Protocol, SimpleProtocolParser};
 
 /// ETHER TYPES
 ///
@@ -189,33 +188,43 @@ pub const _3GPP2: u16 = 0x88D2;
 /// Infiniband RDMA over Converged Ethernet
 // const ROCE: u16 = 0x8915;
 
-#[inline]
-pub fn parse(pkt: &mut packet::Packet) -> Result<Protocol, ParserError> {
-    let clayer = pkt.last_layer_index as usize;
-    let cspos = pkt.layers[clayer].start_pos; // current layer start position
-    let proto_len = pkt.len() - cspos;
+pub struct Parser {}
 
-    if proto_len < 14 {
-        return Err(ParserError::CorruptPacket(format!(
-            "The packet is a corrupt packet, packet too short"
-        )));
-    }
+impl SimpleProtocolParser for Parser {
+    #[inline]
+    fn parse(buf: &[u8]) -> Result<(Layer, u16), ParserError> {
+        if buf.len() < 14 {
+            return Err(ParserError::CorruptPacket(format!(
+                "The ethernet packet is corrupted, packet too short ({} bytes)",
+                buf.len()
+            )));
+        }
 
-    let pos = (pkt.layers[clayer].start_pos + 12) as usize;
-    let etype = (pkt.data[pos] as u16) << 8 | pkt.data[pos + 1] as u16;
+        let mut layer = Layer {
+            protocol: Protocol::default(),
+            offset: 0,
+        };
 
-    pkt.layers[clayer].start_pos = cspos + 6 + 6 + 2;
+        let etype = (buf[12] as u16) << 8 | buf[12 + 1] as u16;
+        let mut next_proto_offset = 6 + 6 + 2;
+        match etype {
+            IPV4 => layer.protocol = Protocol::IPV4,
+            IPV6 => layer.protocol = Protocol::IPV6,
+            PPP => layer.protocol = Protocol::PPP,
+            MPLSUC => layer.protocol = Protocol::MPLS,
+            PPPOES => layer.protocol = Protocol::PPPOE,
+            VLAN => {
+                layer.protocol = Protocol::VLAN;
+                next_proto_offset = 6 + 6;
+            }
+            _ => {
+                return Err(ParserError::UnsupportProtocol(format!(
+                    "Unsupport protocol, ether type: {}",
+                    etype
+                )))
+            }
+        };
 
-    match etype {
-        IPV4 => Ok(Protocol::IPV4),
-        IPV6 => Ok(Protocol::IPV6),
-        PPP => Ok(Protocol::PPP),
-        MPLSUC => Ok(Protocol::MPLS),
-        PPPOES => Ok(Protocol::PPPOE),
-        VLAN => Ok(Protocol::VLAN),
-        _ => Err(ParserError::UnsupportProtocol(format!(
-            "Unsupport protocol, ether type: {}",
-            etype
-        ))),
+        Ok((layer, next_proto_offset))
     }
 }

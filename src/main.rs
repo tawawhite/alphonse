@@ -62,14 +62,7 @@ fn main() -> Result<(), error::Error> {
     let root_cmd = commands::new_root_command();
     let config = config::parse_args(root_cmd)?;
 
-    let parser_result = protocols::Parser::from_pcap_file(&config.pcap_file);
-    let mut parser;
-    match parser_result {
-        Err(e) => {
-            return Err(e);
-        }
-        Ok(p) => parser = p,
-    }
+    let parser = protocols::Parser::new(1);
 
     let cap_result = capture::Capture::from_pcap_file(&config.pcap_file);
     let mut cap;
@@ -84,7 +77,7 @@ fn main() -> Result<(), error::Error> {
         let result = parser.parse_pkt(&mut pkt);
         match result {
             Ok(_) => {}
-            Err(e) => println!("{:?}", e),
+            Err(_) => {}
         }
     }
 

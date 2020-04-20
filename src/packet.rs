@@ -1,6 +1,8 @@
 extern crate libc;
 extern crate pcap;
 
+use super::protocols::Protocol;
+
 /// 最大协议层数
 /// 目前按照TCP/IP协议栈的层数定义为4层，即：
 /// 链路层、网络层、传输层、应用层
@@ -14,9 +16,13 @@ pub const PACKET_MAX_LAYERS: usize = 4;
 pub const DIRECTION_LEFT: bool = false;
 pub const DIRECTION_RIGHT: bool = true;
 
-#[derive(Default, Clone, Copy)]
+#[derive(Default, Clone, Copy, Debug)]
+#[repr(packed)]
+/// Packet protocol layer, 3 bytes
 pub struct Layer {
-    pub start_pos: u16,
+    pub protocol: Protocol,
+    /// protocol start offset
+    pub offset: u16,
 }
 
 pub struct Packet {
@@ -45,7 +51,7 @@ impl Packet {
     pub fn len_of_layer(&self, depth: usize) -> u16 {
         match depth {
             0 => self.len(),
-            _ => self.len() - self.layers[depth].start_pos,
+            _ => self.len() - self.layers[depth].offset,
         }
     }
 
@@ -55,7 +61,10 @@ impl Packet {
             caplen: raw_pkt.header.caplen,
             data: Vec::from(raw_pkt.data),
             last_layer_index: 0,
-            layers: [Layer { start_pos: 0 }; PACKET_MAX_LAYERS],
+            layers: [Layer {
+                protocol: Protocol::default(),
+                offset: 0,
+            }; PACKET_MAX_LAYERS],
             direction: DIRECTION_LEFT,
         }
     }

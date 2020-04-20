@@ -1,36 +1,49 @@
-use super::super::Protocol;
-use super::{error::ParserError, packet};
+use super::error::ParserError;
+use super::{Layer, Protocol, SimpleProtocolParser};
 
-#[inline]
-pub fn parse(pkt: &mut packet::Packet) -> Result<Protocol, ParserError> {
-    let clayer = pkt.last_layer_index as usize;
-    let cspos = pkt.layers[clayer].start_pos; // current layer start position
-    let proto_len = pkt.len() - cspos;
+pub struct Parser {}
 
-    if proto_len < 4 {
-        return Err(ParserError::CorruptPacket(format!(
-            "The packet is a corrupt packet, packet too short"
-        )));
-    }
+impl SimpleProtocolParser for Parser {
+    #[inline]
+    fn parse(buf: &[u8]) -> Result<(Layer, u16), ParserError> {
+        if buf.len() < 4 {
+            return Err(ParserError::CorruptPacket(format!(
+                "The packet is corrupted, packet too short ({} bytes)",
+                buf.len()
+            )));
+        }
 
-    // 计算下一层协议的开始位置, 并暂存在当前 layer 的信息中
-    pkt.layers[clayer].start_pos = cspos + 4;
+        let mut layer = Layer {
+            protocol: Protocol::default(),
+            offset: 0,
+        };
+        let next_proto_offset = 4;
+        let link_type = buf[0];
 
-    // from https://www.tcpdump.org/linktypes.html
-    match pkt.data[cspos as usize] {
-        2 => Ok(Protocol::IPV4),
-        // OSI packets
-        7 => Err(ParserError::UnsupportProtocol(format!(
-            "Does not support OSI packet"
-        ))),
-        // IPX packets
-        23 => Err(ParserError::UnsupportProtocol(format!(
-            "Does not support IPX packet"
-        ))),
-        24 | 28 | 30 => Ok(Protocol::IPV6),
-        _ => Err(ParserError::UnsupportProtocol(format!(
-            "Unknown protocol {}",
-            pkt.data[cspos as usize],
-        ))),
+        // from https://www.tcpdump.org/linktypes.html
+        match link_type {
+            2 => layer.protocol = Protocol::IPV4,
+            // OSI packets
+            7 => {
+                return Err(ParserError::UnsupportProtocol(format!(
+                    "Does not support OSI packet"
+                )))
+            }
+            // IPX packets
+            23 => {
+                return Err(ParserError::UnsupportProtocol(format!(
+                    "Does not support IPX packet"
+                )))
+            }
+            24 | 28 | 30 => layer.protocol = Protocol::IPV6,
+            _ => {
+                return Err(ParserError::UnsupportProtocol(format!(
+                    "Unknown protocol {}",
+                    buf[0],
+                )))
+            }
+        }
+
+        Ok((layer, next_proto_offset))
     }
 }

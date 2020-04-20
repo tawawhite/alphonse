@@ -1,9 +1,13 @@
-use super::Protocol;
-use super::{packet, ParserError};
+use super::ParserError;
+use super::{Layer, SimpleProtocolParser};
 
-#[inline]
-pub fn parse(_pkt: &mut packet::Packet) -> Result<Protocol, ParserError> {
-    return Err(ParserError::UnsupportProtocol(format!(
-        "Unsupport protocol: ICMP"
-    )));
+pub struct Parser {}
+
+impl SimpleProtocolParser for Parser {
+    #[inline]
+    fn parse(_buf: &[u8]) -> Result<(Layer, u16), ParserError> {
+        return Err(ParserError::UnsupportProtocol(format!(
+            "Unsupport protocol: ICMP"
+        )));
+    }
 }
