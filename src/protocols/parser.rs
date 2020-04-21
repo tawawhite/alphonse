@@ -40,12 +40,10 @@ impl Parser {
         let mut result = match self.link_type {
             link::NULL => {
                 pkt.layers[0].protocol = Protocol::NULL;
-                pkt.last_layer_index += 1;
                 link::null::Parser::parse(pkt.data.as_ref())
             }
             link::ETHERNET => {
                 pkt.layers[0].protocol = Protocol::ETHERNET;
-                pkt.last_layer_index += 1;
                 link::ethernet::Parser::parse(pkt.data.as_ref())
             }
             link::RAW | link::IPV4 => {
@@ -72,6 +70,7 @@ impl Parser {
 
         match result {
             Ok(l) => {
+                pkt.last_layer_index += 1;
                 pkt.layers[pkt.last_layer_index as usize] = l;
             }
             Err(e) => return Err(e),
@@ -100,8 +99,8 @@ impl Parser {
 
             match result {
                 Ok(l) => {
-                    pkt.layers[pkt.last_layer_index as usize] = l;
                     pkt.last_layer_index += 1;
+                    pkt.layers[pkt.last_layer_index as usize] = l;
                 }
                 Err(e) => return Err(e),
             };
