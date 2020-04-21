@@ -23,7 +23,7 @@ const SCTP: u8 = 132;
 pub struct Parser {}
 impl SimpleProtocolParser for Parser {
     #[inline]
-    fn parse(buf: &[u8]) -> Result<(Layer, u16), ParserError> {
+    fn parse(buf: &[u8]) -> Result<Layer, ParserError> {
         if buf.len() < 4 * 5 {
             // 如果报文内容长度小于IP报文最短长度(IP协议头长度)
             // 数据包有错误
@@ -62,7 +62,7 @@ impl SimpleProtocolParser for Parser {
 
         let mut layer = Layer {
             protocol: Protocol::default(),
-            offset: 0,
+            offset: ip_len,
         };
         let ip_proto = buf[(9) as usize];
 
@@ -83,6 +83,6 @@ impl SimpleProtocolParser for Parser {
             }
         };
 
-        Ok((layer, ip_len))
+        Ok(layer)
     }
 }

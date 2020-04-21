@@ -5,7 +5,7 @@ pub struct Parser {}
 
 impl SimpleProtocolParser for Parser {
     #[inline]
-    fn parse(buf: &[u8]) -> Result<(Layer, u16), ParserError> {
+    fn parse(buf: &[u8]) -> Result<Layer, ParserError> {
         if buf.len() < 4 {
             return Err(ParserError::CorruptPacket(format!(
                 "The packet is corrupted, packet too short ({} bytes)",
@@ -17,7 +17,7 @@ impl SimpleProtocolParser for Parser {
             protocol: Protocol::default(),
             offset: 0,
         };
-        let next_proto_offset = 4;
+        layer.offset = 4;
         let link_type = buf[0];
 
         // from https://www.tcpdump.org/linktypes.html
@@ -44,7 +44,6 @@ impl SimpleProtocolParser for Parser {
             }
         }
 
-        layer.offset = next_proto_offset;
-        Ok((layer, next_proto_offset))
+        Ok(layer)
     }
 }

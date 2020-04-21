@@ -12,7 +12,7 @@ pub trait SimpleProtocolParser {
     /// * `nlayer` - 下一层协议的对应的层级
     ///
     /// * `pkt` - 数据包
-    fn parse(buf: &[u8]) -> Result<(Layer, u16), ParserError>;
+    fn parse(buf: &[u8]) -> Result<Layer, ParserError>;
 }
 
 pub struct Parser {
@@ -36,7 +36,7 @@ impl Parser {
 impl Parser {
     /// 解析单个数据包
     pub fn parse_pkt(&self, pkt: &mut packet::Packet) -> Result<(), ParserError> {
-        // 根据 link type 解析数据链路层协议
+        // 根据 link type 解析数据链路层协议, 获取下一层协议的协议类型和起始位置
         let mut result = match self.link_type {
             link::NULL => {
                 pkt.layers[0].protocol = Protocol::NULL;
@@ -49,20 +49,18 @@ impl Parser {
                 link::ethernet::Parser::parse(pkt.data.as_ref())
             }
             link::RAW | link::IPV4 => {
-                pkt.layers[0].protocol = Protocol::IPV4;
                 let layer = Layer {
                     protocol: Protocol::IPV4,
                     offset: 0,
                 };
-                Ok((layer, 0))
+                Ok(layer)
             }
             link::IPV6 => {
-                pkt.layers[0].protocol = Protocol::IPV6;
                 let layer = Layer {
                     protocol: Protocol::IPV6,
                     offset: 0,
                 };
-                Ok((layer, 0))
+                Ok(layer)
             }
             _ => {
                 return Err(ParserError::UnsupportProtocol(format!(
@@ -72,18 +70,16 @@ impl Parser {
             }
         };
 
-        let mut layer;
-        let mut offset;
         match result {
-            Ok((l, o)) => {
-                layer = l;
-                offset = o as usize;
+            Ok(l) => {
+                pkt.layers[pkt.last_layer_index as usize] = l;
             }
             Err(e) => return Err(e),
         };
 
         loop {
-            let buf = &pkt.data.as_slice()[offset..];
+            let layer = &pkt.layers[pkt.last_layer_index as usize];
+            let buf = &pkt.data.as_slice()[layer.offset as usize..];
             result = match layer.protocol {
                 Protocol::UNKNOWN => {
                     break;
@@ -98,14 +94,14 @@ impl Parser {
                     return Err(ParserError::UnsupportProtocol(format!(
                         "Unsupport protocol {:?}",
                         p
-                    )))
+                    )));
                 }
             };
 
             match result {
-                Ok((l, o)) => {
-                    layer = l;
-                    offset = o as usize;
+                Ok(l) => {
+                    pkt.layers[pkt.last_layer_index as usize] = l;
+                    pkt.last_layer_index += 1;
                 }
                 Err(e) => return Err(e),
             };
