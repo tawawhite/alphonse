@@ -224,6 +224,7 @@ impl SimpleProtocolParser for Parser {
                 )))
             }
         };
+        layer.offset = next_proto_offset;
 
         Ok((layer, next_proto_offset))
     }
