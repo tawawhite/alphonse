@@ -62,7 +62,7 @@ impl SimpleProtocolParser for Parser {
 
         let mut layer = Layer {
             protocol: Protocol::default(),
-            offset: ip_len,
+            offset: ip_hdr_len,
         };
         let ip_proto = buf[(9) as usize];
 
