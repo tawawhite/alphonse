@@ -6,10 +6,10 @@ use super::Protocol;
 
 pub struct Parser {}
 impl SimpleProtocolParser for Parser {
-    fn parse(buf: &[u8]) -> Result<Layer, ParserError> {
+    fn parse(buf: &[u8], offset: u16) -> Result<Layer, ParserError> {
         let mut layer = Layer {
             protocol: Protocol::default(),
-            offset: 4 + 2,
+            offset: offset + 4 + 2,
         };
 
         let etype = (buf[0] as u16) << 8 | buf[0] as u16;

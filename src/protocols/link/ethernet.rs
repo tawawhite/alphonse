@@ -192,7 +192,7 @@ pub struct Parser {}
 
 impl SimpleProtocolParser for Parser {
     #[inline]
-    fn parse(buf: &[u8]) -> Result<Layer, ParserError> {
+    fn parse(buf: &[u8], _offset: u16) -> Result<Layer, ParserError> {
         if buf.len() < 14 {
             return Err(ParserError::CorruptPacket(format!(
                 "The ethernet packet is corrupted, packet too short ({} bytes)",

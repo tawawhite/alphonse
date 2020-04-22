@@ -7,12 +7,12 @@ pub trait SimpleProtocolParser {
     ///
     /// # Arguments
     ///
-    /// * `clayer` - 当前层协议对应的层级
+    /// * `buf` - 该层协议的内容，包含协议头
     ///
-    /// * `nlayer` - 下一层协议的对应的层级
+    /// * `offset` - 本层协议距离数据包头部的距离
     ///
     /// * `pkt` - 数据包
-    fn parse(buf: &[u8]) -> Result<Layer, ParserError>;
+    fn parse(buf: &[u8], offset: u16) -> Result<Layer, ParserError>;
 }
 
 pub struct Parser {
@@ -40,11 +40,11 @@ impl Parser {
         let mut result = match self.link_type {
             link::NULL => {
                 pkt.layers[0].protocol = Protocol::NULL;
-                link::null::Parser::parse(pkt.data.as_ref())
+                link::null::Parser::parse(pkt.data.as_ref(), 0)
             }
             link::ETHERNET => {
                 pkt.layers[0].protocol = Protocol::ETHERNET;
-                link::ethernet::Parser::parse(pkt.data.as_ref())
+                link::ethernet::Parser::parse(pkt.data.as_ref(), 0)
             }
             link::RAW | link::IPV4 => {
                 let layer = Layer {
@@ -78,17 +78,18 @@ impl Parser {
 
         loop {
             let layer = &pkt.layers[pkt.last_layer_index as usize];
+            let offset = layer.offset;
             let buf = &pkt.data.as_slice()[layer.offset as usize..];
             result = match layer.protocol {
+                Protocol::ETHERNET => link::ethernet::Parser::parse(buf, offset),
+                Protocol::NULL => link::null::Parser::parse(buf, offset),
+                Protocol::RAW | Protocol::IPV4 => network::ipv4::Parser::parse(buf, offset),
+                Protocol::IPV6 => network::ipv6::Parser::parse(buf, offset),
+                Protocol::VLAN => network::vlan::Parser::parse(buf, offset),
+                Protocol::ICMP => network::icmp::Parser::parse(buf, offset),
                 Protocol::UNKNOWN => {
-                    break;
+                    return Err(ParserError::UnknownProtocol);
                 }
-                Protocol::ETHERNET => link::ethernet::Parser::parse(buf),
-                Protocol::NULL => link::null::Parser::parse(buf),
-                Protocol::RAW | Protocol::IPV4 => network::ipv4::Parser::parse(buf),
-                Protocol::IPV6 => network::ipv6::Parser::parse(buf),
-                Protocol::VLAN => network::vlan::Parser::parse(buf),
-                Protocol::ICMP => network::icmp::Parser::parse(buf),
                 p => {
                     return Err(ParserError::UnsupportProtocol(format!(
                         "Unsupport protocol {:?}",
@@ -105,7 +106,5 @@ impl Parser {
                 Err(e) => return Err(e),
             };
         }
-
-        Ok(())
     }
 }
