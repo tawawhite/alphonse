@@ -1,16 +1,19 @@
+//! We do not perform serious protocol parsing in this module.
+//! All we do here is figuring out layer's length and protocol type, that's it.
+//! More serious protocol parsing jobs are done by the protocol parsers in another module.
+//!
+//!
+
+use super::error;
+
 extern crate libc;
 extern crate pcap;
 
-use super::protocols::Protocol;
+pub mod link;
+pub mod network;
+pub mod parser;
+pub mod transport;
 
-/// 最大协议层数
-/// 目前按照TCP/IP协议栈的层数定义为4层，即：
-/// 链路层、网络层、传输层、应用层
-///
-/// 这样虽然会丢失一些中间协议的开始位置和信息，
-/// 但是减少了数据包基础结构的大小，
-/// 而且其实有可能某些情况下对于中间层的隧道协议不关心的情况下，
-/// 没有必要去知晓这些内容
 pub const PACKET_MAX_LAYERS: usize = 4;
 
 pub const DIRECTION_LEFT: bool = false;
@@ -69,3 +72,56 @@ impl Packet {
         }
     }
 }
+
+#[repr(u8)]
+#[derive(Clone, Copy, Debug)]
+/// Protocol collection, 1 byte
+pub enum Protocol {
+    // Data link layer protocols
+    NULL,
+    ETHERNET,
+    RAW,
+    PPP,
+    MPLS,
+    PPPOE,
+
+    // Tunnel protocols
+    GRE,
+
+    // Network layer protocols
+    IPV4,
+    IPV6,
+    ICMP,
+    CLNS,
+    DDP,
+    EGP,
+    EIGRP,
+    IGMP,
+    IPX,
+    ESP,
+    OSPF,
+    PIM,
+    RIP,
+    VLAN,
+    WIREGUARD,
+
+    // Transport layer protocols
+    TCP,
+    UDP,
+    SCTP,
+
+    // Application layer protocols
+    HTTP,
+
+    // Unknown protocol
+    UNKNOWN,
+}
+
+impl Default for Protocol {
+    #[inline]
+    fn default() -> Self {
+        Protocol::UNKNOWN
+    }
+}
+
+pub type Parser = parser::Parser;

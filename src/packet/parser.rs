@@ -1,5 +1,5 @@
 use super::error::ParserError;
-use super::{link, network, packet, Layer, Protocol};
+use super::{link, network, Layer, Packet, Protocol};
 
 /// 仅解析协议在数据包中的开始位置和协议长度的 parser
 pub trait SimpleProtocolParser {
@@ -35,7 +35,7 @@ impl Parser {
 
 impl Parser {
     /// 解析单个数据包
-    pub fn parse_pkt(&self, pkt: &mut packet::Packet) -> Result<(), ParserError> {
+    pub fn parse_pkt(&self, pkt: &mut Packet) -> Result<(), ParserError> {
         // 根据 link type 解析数据链路层协议, 获取下一层协议的协议类型和起始位置
         let mut result = match self.link_type {
             link::NULL => {

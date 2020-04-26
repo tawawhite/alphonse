@@ -8,7 +8,6 @@ mod config;
 mod dpdk;
 mod error;
 mod packet;
-mod protocols;
 
 #[cfg(all(target_os = "linux", feature = "dpdk"))]
 fn main() -> Result<(), error::Error> {
@@ -62,7 +61,7 @@ fn main() -> Result<(), error::Error> {
     let root_cmd = commands::new_root_command();
     let config = config::parse_args(root_cmd)?;
 
-    let parser = protocols::Parser::new(1);
+    let parser = packet::Parser::new(1);
 
     let cap_result = capture::Capture::from_pcap_file(&config.pcap_file);
     let mut cap;
