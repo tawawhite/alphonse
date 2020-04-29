@@ -22,7 +22,8 @@ endif()
 
 # Currently DPDK is only for Linux, FreeBSD and Windows
 # We only target for Linux in current stage
-if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+option(BUILD_DPDK "build dpdk" OFF)
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND BUILD_DPDK)
     add_dependencies(alphonse dpdk)
 endif()
 

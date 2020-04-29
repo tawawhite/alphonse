@@ -9,10 +9,11 @@ clap = "2.33.0"
 pcap = "0.7.0"
 yaml-rust = "0.4.3"
 cpp = "0.5.4"
+libc = "0.2.69"
 
 [build-dependencies]
 cpp_build = "0.5.4"
 bindgen = "*"
 
-[features]
-dpdk=[]
+# [features]
+# dpdk=[]
