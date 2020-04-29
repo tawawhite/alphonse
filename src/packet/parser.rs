@@ -1,5 +1,5 @@
 use super::error::ParserError;
-use super::{link, network, Layer, Packet, Protocol};
+use super::{link, network, transport, Layer, Packet, Protocol};
 
 /// 仅解析协议在数据包中的开始位置和协议长度的 parser
 pub trait SimpleProtocolParser {
@@ -87,6 +87,9 @@ impl Parser {
                 Protocol::IPV6 => network::ipv6::Parser::parse(buf, offset),
                 Protocol::VLAN => network::vlan::Parser::parse(buf, offset),
                 Protocol::ICMP => network::icmp::Parser::parse(buf, offset),
+                Protocol::TCP => transport::tcp::Parser::parse(buf, offset),
+                Protocol::UDP => transport::udp::Parser::parse(buf, offset),
+                Protocol::APPLICATION => return Ok(()),
                 Protocol::UNKNOWN => {
                     return Err(ParserError::UnknownProtocol);
                 }

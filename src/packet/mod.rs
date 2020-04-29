@@ -115,6 +115,8 @@ pub enum Protocol {
 
     // Unknown protocol
     UNKNOWN,
+
+    APPLICATION,
 }
 
 impl Default for Protocol {
