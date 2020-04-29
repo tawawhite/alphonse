@@ -52,12 +52,14 @@ pub fn new_root_command<'a>() -> clap::App<'a, 'static> {
                 .short("R")
                 .value_name("PCAP-DIR")
                 .help("Offline pcap directory, all *.pcap files will be processed")
-                .takes_value(true),
+                .takes_value(true)
+                .conflicts_with(CliArg::PcapFile.as_str()),
             Arg::with_name(CliArg::PcapFile.as_str())
                 .short("r")
                 .value_name("PCAP-FILE")
                 .help("Offline pcap file")
-                .takes_value(true),
+                .takes_value(true)
+                .conflicts_with(CliArg::PcapDir.as_str()),
             Arg::with_name(CliArg::Quiet.as_str())
                 .short("q")
                 .long("quiet")

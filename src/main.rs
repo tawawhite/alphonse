@@ -1,5 +1,10 @@
 #[macro_use]
 extern crate clap;
+extern crate crossbeam_channel;
+
+use std::thread;
+
+use crossbeam_channel::unbounded;
 
 mod capture;
 mod commands;
@@ -8,6 +13,7 @@ mod config;
 mod dpdk;
 mod error;
 mod packet;
+mod threadings;
 
 #[cfg(all(target_os = "linux", feature = "dpdk"))]
 fn main() -> Result<(), error::Error> {
@@ -59,26 +65,23 @@ fn main() -> Result<(), error::Error> {
 #[cfg(not(feature = "dpdk"))]
 fn main() -> Result<(), error::Error> {
     let root_cmd = commands::new_root_command();
-    let config = config::parse_args(root_cmd)?;
+    let cfg = config::parse_args(root_cmd)?;
 
-    let parser = packet::Parser::new(1);
-
-    let cap_result = capture::Capture::from_pcap_file(&config.pcap_file);
-    let mut cap;
-    match cap_result {
-        Err(e) => {
-            return Err(e);
-        }
-        Ok(c) => cap = c,
-    }
-
-    while let Ok(mut pkt) = cap.next() {
-        let result = parser.parse_pkt(&mut pkt);
-        match result {
-            Ok(_) => {}
-            Err(_) => {}
-        }
-    }
+    let (sender, receiver) = unbounded();
+    let mut pkt_thread = threadings::PktThread::new(
+        0,
+        packet::link::ETHERNET,
+        Box::from(sender.clone()),
+        Box::from(receiver.clone()),
+    );
+    let handle = thread::spawn(move || match pkt_thread.spawn(Box::from(cfg.clone())) {
+        Ok(_) => {}
+        Err(e) => println!("{}", e),
+    });
+    match handle.join() {
+        Ok(_) => {}
+        Err(e) => println!("{:?}", e),
+    };
 
     Ok(())
 }

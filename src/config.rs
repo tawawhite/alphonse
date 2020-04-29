@@ -5,12 +5,12 @@ use std::path::Path;
 extern crate clap;
 extern crate yaml_rust;
 
-use yaml_rust::{Yaml, YamlLoader};
+use yaml_rust::YamlLoader;
 
 use super::commands::CliArg;
 use super::error::Error;
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Config {
     pub backend: String,
     pub verbose_mode: bool,
@@ -19,6 +19,7 @@ pub struct Config {
     pub dry_run: bool,
     pub pcap_file: String,
     pub pcap_dir: String,
+    pub pkt_threads_amount: u8,
     pub quiet: bool,
     pub recursive: bool,
     pub tags: Vec<String>,
@@ -54,6 +55,11 @@ fn parse_config_file(config_file: &str, config: &mut Config) -> Result<(), Error
     let doc = &docs[0];
 
     doc["some-key"].as_str().unwrap_or("value");
+    config.pkt_threads_amount = doc["pkt-threads"]
+        .as_i64()
+        .ok_or(Error::CommonError(format!(
+            "Failed to convert Yaml into i64"
+        )))? as u8;
 
     match doc["backend"].as_str() {
         None => panic!(""),
@@ -65,24 +71,28 @@ fn parse_config_file(config_file: &str, config: &mut Config) -> Result<(), Error
         },
     };
 
-    // 处理 DPDK EAL 启动参数
-    match *&doc["dpdk"] {
-        Yaml::Array(ref array) => {
-            for v in array {
-                let s = v.as_str().ok_or(Error::CommonError(format!(
-                    "Failed to convert Yaml into &str"
-                )))?;
-                config.dpdk_eal_args.push(String::from(s));
+    #[cfg(all(target_os = "linux", feature = "dpdk"))]
+    {
+        // 处理 DPDK EAL 启动参数
+        match *&doc["dpdk"] {
+            Yaml::Array(ref array) => {
+                for v in array {
+                    let s = v.as_str().ok_or(Error::CommonError(format!(
+                        "Failed to convert Yaml into &str"
+                    )))?;
+                    config.dpdk_eal_args.push(String::from(s));
+                }
+                Ok(())
             }
-            Ok(())
-        }
-        _ => {
-            return Err(Error::CommonError(format!(
-                "Invalid dpdk args in {}",
-                config_file
-            )))
-        }
+            _ => {
+                return Err(Error::CommonError(format!(
+                    "Invalid/Empty dpdk args in {}",
+                    config_file
+                )))
+            }
+        };
     }
+    Ok(())
 }
 
 /// Use command arguments overrides config file settings

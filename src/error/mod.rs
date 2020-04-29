@@ -49,8 +49,8 @@ impl From<std::io::Error> for Error {
     }
 }
 
-impl From<ParserError> for Error {
-    fn from(e: ParserError) -> Self {
-        Error::ParserError(e)
-    }
-}
+// impl From<ParserError> for Error {
+//     fn from(e: ParserError) -> Self {
+//         Error::ParserError(e)
+//     }
+// }
