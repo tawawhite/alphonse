@@ -11,6 +11,7 @@ yaml-rust = "0.4.3"
 cpp = "0.5.4"
 libc = "0.2.69"
 crossbeam-channel = "0.4"
+path-absolutize = "1.2.0"
 
 [build-dependencies]
 cpp_build = "0.5.4"
