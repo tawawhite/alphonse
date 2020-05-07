@@ -1,9 +1,12 @@
 extern crate crossbeam_channel;
+extern crate path_absolutize;
 extern crate pcap;
 
-use std::path::PathBuf;
+use std::ffi::OsString;
+use std::path::{Path, PathBuf};
 
 use crossbeam_channel::{unbounded, Receiver, Sender};
+use path_absolutize::Absolutize;
 
 use super::capture::{Capture, Libpcap};
 use super::config;
@@ -41,14 +44,41 @@ impl PktThread {
 }
 
 impl PktThread {
-    pub fn spawn(&mut self, cfg: Box<config::Config>) -> Result<(), Error> {
+    fn get_pcap_files(cfg: &config::Config) -> Vec<PathBuf> {
         let mut files = Vec::new();
         if !cfg.pcap_file.is_empty() {
-            println!("pcap file: {}", cfg.pcap_file);
-            files.push(cfg.pcap_file.clone());
+            files.push(PathBuf::from(&cfg.pcap_file));
         } else if !cfg.pcap_dir.is_empty() {
-            println!("pcap dir: {}", cfg.pcap_dir);
+            let pcap_dir = PathBuf::from(&cfg.pcap_dir).absolutize().unwrap();
+            for entry in pcap_dir.read_dir().expect("read_dir call failed") {
+                if let Ok(entry) = entry {
+                    let buf = entry.path();
+                    if buf.is_dir() {
+                        continue;
+                    }
+
+                    match buf.extension() {
+                        None => continue,
+                        Some(s) => {
+                            let ext = std::ffi::OsString::from(s);
+                            let pcap_ext = OsString::from("pcap");
+                            let pcapng_ext = OsString::from("pcapng");
+                            match ext {
+                                _ if ext == pcap_ext => files.push(entry.path()),
+                                _ if ext == pcapng_ext => files.push(entry.path()),
+                                _ => {}
+                            };
+                        }
+                    };
+                }
+            }
         }
+
+        return files;
+    }
+
+    pub fn spawn(&mut self, cfg: Box<config::Config>) -> Result<(), Error> {
+        let files = PktThread::get_pcap_files(cfg.as_ref());
 
         for file in files {
             let result = Libpcap::from_file(&file);
@@ -64,7 +94,7 @@ impl PktThread {
                 match self.parser.parse_pkt(&mut pkt) {
                     Ok(_) => {}
                     Err(e) => {
-                        println!("{:?}", e);
+                        return Err(Error::ParserError(e));
                     }
                 };
                 let result = self.sender.send(pkt);
