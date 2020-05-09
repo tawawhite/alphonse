@@ -3,9 +3,9 @@ extern crate path_absolutize;
 extern crate pcap;
 
 use std::ffi::OsString;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
-use crossbeam_channel::{unbounded, Receiver, Sender};
+use crossbeam_channel::Sender;
 use path_absolutize::Absolutize;
 
 use super::capture::{Capture, Libpcap};
@@ -22,28 +22,22 @@ pub struct PktThread {
     // 基本协议解析器
     parser: Parser,
     sender: Box<Sender<Packet>>,
-    receiver: Box<Receiver<Packet>>,
 }
 
 impl PktThread {
     /// 创建一个新的收包线程结构体
-    pub fn new(
-        id: u8,
-        link_type: u16,
-        sender: Box<Sender<Packet>>,
-        receiver: Box<Receiver<Packet>>,
-    ) -> PktThread {
+    pub fn new(id: u8, link_type: u16, sender: Box<Sender<Packet>>) -> PktThread {
         PktThread {
             id,
             rx_count: 0,
             parser: Parser::new(link_type),
             sender,
-            receiver,
         }
     }
 }
 
 impl PktThread {
+    /// get pcap files according to command line arguments/configuration file
     fn get_pcap_files(cfg: &config::Config) -> Vec<PathBuf> {
         let mut files = Vec::new();
         if !cfg.pcap_file.is_empty() {
@@ -97,8 +91,7 @@ impl PktThread {
                         return Err(Error::ParserError(e));
                     }
                 };
-                let result = self.sender.send(pkt);
-                match result {
+                match self.sender.send(pkt) {
                     Ok(_) => {}
                     Err(_) => {} // TODO: handle error
                 }

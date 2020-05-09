@@ -4,6 +4,8 @@
 //!
 //!
 
+use std::hash::{Hash, Hasher};
+
 use super::error;
 
 extern crate libc;
@@ -26,6 +28,12 @@ pub struct Layer {
     pub protocol: Protocol,
     /// protocol start offset
     pub offset: u16,
+}
+
+impl Hash for Layer {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.protocol.hash(state);
+    }
 }
 
 pub struct Packet {
@@ -73,8 +81,42 @@ impl Packet {
     }
 }
 
+impl Hash for Packet {
+    #[inline]
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        match self.layers[2].protocol {
+            Protocol::TCP | Protocol::UDP => {
+                self.layers[2].hash(state);
+                let src_port_pos = (self.layers[2].offset) as usize;
+                let dst_port_pos = (self.layers[2].offset + 2) as usize;
+                self.data.as_slice()[src_port_pos..src_port_pos + 4].hash(state);
+                self.data.as_slice()[dst_port_pos..dst_port_pos + 4].hash(state);
+            }
+            _ => {}
+        };
+
+        match self.layers[1].protocol {
+            Protocol::IPV4 => {
+                let src_ip_pos = (self.layers[1].offset + 12) as usize;
+                let dst_ip_pos = (self.layers[1].offset + 16) as usize;
+                self.data.as_slice()[src_ip_pos..src_ip_pos + 4].hash(state);
+                self.data.as_slice()[dst_ip_pos..dst_ip_pos + 4].hash(state);
+            }
+            Protocol::IPV6 => {
+                let src_ip_pos = (self.layers[1].offset + 8) as usize;
+                let dst_ip_pos = (self.layers[1].offset + 16) as usize;
+                self.data.as_slice()[src_ip_pos..src_ip_pos + 4].hash(state);
+                self.data.as_slice()[dst_ip_pos..dst_ip_pos + 16].hash(state);
+            }
+            _ => {
+                0_u8.hash(state);
+            }
+        };
+    }
+}
+
 #[repr(u8)]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Hash)]
 /// Protocol collection, 1 byte
 pub enum Protocol {
     // Data link layer protocols

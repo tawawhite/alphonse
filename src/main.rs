@@ -13,6 +13,7 @@ mod config;
 mod dpdk;
 mod error;
 mod packet;
+mod session;
 mod threadings;
 
 #[cfg(all(target_os = "linux", feature = "dpdk"))]
@@ -68,20 +69,27 @@ fn main() -> Result<(), error::Error> {
     let cfg = config::parse_args(root_cmd)?;
 
     let (sender, receiver) = unbounded();
-    let mut pkt_thread = threadings::PktThread::new(
-        0,
-        packet::link::ETHERNET,
-        Box::from(sender.clone()),
-        Box::from(receiver.clone()),
-    );
-    let handle = thread::spawn(move || match pkt_thread.spawn(Box::from(cfg.clone())) {
-        Ok(_) => {}
-        Err(e) => println!("{}", e),
-    });
-    match handle.join() {
-        Ok(_) => {}
-        Err(e) => println!("{:?}", e),
-    };
+    let mut pkt_thread =
+        threadings::PktThread::new(0, packet::link::ETHERNET, Box::from(sender.clone()));
+    let mut session_thread = threadings::SessionThread::new(0, Box::from(receiver.clone()));
+
+    let mut handles = vec![];
+
+    handles.push(thread::spawn(move || session_thread.spawn()));
+
+    handles.push(thread::spawn(move || {
+        match pkt_thread.spawn(Box::from(cfg.clone())) {
+            Ok(_) => {}
+            Err(e) => println!("{}", e),
+        }
+    }));
+
+    for handle in handles {
+        match handle.join() {
+            Ok(_) => {}
+            Err(e) => println!("{:?}", e),
+        };
+    }
 
     Ok(())
 }
