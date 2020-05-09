@@ -108,9 +108,7 @@ impl Hash for Packet {
                 self.data.as_slice()[src_ip_pos..src_ip_pos + 4].hash(state);
                 self.data.as_slice()[dst_ip_pos..dst_ip_pos + 16].hash(state);
             }
-            _ => {
-                0_u8.hash(state);
-            }
+            _ => {}
         };
     }
 }
