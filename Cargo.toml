@@ -5,11 +5,11 @@ authors = ["Jack Liar <15205739+JackLiar@users.noreply.github.com>"]
 edition = "2018"
 
 [dependencies]
-clap = "2.33.0"
+clap = "2.33.1"
 pcap = "0.7.0"
 yaml-rust = "0.4.3"
 cpp = "0.5.4"
-libc = "0.2.69"
+libc = "0.2.70"
 crossbeam-channel = "0.4"
 path-absolutize = "1.2.0"
 
