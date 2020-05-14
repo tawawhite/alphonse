@@ -2,7 +2,9 @@ extern crate crossbeam_channel;
 extern crate path_absolutize;
 extern crate pcap;
 
+use std::collections::hash_map::DefaultHasher;
 use std::ffi::OsString;
+use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 
 use crossbeam_channel::Sender;
@@ -13,30 +15,32 @@ use super::config;
 use super::error::Error;
 use super::packet::{Packet, Parser};
 
-/// 数据包处理线程
-pub struct PktThread {
+/// 收包线程
+pub struct RxThread {
     /// 线程ID
     id: u8,
     /// 收包总数
     pub rx_count: u64,
     // 基本协议解析器
     parser: Parser,
-    sender: Box<Sender<Packet>>,
+    senders: Vec<Sender<Box<Packet>>>,
+    hasher: DefaultHasher,
 }
 
-impl PktThread {
+impl RxThread {
     /// 创建一个新的收包线程结构体
-    pub fn new(id: u8, link_type: u16, sender: Box<Sender<Packet>>) -> PktThread {
-        PktThread {
+    pub fn new(id: u8, link_type: u16, senders: Vec<Sender<Box<Packet>>>) -> RxThread {
+        RxThread {
             id,
             rx_count: 0,
             parser: Parser::new(link_type),
-            sender,
+            senders,
+            hasher: DefaultHasher::new(),
         }
     }
 }
 
-impl PktThread {
+impl RxThread {
     /// get pcap files according to command line arguments/configuration file
     fn get_pcap_files(cfg: &config::Config) -> Vec<PathBuf> {
         let mut files = Vec::new();
@@ -72,7 +76,7 @@ impl PktThread {
     }
 
     pub fn spawn(&mut self, cfg: Box<config::Config>) -> Result<(), Error> {
-        let files = PktThread::get_pcap_files(cfg.as_ref());
+        let files = RxThread::get_pcap_files(cfg.as_ref());
 
         for file in files {
             let result = Libpcap::from_file(&file);
@@ -91,7 +95,10 @@ impl PktThread {
                         return Err(Error::ParserError(e));
                     }
                 };
-                match self.sender.send(pkt) {
+                pkt.hash(&mut self.hasher);
+
+                let thread = (self.hasher.finish() % self.senders.len() as u64) as usize;
+                match self.senders[thread].send(Box::from(pkt)) {
                     Ok(_) => {}
                     Err(_) => {} // TODO: handle error
                 }

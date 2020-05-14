@@ -195,6 +195,8 @@ impl PartialEq for Packet {
     }
 }
 
+impl Eq for Packet {}
+
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 /// Protocol collection, 1 byte
