@@ -68,9 +68,10 @@ fn main() -> Result<(), error::Error> {
     let root_cmd = commands::new_root_command();
     let cfg = config::parse_args(root_cmd)?;
 
+    let mut senders = Vec::new();
     let (sender, receiver) = unbounded();
-    let mut pkt_thread =
-        threadings::PktThread::new(0, packet::link::ETHERNET, Box::from(sender.clone()));
+    senders.push(sender);
+    let mut rx_thread = threadings::RxThread::new(0, packet::link::ETHERNET, senders);
     let mut session_thread = threadings::SessionThread::new(0, Box::from(receiver.clone()));
 
     let mut handles = vec![];
@@ -78,7 +79,7 @@ fn main() -> Result<(), error::Error> {
     handles.push(thread::spawn(move || session_thread.spawn()));
 
     handles.push(thread::spawn(move || {
-        match pkt_thread.spawn(Box::from(cfg.clone())) {
+        match rx_thread.spawn(Box::from(cfg.clone())) {
             Ok(_) => {}
             Err(e) => println!("{}", e),
         }

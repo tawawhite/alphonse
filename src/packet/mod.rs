@@ -104,17 +104,99 @@ impl Hash for Packet {
             }
             Protocol::IPV6 => {
                 let src_ip_pos = (self.layers[1].offset + 8) as usize;
-                let dst_ip_pos = (self.layers[1].offset + 16) as usize;
-                self.data.as_slice()[src_ip_pos..src_ip_pos + 4].hash(state);
-                self.data.as_slice()[dst_ip_pos..dst_ip_pos + 16].hash(state);
+                let dst_ip_pos = (self.layers[1].offset + 8 + 16) as usize;
+                self.data.as_slice()[src_ip_pos..src_ip_pos + 8].hash(state);
+                self.data.as_slice()[dst_ip_pos..dst_ip_pos + 8 + 16].hash(state);
             }
             _ => {}
         };
     }
 }
 
+impl PartialEq for Packet {
+    #[inline]
+    fn eq(&self, other: &Packet) -> bool {
+        if self.layers[1].protocol != other.layers[1].protocol {
+            return false;
+        }
+
+        if self.layers[2].protocol != other.layers[2].protocol {
+            return false;
+        }
+
+        match self.layers[2].protocol {
+            Protocol::TCP | Protocol::UDP => {
+                let self_port_pos = (self.layers[2].offset) as usize;
+                let other_port_pos = (self.layers[2].offset) as usize;
+                let self_port;
+                let other_port;
+                unsafe {
+                    self_port = *(self.data.as_ptr().add(self_port_pos) as *const u32);
+                    other_port = *(other.data.as_ptr().add(other_port_pos) as *const u32);
+                }
+                if self_port != other_port {
+                    return false;
+                }
+            }
+            _ => {}
+        };
+
+        match self.layers[1].protocol {
+            Protocol::IPV4 => {
+                let self_src_ip_pos = (self.layers[1].offset + 12) as usize;
+                let self_dst_ip_pos = (self.layers[1].offset + 16) as usize;
+                let other_src_ip_pos = (self.layers[1].offset + 12) as usize;
+                let other_dst_ip_pos = (self.layers[1].offset + 16) as usize;
+                let self_src_ip;
+                let other_src_ip;
+                let self_dst_ip;
+                let other_dst_ip;
+                unsafe {
+                    self_src_ip = *(self.data.as_ptr().add(self_src_ip_pos)) as u32;
+                    other_src_ip = *(self.data.as_ptr().add(other_src_ip_pos)) as u32;
+                    self_dst_ip = *(self.data.as_ptr().add(self_dst_ip_pos)) as u32;
+                    other_dst_ip = *(self.data.as_ptr().add(other_dst_ip_pos)) as u32;
+                }
+                if (self_src_ip == other_src_ip && self_dst_ip == other_dst_ip)
+                    || (self_src_ip == other_dst_ip && self_dst_ip == other_dst_ip)
+                {
+                    return true;
+                } else {
+                    return false;
+                }
+            }
+            Protocol::IPV6 => {
+                let self_src_ip_pos = (self.layers[1].offset + 8) as usize;
+                let self_dst_ip_pos = (self.layers[1].offset + 8 + 16) as usize;
+                let other_src_ip_pos = (self.layers[1].offset + 8) as usize;
+                let other_dst_ip_pos = (self.layers[1].offset + 8 + 16) as usize;
+                let self_src_ip;
+                let other_src_ip;
+                let self_dst_ip;
+                let other_dst_ip;
+                unsafe {
+                    self_src_ip = *(self.data.as_ptr().add(self_src_ip_pos)) as u128;
+                    other_src_ip = *(self.data.as_ptr().add(other_src_ip_pos)) as u128;
+                    self_dst_ip = *(self.data.as_ptr().add(self_dst_ip_pos)) as u128;
+                    other_dst_ip = *(self.data.as_ptr().add(other_dst_ip_pos)) as u128;
+                }
+                if (self_src_ip == other_src_ip && self_dst_ip == other_dst_ip)
+                    || (self_src_ip == other_dst_ip && self_dst_ip == other_dst_ip)
+                {
+                    return true;
+                } else {
+                    return false;
+                }
+            }
+            _ => {}
+        };
+
+        true
+    }
+}
+
 #[repr(u8)]
-#[derive(Clone, Copy, Debug, Hash)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 /// Protocol collection, 1 byte
 pub enum Protocol {
     // Data link layer protocols

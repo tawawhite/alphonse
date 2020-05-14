@@ -19,7 +19,7 @@ pub struct Config {
     pub dry_run: bool,
     pub pcap_file: String,
     pub pcap_dir: String,
-    pub pkt_threads_amount: u8,
+    pub rx_threads: u8,
     pub quiet: bool,
     pub recursive: bool,
     pub tags: Vec<String>,
@@ -55,7 +55,7 @@ fn parse_config_file(config_file: &str, config: &mut Config) -> Result<(), Error
     let doc = &docs[0];
 
     doc["some-key"].as_str().unwrap_or("value");
-    config.pkt_threads_amount = doc["pkt-threads"]
+    config.rx_threads = doc["rx-threads"]
         .as_i64()
         .ok_or(Error::CommonError(format!(
             "Failed to convert Yaml into i64"
