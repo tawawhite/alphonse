@@ -43,7 +43,7 @@ impl SessionThread {
                         &mut self.session_table.insert(*p, ses);
                     }
                 },
-                Err(_) => {}
+                Err(_) => break,
             };
         }
     }
