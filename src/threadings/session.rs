@@ -39,7 +39,8 @@ impl SessionThread {
                         }
                     }
                     false => {
-                        let ses = Session::new();
+                        let mut ses = Session::new();
+                        ses.start_time = p.ts;
                         &mut self.session_table.insert(*p, ses);
                     }
                 },
