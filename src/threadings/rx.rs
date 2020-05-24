@@ -6,6 +6,7 @@ use std::collections::hash_map::DefaultHasher;
 use std::ffi::OsString;
 use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use crossbeam_channel::Sender;
 use path_absolutize::Absolutize;
@@ -75,7 +76,7 @@ impl RxThread {
         return files;
     }
 
-    pub fn spawn(&mut self, cfg: Box<config::Config>) -> Result<(), Error> {
+    pub fn spawn(&mut self, cfg: Arc<config::Config>) -> Result<(), Error> {
         let files = RxThread::get_pcap_files(cfg.as_ref());
 
         for file in files {

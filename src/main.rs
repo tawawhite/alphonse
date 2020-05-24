@@ -2,6 +2,7 @@
 extern crate clap;
 extern crate crossbeam_channel;
 
+use std::sync::Arc;
 use std::thread;
 
 use crossbeam_channel::unbounded;
@@ -66,7 +67,7 @@ fn main() -> Result<(), error::Error> {
 #[cfg(not(feature = "dpdk"))]
 fn main() -> Result<(), error::Error> {
     let root_cmd = commands::new_root_command();
-    let cfg = config::parse_args(root_cmd)?;
+    let cfg = Arc::new(config::parse_args(root_cmd)?);
 
     let mut senders = Vec::new();
     let (sender, receiver) = unbounded();
@@ -78,11 +79,9 @@ fn main() -> Result<(), error::Error> {
 
     handles.push(thread::spawn(move || session_thread.spawn()));
 
-    handles.push(thread::spawn(move || {
-        match rx_thread.spawn(Box::from(cfg.clone())) {
-            Ok(_) => {}
-            Err(e) => println!("{}", e),
-        }
+    handles.push(thread::spawn(move || match rx_thread.spawn(cfg) {
+        Ok(_) => {}
+        Err(e) => println!("{}", e),
     }));
 
     for handle in handles {
