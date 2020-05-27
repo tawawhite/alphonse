@@ -9,9 +9,9 @@ clap = "2.33.1"
 pcap = "0.7.0"
 yaml-rust = "0.4.3"
 cpp = "0.5.4"
-libc = "0.2.70"
+libc = "0.2.71"
 crossbeam-channel = "0.4"
-path-absolutize = "1.2.0"
+path-absolutize = "1.2.1"
 
 [build-dependencies]
 cpp_build = "0.5.4"
