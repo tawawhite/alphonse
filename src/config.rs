@@ -5,7 +5,7 @@ use std::path::Path;
 extern crate clap;
 extern crate yaml_rust;
 
-use yaml_rust::YamlLoader;
+use yaml_rust::{Yaml, YamlLoader};
 
 use super::commands::CliArg;
 use super::error::Error;
@@ -20,6 +20,7 @@ pub struct Config {
     pub pcap_file: String,
     pub pcap_dir: String,
     pub rx_threads: u8,
+    pub ses_threads: u8,
     pub quiet: bool,
     pub recursive: bool,
     pub tags: Vec<String>,
@@ -54,21 +55,51 @@ fn parse_config_file(config_file: &str, config: &mut Config) -> Result<(), Error
     let docs = YamlLoader::load_from_str(&s)?;
     let doc = &docs[0];
 
-    doc["some-key"].as_str().unwrap_or("value");
-    config.rx_threads = doc["rx-threads"]
-        .as_i64()
-        .ok_or(Error::CommonError(format!(
-            "Failed to convert Yaml into i64"
-        )))? as u8;
+    match &doc["threads.rx"] {
+        Yaml::Integer(i) => config.rx_threads = *i as u8,
+        Yaml::BadValue => {
+            return Err(Error::CommonError(String::from(
+                "Option threads.rx not found or bad integer value",
+            )))
+        }
+        _ => {
+            return Err(Error::CommonError(String::from(
+                "Wrong value type for threads.rx, expecting integer",
+            )))
+        }
+    };
 
-    match doc["backend"].as_str() {
-        None => panic!(""),
-        Some(s) => match s {
+    match &doc["threads.session"] {
+        Yaml::Integer(i) => config.ses_threads = *i as u8,
+        Yaml::BadValue => {
+            return Err(Error::CommonError(String::from(
+                "Option threads.ses not found or bad integer value",
+            )))
+        }
+        _ => {
+            return Err(Error::CommonError(String::from(
+                "Wrong value type for threads.rx, expecting integer",
+            )))
+        }
+    };
+
+    match &doc["backend"] {
+        Yaml::String(s) => match s.as_str() {
             "dpdk" | "libpcap" => {
                 config.backend = String::from(s);
             }
             _ => return Err(Error::CommonError(format!("Invalid backend option: {}", s))),
         },
+        Yaml::BadValue => {
+            return Err(Error::CommonError(String::from(
+                "Option backend not found or bad string value",
+            )))
+        }
+        _ => {
+            return Err(Error::CommonError(String::from(
+                "Wrong value type for backend, expecting string",
+            )))
+        }
     };
 
     #[cfg(all(target_os = "linux", feature = "dpdk"))]
