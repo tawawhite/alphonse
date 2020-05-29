@@ -6,6 +6,7 @@ use std::collections::hash_map::DefaultHasher;
 use std::ffi::OsString;
 use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use crossbeam_channel::Sender;
@@ -20,6 +21,7 @@ use super::packet::{Packet, Parser};
 pub struct RxThread {
     /// 线程ID
     id: u8,
+    exit: Arc<AtomicBool>,
     /// 收包总数
     pub rx_count: u64,
     // 基本协议解析器
@@ -30,9 +32,15 @@ pub struct RxThread {
 
 impl RxThread {
     /// 创建一个新的收包线程结构体
-    pub fn new(id: u8, link_type: u16, senders: Vec<Sender<Box<Packet>>>) -> RxThread {
+    pub fn new(
+        id: u8,
+        link_type: u16,
+        senders: Vec<Sender<Box<Packet>>>,
+        exit: Arc<AtomicBool>,
+    ) -> RxThread {
         RxThread {
             id,
+            exit,
             rx_count: 0,
             parser: Parser::new(link_type),
             senders,
@@ -76,35 +84,44 @@ impl RxThread {
         return files;
     }
 
-    pub fn spawn(&mut self, cfg: Arc<config::Config>) -> Result<(), Error> {
-        let files = RxThread::get_pcap_files(cfg.as_ref());
-
-        for file in files {
-            let result = Libpcap::from_file(&file);
-            let mut cap;
-            match result {
-                Err(e) => {
-                    return Err(e);
-                }
-                Ok(c) => cap = c,
-            }
-
-            while let Ok(mut pkt) = cap.next() {
-                match self.parser.parse_pkt(&mut pkt) {
-                    Ok(_) => {}
+    fn process_files(&mut self, files: &Vec<PathBuf>) -> Result<(), Error> {
+        while !self.exit.load(Ordering::Relaxed) {
+            for file in files {
+                let result = Libpcap::from_file(&file);
+                let mut cap;
+                match result {
                     Err(e) => {
-                        return Err(Error::ParserError(e));
+                        return Err(e);
                     }
-                };
-                pkt.hash(&mut self.hasher);
+                    Ok(c) => cap = c,
+                }
 
-                let thread = (self.hasher.finish() % self.senders.len() as u64) as usize;
-                match self.senders[thread].send(Box::from(pkt)) {
-                    Ok(_) => {}
-                    Err(_) => {} // TODO: handle error
+                while let Ok(mut pkt) = cap.next() {
+                    match self.parser.parse_pkt(&mut pkt) {
+                        Ok(_) => {}
+                        Err(e) => {
+                            return Err(Error::ParserError(e));
+                        }
+                    };
+                    pkt.hash(&mut self.hasher);
+
+                    let thread = (self.hasher.finish() % self.senders.len() as u64) as usize;
+                    match self.senders[thread].send(Box::from(pkt)) {
+                        Ok(_) => {}
+                        Err(_) => {} // TODO: handle error
+                    }
                 }
             }
         }
+        Ok(())
+    }
+
+    pub fn spawn(&mut self, cfg: Arc<config::Config>) -> Result<(), Error> {
+        let files = RxThread::get_pcap_files(cfg.as_ref());
+        if !files.is_empty() {
+            return self.process_files(&files);
+        }
+
         Ok(())
     }
 }

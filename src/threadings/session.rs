@@ -1,7 +1,8 @@
-extern crate crossbeam_channel;
+use std::collections::hash_map::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
-use std::collections::hash_map::{DefaultHasher, HashMap};
-use std::hash::{Hash, Hasher};
+extern crate crossbeam_channel;
 
 use crossbeam_channel::Receiver;
 
@@ -12,32 +13,31 @@ use super::sessions::Session;
 pub struct SessionThread {
     /// 线程ID
     id: u8,
-    receiver: Box<Receiver<Box<Packet>>>,
+    exit: Arc<AtomicBool>,
+    receiver: Receiver<Box<Packet>>,
     session_table: HashMap<Packet, Session>,
 }
 
 impl SessionThread {
-    pub fn new(id: u8, receiver: Box<Receiver<Box<Packet>>>) -> SessionThread {
+    pub fn new(id: u8, exit: Arc<AtomicBool>, receiver: Receiver<Box<Packet>>) -> SessionThread {
         SessionThread {
             id,
+            exit,
             receiver,
             session_table: HashMap::new(),
         }
     }
 
     pub fn spawn(&mut self) {
-        loop {
+        while !self.exit.load(Ordering::Relaxed) {
             match self.receiver.recv() {
                 Ok(p) => match self.session_table.contains_key(&p) {
-                    true => {
-                        let ses = &mut self.session_table.get_mut(&p);
-                        match ses {
-                            Some(s) => {
-                                s.pkts.push(Box::from(p));
-                            }
-                            None => {}
+                    true => match self.session_table.get_mut(&p) {
+                        Some(ses) => {
+                            ses.pkts.push(p);
                         }
-                    }
+                        None => {}
+                    },
                     false => {
                         let mut ses = Session::new();
                         ses.start_time = p.ts;

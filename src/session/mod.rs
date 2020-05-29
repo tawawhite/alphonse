@@ -1,5 +1,3 @@
-extern crate libc;
-
 use super::packet;
 
 /// network session
