@@ -112,6 +112,7 @@ impl RxThread {
                     }
                 }
             }
+            break;
         }
         Ok(())
     }
