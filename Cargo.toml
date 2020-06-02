@@ -6,16 +6,15 @@ edition = "2018"
 
 [dependencies]
 clap = "2.33.1"
-pcap = "0.7.0"
-yaml-rust = "0.4.3"
-cpp = "0.5.4"
+crossbeam-channel = "0.4.2"
 libc = "0.2.71"
-crossbeam-channel = "0.4"
-path-absolutize = "1.2.1"
+path-absolutize = "2.0.2"
+pcap = "0.7.0"
+yaml-rust = "0.4.4"
 
 [build-dependencies]
 cpp_build = "0.5.4"
-bindgen = "*"
+bindgen = "0.54.0"
 
 # [features]
 # dpdk=[]
