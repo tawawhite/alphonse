@@ -35,6 +35,7 @@ impl Parser {
 
 impl Parser {
     /// 解析单个数据包
+    #[inline]
     pub fn parse_pkt(&self, pkt: &mut Packet) -> Result<(), ParserError> {
         let mut layer;
         // 根据 link type 解析数据链路层协议, 获取下一层协议的协议类型和起始位置

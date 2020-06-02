@@ -31,6 +31,7 @@ pub struct Layer {
 }
 
 impl Hash for Layer {
+    #[inline]
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.protocol.hash(state);
     }
