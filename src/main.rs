@@ -2,6 +2,9 @@
 extern crate clap;
 extern crate crossbeam_channel;
 extern crate libc;
+extern crate path_absolutize;
+extern crate pcap;
+extern crate twox_hash;
 
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;

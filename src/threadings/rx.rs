@@ -1,8 +1,3 @@
-extern crate crossbeam_channel;
-extern crate path_absolutize;
-extern crate pcap;
-
-use std::collections::hash_map::DefaultHasher;
 use std::ffi::OsString;
 use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
@@ -27,7 +22,6 @@ pub struct RxThread {
     // 基本协议解析器
     parser: Parser,
     senders: Vec<Sender<Box<Packet>>>,
-    hasher: DefaultHasher,
 }
 
 impl RxThread {
@@ -44,7 +38,6 @@ impl RxThread {
             rx_count: 0,
             parser: Parser::new(link_type),
             senders,
-            hasher: DefaultHasher::new(),
         }
     }
 }
@@ -103,9 +96,11 @@ impl RxThread {
                             return Err(Error::ParserError(e));
                         }
                     };
-                    pkt.hash(&mut self.hasher);
+                    // TODO: inline with_seed function
+                    let mut hasher = twox_hash::Xxh3Hash64::with_seed(0);
+                    pkt.hash(&mut hasher);
 
-                    let thread = (self.hasher.finish() % self.senders.len() as u64) as usize;
+                    let thread = (hasher.finish() % self.senders.len() as u64) as usize;
                     match self.senders[thread].send(Box::from(pkt)) {
                         Ok(_) => {}
                         Err(_) => {} // TODO: handle error
