@@ -234,10 +234,6 @@ impl PartialEq for Packet {
                         return false;
                     }
                 }
-                let self_src_ip_pos = (self.network_layer.offset + 8) as usize;
-                let self_dst_ip_pos = (self.network_layer.offset + 8 + 16) as usize;
-                let other_src_ip_pos = (self.network_layer.offset + 8) as usize;
-                let other_dst_ip_pos = (self.network_layer.offset + 8 + 16) as usize;
             }
             _ => {}
         };
