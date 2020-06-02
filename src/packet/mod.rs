@@ -43,10 +43,10 @@ pub struct Packet {
     pub caplen: u32,
     /// actual length
     pub data: Vec<u8>,
-    /// All layer's basic info
-    pub layers: [Layer; PACKET_MAX_LAYERS],
-    /// How much layers does the packet contain
-    pub last_layer_index: u8,
+    pub data_link_layer: Layer,
+    pub network_layer: Layer,
+    pub trans_layer: Layer,
+    pub app_layer: Layer,
     /// Direction
     pub direction: bool,
 }
@@ -58,55 +58,105 @@ impl Packet {
     }
 
     #[inline]
-    /// return the length of the specific layer
-    pub fn len_of_layer(&self, depth: usize) -> u16 {
-        match depth {
-            0 => self.len(),
-            _ => self.len() - self.layers[depth].offset,
-        }
-    }
-
     pub fn from(raw_pkt: pcap::Packet) -> Packet {
         Packet {
             ts: raw_pkt.header.ts,
             caplen: raw_pkt.header.caplen,
             data: Vec::from(raw_pkt.data),
-            last_layer_index: 0,
-            layers: [Layer {
+            data_link_layer: Layer {
                 protocol: Protocol::default(),
                 offset: 0,
-            }; PACKET_MAX_LAYERS],
+            },
+            network_layer: Layer {
+                protocol: Protocol::default(),
+                offset: 0,
+            },
+            trans_layer: Layer {
+                protocol: Protocol::default(),
+                offset: 0,
+            },
+            app_layer: Layer {
+                protocol: Protocol::default(),
+                offset: 0,
+            },
             direction: DIRECTION_LEFT,
         }
+    }
+
+    /// Get src port
+    ///
+    /// It's the caller's duty to guarantee transport layer is TCP/UDP
+    #[inline]
+    pub fn get_src_port(&self) -> u16 {
+        let src_port_pos = (self.trans_layer.offset) as usize;
+        unsafe { *(&self.data[src_port_pos] as *const u8 as *const u16) }
+    }
+
+    /// Get dst port
+    ///
+    /// It's the caller's duty to guarantee transport layer is TCP/UDP
+    #[inline]
+    pub fn get_dst_port(&self) -> u16 {
+        let dst_port_pos = (self.trans_layer.offset + 2) as usize;
+        unsafe { *(&self.data[dst_port_pos] as *const u8 as *const u16) }
+    }
+
+    /// Get src ipv4 address
+    ///
+    /// It's the caller's duty to guarantee network layer is IPV4
+    #[inline]
+    pub fn get_src_ipv4(&self) -> u32 {
+        let src_ip_pos = (self.network_layer.offset + 12) as usize;
+        unsafe { *(&self.data[src_ip_pos] as *const u8 as *const u32) }
+    }
+
+    /// Get dst ipv4 address
+    ///
+    /// It's the caller's duty to guarantee network layer is IPV4
+    #[inline]
+    pub fn get_dst_ipv4(&self) -> u32 {
+        let dst_ip_pos = (self.network_layer.offset + 16) as usize;
+        unsafe { *(&self.data[dst_ip_pos] as *const u8 as *const u32) }
+    }
+
+    /// Get src ipv6 address
+    ///
+    /// It's the caller's duty to guarantee network layer is IPV6
+    #[inline]
+    pub fn get_src_ipv6(&self) -> &u128 {
+        let src_ip_pos = (self.network_layer.offset + 8) as usize;
+        unsafe { &*(&self.data[src_ip_pos] as *const u8 as *const u128) }
+    }
+
+    /// Get dst ipv6 address
+    ///
+    /// It's the caller's duty to guarantee network layer is IPV6
+    #[inline]
+    pub fn get_dst_ipv6(&self) -> &u128 {
+        let dst_ip_pos = (self.network_layer.offset + 8 + 16) as usize;
+        unsafe { &*(&self.data[dst_ip_pos] as *const u8 as *const u128) }
     }
 }
 
 impl Hash for Packet {
     #[inline]
     fn hash<H: Hasher>(&self, state: &mut H) {
-        match self.layers[2].protocol {
+        match self.trans_layer.protocol {
             Protocol::TCP | Protocol::UDP => {
-                self.layers[2].hash(state);
-                let src_port_pos = (self.layers[2].offset) as usize;
-                let dst_port_pos = (self.layers[2].offset + 2) as usize;
-                self.data.as_slice()[src_port_pos..src_port_pos + 4].hash(state);
-                self.data.as_slice()[dst_port_pos..dst_port_pos + 4].hash(state);
+                self.get_src_port().hash(state);
+                self.get_dst_port().hash(state);
             }
             _ => {}
         };
 
-        match self.layers[1].protocol {
+        match self.network_layer.protocol {
             Protocol::IPV4 => {
-                let src_ip_pos = (self.layers[1].offset + 12) as usize;
-                let dst_ip_pos = (self.layers[1].offset + 16) as usize;
-                self.data.as_slice()[src_ip_pos..src_ip_pos + 4].hash(state);
-                self.data.as_slice()[dst_ip_pos..dst_ip_pos + 4].hash(state);
+                self.get_src_ipv4().hash(state);
+                self.get_dst_ipv4().hash(state);
             }
             Protocol::IPV6 => {
-                let src_ip_pos = (self.layers[1].offset + 8) as usize;
-                let dst_ip_pos = (self.layers[1].offset + 8 + 16) as usize;
-                self.data.as_slice()[src_ip_pos..src_ip_pos + 8].hash(state);
-                self.data.as_slice()[dst_ip_pos..dst_ip_pos + 8 + 16].hash(state);
+                (*self.get_src_ipv6()).hash(state);
+                (*self.get_dst_ipv6()).hash(state);
             }
             _ => {}
         };
@@ -116,77 +166,77 @@ impl Hash for Packet {
 impl PartialEq for Packet {
     #[inline]
     fn eq(&self, other: &Packet) -> bool {
-        if self.layers[1].protocol != other.layers[1].protocol {
+        if self.trans_layer.protocol != other.trans_layer.protocol {
             return false;
         }
 
-        if self.layers[2].protocol != other.layers[2].protocol {
+        if self.network_layer.protocol != other.network_layer.protocol {
             return false;
         }
 
-        match self.layers[2].protocol {
+        match self.trans_layer.protocol {
             Protocol::TCP | Protocol::UDP => {
-                let self_port_pos = (self.layers[2].offset) as usize;
-                let other_port_pos = (self.layers[2].offset) as usize;
-                let self_port;
-                let other_port;
-                unsafe {
-                    self_port = *(self.data.as_ptr().add(self_port_pos) as *const u32);
-                    other_port = *(other.data.as_ptr().add(other_port_pos) as *const u32);
-                }
-                if self_port != other_port {
-                    return false;
+                let self_src_port = self.get_src_port();
+                let self_dst_port = self.get_dst_port();
+                let other_src_port = self.get_src_port();
+                let other_dst_port = self.get_dst_port();
+
+                let self_cmp = self_src_port > self_dst_port;
+                let other_cmp = other_src_port > other_dst_port;
+
+                if self_cmp == other_cmp {
+                    if (self_src_port != other_src_port) || (self_dst_port == other_dst_port) {
+                        return false;
+                    }
+                } else {
+                    if (self_src_port != other_dst_port) || (self_dst_port == other_src_port) {
+                        return false;
+                    }
                 }
             }
             _ => {}
         };
 
-        match self.layers[1].protocol {
+        match self.network_layer.protocol {
             Protocol::IPV4 => {
-                let self_src_ip_pos = (self.layers[1].offset + 12) as usize;
-                let self_dst_ip_pos = (self.layers[1].offset + 16) as usize;
-                let other_src_ip_pos = (self.layers[1].offset + 12) as usize;
-                let other_dst_ip_pos = (self.layers[1].offset + 16) as usize;
-                let self_src_ip;
-                let other_src_ip;
-                let self_dst_ip;
-                let other_dst_ip;
-                unsafe {
-                    self_src_ip = *(self.data.as_ptr().add(self_src_ip_pos)) as u32;
-                    other_src_ip = *(self.data.as_ptr().add(other_src_ip_pos)) as u32;
-                    self_dst_ip = *(self.data.as_ptr().add(self_dst_ip_pos)) as u32;
-                    other_dst_ip = *(self.data.as_ptr().add(other_dst_ip_pos)) as u32;
-                }
-                if (self_src_ip == other_src_ip && self_dst_ip == other_dst_ip)
-                    || (self_src_ip == other_dst_ip && self_dst_ip == other_dst_ip)
-                {
-                    return true;
+                let self_src_ip = self.get_src_ipv4();
+                let self_dst_ip = self.get_dst_ipv4();
+                let other_src_ip = other.get_src_ipv4();
+                let other_dst_ip = other.get_dst_ipv4();
+
+                let self_cmp = self_src_ip > self_dst_ip;
+                let other_cmp = other_src_ip > other_dst_ip;
+                if self_cmp == other_cmp {
+                    if (self_src_ip != other_src_ip) || (self_dst_ip == other_dst_ip) {
+                        return false;
+                    }
                 } else {
-                    return false;
+                    if (self_src_ip != other_dst_ip) || (self_dst_ip == other_src_ip) {
+                        return false;
+                    }
                 }
             }
             Protocol::IPV6 => {
-                let self_src_ip_pos = (self.layers[1].offset + 8) as usize;
-                let self_dst_ip_pos = (self.layers[1].offset + 8 + 16) as usize;
-                let other_src_ip_pos = (self.layers[1].offset + 8) as usize;
-                let other_dst_ip_pos = (self.layers[1].offset + 8 + 16) as usize;
-                let self_src_ip;
-                let other_src_ip;
-                let self_dst_ip;
-                let other_dst_ip;
-                unsafe {
-                    self_src_ip = *(self.data.as_ptr().add(self_src_ip_pos)) as u128;
-                    other_src_ip = *(self.data.as_ptr().add(other_src_ip_pos)) as u128;
-                    self_dst_ip = *(self.data.as_ptr().add(self_dst_ip_pos)) as u128;
-                    other_dst_ip = *(self.data.as_ptr().add(other_dst_ip_pos)) as u128;
-                }
-                if (self_src_ip == other_src_ip && self_dst_ip == other_dst_ip)
-                    || (self_src_ip == other_dst_ip && self_dst_ip == other_dst_ip)
-                {
-                    return true;
+                let self_src_ip = self.get_src_ipv4();
+                let self_dst_ip = self.get_dst_ipv4();
+                let other_src_ip = other.get_src_ipv4();
+                let other_dst_ip = other.get_dst_ipv4();
+
+                let self_cmp = self_src_ip > self_dst_ip;
+                let other_cmp = other_src_ip > other_dst_ip;
+                if self_cmp == other_cmp {
+                    if (self_src_ip != other_src_ip) || (self_dst_ip == other_dst_ip) {
+                        return false;
+                    }
                 } else {
-                    return false;
+                    if (self_src_ip != other_dst_ip) || (self_dst_ip == other_src_ip) {
+                        return false;
+                    }
                 }
+                let self_src_ip_pos = (self.network_layer.offset + 8) as usize;
+                let self_dst_ip_pos = (self.network_layer.offset + 8 + 16) as usize;
+                let other_src_ip_pos = (self.network_layer.offset + 8) as usize;
+                let other_dst_ip_pos = (self.network_layer.offset + 8 + 16) as usize;
             }
             _ => {}
         };
