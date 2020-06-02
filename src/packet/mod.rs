@@ -218,10 +218,10 @@ impl PartialEq for Packet {
                 }
             }
             Protocol::IPV6 => {
-                let self_src_ip = self.get_src_ipv4();
-                let self_dst_ip = self.get_dst_ipv4();
-                let other_src_ip = other.get_src_ipv4();
-                let other_dst_ip = other.get_dst_ipv4();
+                let self_src_ip = self.get_src_ipv6();
+                let self_dst_ip = self.get_dst_ipv6();
+                let other_src_ip = other.get_src_ipv6();
+                let other_dst_ip = other.get_dst_ipv6();
 
                 let self_cmp = self_src_ip > self_dst_ip;
                 let other_cmp = other_src_ip > other_dst_ip;
