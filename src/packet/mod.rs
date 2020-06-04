@@ -16,8 +16,6 @@ pub mod network;
 pub mod parser;
 pub mod transport;
 
-pub const PACKET_MAX_LAYERS: usize = 4;
-
 pub const DIRECTION_LEFT: bool = false;
 pub const DIRECTION_RIGHT: bool = true;
 
@@ -44,9 +42,13 @@ pub struct Packet {
     pub caplen: u32,
     /// actual length
     pub data: Vec<u8>,
+    /// data link layer
     pub data_link_layer: Layer,
+    /// network layer
     pub network_layer: Layer,
+    /// transport layer
     pub trans_layer: Layer,
+    /// application layer
     pub app_layer: Layer,
     /// Direction
     pub direction: bool,
@@ -59,27 +61,15 @@ impl Packet {
     }
 
     #[inline]
-    pub fn from(raw_pkt: pcap::Packet) -> Packet {
+    pub fn from(raw_pkt: &pcap::Packet) -> Packet {
         Packet {
             ts: raw_pkt.header.ts,
             caplen: raw_pkt.header.caplen,
             data: Vec::from(raw_pkt.data),
-            data_link_layer: Layer {
-                protocol: Protocol::default(),
-                offset: 0,
-            },
-            network_layer: Layer {
-                protocol: Protocol::default(),
-                offset: 0,
-            },
-            trans_layer: Layer {
-                protocol: Protocol::default(),
-                offset: 0,
-            },
-            app_layer: Layer {
-                protocol: Protocol::default(),
-                offset: 0,
-            },
+            data_link_layer: Layer::default(),
+            network_layer: Layer::default(),
+            trans_layer: Layer::default(),
+            app_layer: Layer::default(),
             direction: DIRECTION_LEFT,
         }
     }

@@ -14,7 +14,7 @@ impl Capture for Libpcap {
     /// 获取下一个数据包
     fn next(&mut self) -> Result<Packet, Error> {
         match self.pcap_file.as_mut().unwrap().next() {
-            Ok(raw_pkt) => Ok(Packet::from(raw_pkt)),
+            Ok(raw_pkt) => Ok(Packet::from(&raw_pkt)),
             Err(e) => Err(Error::CaptureError(e)),
         }
     }
