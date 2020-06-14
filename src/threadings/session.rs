@@ -31,14 +31,11 @@ impl SessionThread {
     pub fn spawn(&mut self) {
         while !self.exit.load(Ordering::Relaxed) {
             match self.receiver.recv() {
-                Ok(p) => match self.session_table.contains_key(&p) {
-                    true => match self.session_table.get_mut(&p) {
-                        Some(ses) => {
-                            ses.pkts.push(p);
-                        }
-                        None => {}
-                    },
-                    false => {
+                Ok(p) => match self.session_table.get_mut(&p) {
+                    Some(ses) => {
+                        ses.pkts.push(p);
+                    }
+                    None => {
                         let mut ses = Session::new();
                         ses.start_time = p.ts;
                         &mut self.session_table.insert(*p, ses);
