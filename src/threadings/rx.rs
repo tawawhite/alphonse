@@ -66,7 +66,7 @@ impl RxThread {
                             match ext {
                                 _ if ext == pcap_ext => files.push(entry.path()),
                                 _ if ext == pcapng_ext => files.push(entry.path()),
-                                _ => {}
+                                _ => {} // if file is not pcap or pcapng, skip
                             };
                         }
                     };
@@ -99,12 +99,10 @@ impl RxThread {
                     // TODO: inline with_seed function
                     let mut hasher = twox_hash::Xxh3Hash64::with_seed(0);
                     pkt.hash(&mut hasher);
+                    pkt.hash = hasher.finish();
 
-                    let thread = (hasher.finish() % self.senders.len() as u64) as usize;
-                    match self.senders[thread].send(Box::from(pkt)) {
-                        Ok(_) => {}
-                        Err(_) => {} // TODO: handle error
-                    }
+                    let thread = (pkt.hash % self.senders.len() as u64) as usize;
+                    self.senders[thread].send(Box::from(pkt)).unwrap() // pkt move happens here, could be optimized
                 }
             }
             break;

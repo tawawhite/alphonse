@@ -19,7 +19,7 @@ pub mod transport;
 pub const DIRECTION_LEFT: bool = false;
 pub const DIRECTION_RIGHT: bool = true;
 
-#[derive(Default, Clone, Copy, Debug)]
+#[derive(Default)]
 #[repr(packed)]
 /// Packet protocol layer, 3 bytes
 pub struct Layer {
@@ -40,8 +40,8 @@ pub struct Packet {
     pub ts: libc::timeval,
     /// capture length
     pub caplen: u32,
-    /// actual length
-    pub data: Vec<u8>,
+    /// raw packet data
+    pub data: Box<Vec<u8>>,
     /// data link layer
     pub data_link_layer: Layer,
     /// network layer
@@ -52,6 +52,8 @@ pub struct Packet {
     pub app_layer: Layer,
     /// Direction
     pub direction: bool,
+    /// Packet hash, improve hash performance
+    pub hash: u64,
 }
 
 impl Packet {
@@ -65,12 +67,13 @@ impl Packet {
         Packet {
             ts: raw_pkt.header.ts,
             caplen: raw_pkt.header.caplen,
-            data: Vec::from(raw_pkt.data),
+            data: Box::new(Vec::from(raw_pkt.data)),
             data_link_layer: Layer::default(),
             network_layer: Layer::default(),
             trans_layer: Layer::default(),
             app_layer: Layer::default(),
             direction: DIRECTION_LEFT,
+            hash: 0,
         }
     }
 
@@ -132,6 +135,10 @@ impl Packet {
 impl Hash for Packet {
     #[inline]
     fn hash<H: Hasher>(&self, state: &mut H) {
+        if self.hash != 0 {
+            return self.hash.hash(state);
+        }
+
         match self.trans_layer.protocol {
             Protocol::TCP | Protocol::UDP => {
                 self.get_src_port().hash(state);
