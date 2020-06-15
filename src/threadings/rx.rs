@@ -7,7 +7,7 @@ use std::sync::Arc;
 use crossbeam_channel::Sender;
 use path_absolutize::Absolutize;
 
-use super::capture::{Capture, Libpcap};
+use super::capture::{Capture, NetworkInterface, Offline};
 use super::config;
 use super::error::Error;
 use super::packet::{Packet, Parser};
@@ -77,10 +77,30 @@ impl RxThread {
         return files;
     }
 
+    #[inline]
+    fn rx<C: Capture>(&mut self, cap: &mut C) -> Result<(), Error> {
+        while let Ok(mut pkt) = cap.next() {
+            match self.parser.parse_pkt(&mut pkt) {
+                Ok(_) => {}
+                Err(e) => {
+                    return Err(Error::ParserError(e));
+                }
+            };
+            // TODO: inline with_seed function
+            let mut hasher = twox_hash::Xxh3Hash64::with_seed(0);
+            pkt.hash(&mut hasher);
+            pkt.hash = hasher.finish();
+
+            let thread = (pkt.hash % self.senders.len() as u64) as usize;
+            self.senders[thread].send(Box::from(pkt)).unwrap() // pkt move happens here, could be optimized
+        }
+        Ok(())
+    }
+
     fn process_files(&mut self, files: &Vec<PathBuf>) -> Result<(), Error> {
         while !self.exit.load(Ordering::Relaxed) {
             for file in files {
-                let result = Libpcap::from_file(&file);
+                let result = Offline::try_from_path(file);
                 let mut cap;
                 match result {
                     Err(e) => {
@@ -89,24 +109,32 @@ impl RxThread {
                     Ok(c) => cap = c,
                 }
 
-                while let Ok(mut pkt) = cap.next() {
-                    match self.parser.parse_pkt(&mut pkt) {
-                        Ok(_) => {}
-                        Err(e) => {
-                            return Err(Error::ParserError(e));
-                        }
-                    };
-                    // TODO: inline with_seed function
-                    let mut hasher = twox_hash::Xxh3Hash64::with_seed(0);
-                    pkt.hash(&mut hasher);
-                    pkt.hash = hasher.finish();
-
-                    let thread = (pkt.hash % self.senders.len() as u64) as usize;
-                    self.senders[thread].send(Box::from(pkt)).unwrap() // pkt move happens here, could be optimized
-                }
+                self.rx(&mut cap)?;
             }
             break;
         }
+        Ok(())
+    }
+
+    fn listen_network_interface(&mut self, cfg: &Arc<config::Config>) -> Result<(), Error> {
+        let interface = match cfg.interfaces.get(self.id as usize) {
+            Some(i) => i,
+            None => todo!(),
+        };
+
+        let result = NetworkInterface::try_from_str(interface);
+        let mut cap;
+        match result {
+            Err(e) => {
+                return Err(e);
+            }
+            Ok(c) => cap = c,
+        }
+
+        while !self.exit.load(Ordering::Relaxed) {
+            self.rx(&mut cap)?;
+        }
+
         Ok(())
     }
 
@@ -114,8 +142,8 @@ impl RxThread {
         let files = RxThread::get_pcap_files(cfg.as_ref());
         if !files.is_empty() {
             return self.process_files(&files);
+        } else {
+            return self.listen_network_interface(&cfg);
         }
-
-        Ok(())
     }
 }

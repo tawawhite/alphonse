@@ -1,44 +1,27 @@
+use std::convert::TryFrom;
 use std::path::Path;
 
 use super::error::Error;
 use super::packet::Packet;
-use super::pcap;
 use super::Capture;
 
-pub struct Libpcap {
-    pcap_file: Option<pcap::Capture<pcap::Offline>>,
+pub struct Offline {
+    cap: Box<pcap::Capture<pcap::Offline>>,
 }
 
-impl Capture for Libpcap {
-    #[inline]
-    /// 获取下一个数据包
-    fn next(&mut self) -> Result<Packet, Error> {
-        match self.pcap_file.as_mut().unwrap().next() {
-            Ok(raw_pkt) => Ok(Packet::from(&raw_pkt)),
-            Err(e) => Err(Error::CaptureError(e)),
-        }
-    }
-}
-
-impl Libpcap {
+impl Offline {
     #[inline]
     /// Get pcap file's link type
     pub fn link_type(&self) -> u16 {
-        self.pcap_file.as_ref().unwrap().get_datalink().0 as u16
+        self.cap.get_datalink().0 as u16
     }
+}
 
-    pub fn new() -> Libpcap {
-        Libpcap { pcap_file: None }
-    }
-
-    #[inline]
-    /// 从 pcap 文件初始化 Capture
-    pub fn from_file<P: AsRef<Path>>(path: &P) -> Result<Libpcap, Error> {
+impl Offline {
+    pub fn try_from_path<P: AsRef<Path>>(path: P) -> Result<Offline, Error> {
         if !path.as_ref().exists() {
             // check pcap file's existence
-            return Err(Error::IoError(std::io::Error::from(
-                std::io::ErrorKind::NotFound,
-            )));
+            return Err(Error::CommonError(format!("File does not exist")));
         }
 
         let result = pcap::Capture::from_file(path);
@@ -51,8 +34,57 @@ impl Libpcap {
             Ok(v) => pcap_file = v,
         }
 
-        Ok(Libpcap {
-            pcap_file: Some(pcap_file),
+        Ok(Offline {
+            cap: Box::new(pcap_file),
         })
+    }
+}
+
+impl Capture for Offline {
+    #[inline]
+    /// 获取下一个数据包
+    fn next(&mut self) -> Result<Packet, Error> {
+        match self.cap.as_mut().next() {
+            Ok(raw_pkt) => Ok(Packet::from(&raw_pkt)),
+            Err(e) => Err(Error::CaptureError(e)),
+        }
+    }
+}
+
+pub struct NetworkInterface {
+    cap: Box<pcap::Capture<pcap::Active>>,
+}
+
+impl Capture for NetworkInterface {
+    #[inline]
+    /// 获取下一个数据包
+    fn next(&mut self) -> Result<Packet, Error> {
+        match self.cap.next() {
+            Ok(raw_pkt) => Ok(Packet::from(&raw_pkt)),
+            Err(e) => Err(Error::CaptureError(e)),
+        }
+    }
+}
+
+impl NetworkInterface {
+    /// Initialize a Libpcap instance from a network interface
+    pub fn try_from_str<S: AsRef<str>>(interface: S) -> Result<NetworkInterface, Error> {
+        let inter_string = String::from(interface.as_ref());
+        match pcap::Device::list() {
+            Ok(devices) => {
+                let _ = match devices.iter().position(|x| inter_string.eq(&x.name)) {
+                    Some(p) => p,
+                    None => todo!(),
+                };
+
+                let cap = pcap::Capture::from_device(interface.as_ref())
+                    .unwrap()
+                    .promisc(true)
+                    .open()
+                    .unwrap();
+                Ok(NetworkInterface { cap: Box::new(cap) })
+            }
+            Err(_) => todo!(),
+        }
     }
 }
