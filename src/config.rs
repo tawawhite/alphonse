@@ -17,6 +17,7 @@ pub struct Config {
     pub delete: bool,
     pub dpdk_eal_args: Vec<String>,
     pub dry_run: bool,
+    pub interfaces: Vec<String>,
     pub pcap_file: String,
     pub pcap_dir: String,
     pub rx_threads: u8,
@@ -36,6 +37,12 @@ pub fn parse_args(root_cmd: clap::App) -> Result<Config, Error> {
     }
 
     set_config_by_cli_args(&mut config, &matches);
+
+    if (config.pcap_dir.is_empty() || config.pcap_file.is_empty()) && config.interfaces.is_empty() {
+        return Err(Error::CommonError(format!(
+            "Launched without specify network interface nor pcap file/dir"
+        )));
+    }
 
     Ok(config)
 }
@@ -101,6 +108,36 @@ fn parse_config_file(config_file: &str, config: &mut Config) -> Result<(), Error
             )))
         }
     };
+
+    match &doc["interfaces"] {
+        Yaml::Array(a) => {
+            for element in a {
+                match element {
+                    Yaml::String(s) => config.interfaces.push(s.clone()),
+                    Yaml::BadValue => {
+                        return Err(Error::CommonError(String::from(
+                            "Bad string value for an interface value",
+                        )))
+                    }
+                    _ => {
+                        return Err(Error::CommonError(String::from(
+                            "Wrong value type for interfaces' element, expecting string",
+                        )))
+                    }
+                }
+            }
+        }
+        Yaml::BadValue => {
+            return Err(Error::CommonError(String::from(
+                "Option interfaces not found or bad array value",
+            )))
+        }
+        _ => {
+            return Err(Error::CommonError(String::from(
+                "Wrong value type for interfaces, expecting array",
+            )))
+        }
+    }
 
     #[cfg(all(target_os = "linux", feature = "dpdk"))]
     {
