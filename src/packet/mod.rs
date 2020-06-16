@@ -181,11 +181,11 @@ impl PartialEq for Packet {
                 let other_cmp = other_src_port > other_dst_port;
 
                 if self_cmp == other_cmp {
-                    if (self_src_port != other_src_port) || (self_dst_port == other_dst_port) {
+                    if (self_src_port != other_src_port) || (self_dst_port != other_dst_port) {
                         return false;
                     }
                 } else {
-                    if (self_src_port != other_dst_port) || (self_dst_port == other_src_port) {
+                    if (self_src_port != other_dst_port) || (self_dst_port != other_src_port) {
                         return false;
                     }
                 }
@@ -203,11 +203,11 @@ impl PartialEq for Packet {
                 let self_cmp = self_src_ip > self_dst_ip;
                 let other_cmp = other_src_ip > other_dst_ip;
                 if self_cmp == other_cmp {
-                    if (self_src_ip != other_src_ip) || (self_dst_ip == other_dst_ip) {
+                    if (self_src_ip != other_src_ip) || (self_dst_ip != other_dst_ip) {
                         return false;
                     }
                 } else {
-                    if (self_src_ip != other_dst_ip) || (self_dst_ip == other_src_ip) {
+                    if (self_src_ip != other_dst_ip) || (self_dst_ip != other_src_ip) {
                         return false;
                     }
                 }
@@ -221,11 +221,11 @@ impl PartialEq for Packet {
                 let self_cmp = self_src_ip > self_dst_ip;
                 let other_cmp = other_src_ip > other_dst_ip;
                 if self_cmp == other_cmp {
-                    if (self_src_ip != other_src_ip) || (self_dst_ip == other_dst_ip) {
+                    if (self_src_ip != other_src_ip) || (self_dst_ip != other_dst_ip) {
                         return false;
                     }
                 } else {
-                    if (self_src_ip != other_dst_ip) || (self_dst_ip == other_src_ip) {
+                    if (self_src_ip != other_dst_ip) || (self_dst_ip != other_src_ip) {
                         return false;
                     }
                 }
