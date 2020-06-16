@@ -5,11 +5,13 @@ extern crate libc;
 extern crate path_absolutize;
 extern crate pcap;
 extern crate twox_hash;
+extern crate yaml_rust;
 
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use std::thread;
 
+use anyhow::Result;
 use crossbeam_channel::unbounded;
 
 mod capture;
@@ -17,13 +19,12 @@ mod commands;
 mod config;
 #[cfg(all(target_os = "linux", feature = "dpdk"))]
 mod dpdk;
-mod error;
 mod packet;
 mod session;
 mod threadings;
 
 #[cfg(all(target_os = "linux", feature = "dpdk"))]
-fn main() -> Result<(), error::Error> {
+fn main() -> Result<()> {
     let root_cmd = commands::new_root_command();
 
     let mut config = config::parse_args(root_cmd)?;
@@ -70,7 +71,7 @@ fn main() -> Result<(), error::Error> {
 }
 
 #[cfg(not(feature = "dpdk"))]
-fn main() -> Result<(), error::Error> {
+fn main() -> Result<()> {
     let root_cmd = commands::new_root_command();
     let cfg = config::parse_args(root_cmd)?;
     let exit = Arc::new(AtomicBool::new(false));

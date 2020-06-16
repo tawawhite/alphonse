@@ -1,13 +1,12 @@
-use super::error::ParserError;
-use super::{Layer, Protocol, SimpleProtocolParser};
+use super::{Error, Layer, Protocol, SimpleProtocolParser};
 
 pub struct Parser {}
 
 impl SimpleProtocolParser for Parser {
     #[inline]
-    fn parse(buf: &[u8], _offset: u16) -> Result<Layer, ParserError> {
+    fn parse(buf: &[u8], _offset: u16) -> Result<Layer, Error> {
         if buf.len() < 4 {
-            return Err(ParserError::CorruptPacket(format!(
+            return Err(Error::CorruptPacket(format!(
                 "The packet is corrupted, packet too short ({} bytes)",
                 buf.len()
             )));
@@ -25,19 +24,19 @@ impl SimpleProtocolParser for Parser {
             2 => layer.protocol = Protocol::IPV4,
             // OSI packets
             7 => {
-                return Err(ParserError::UnsupportProtocol(format!(
+                return Err(Error::UnsupportProtocol(format!(
                     "Does not support OSI packet"
                 )))
             }
             // IPX packets
             23 => {
-                return Err(ParserError::UnsupportProtocol(format!(
+                return Err(Error::UnsupportProtocol(format!(
                     "Does not support IPX packet"
                 )))
             }
             24 | 28 | 30 => layer.protocol = Protocol::IPV6,
             _ => {
-                return Err(ParserError::UnsupportProtocol(format!(
+                return Err(Error::UnsupportProtocol(format!(
                     "Unknown protocol {}",
                     buf[0],
                 )))

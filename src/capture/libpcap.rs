@@ -1,7 +1,7 @@
-use std::convert::TryFrom;
 use std::path::Path;
 
-use super::error::Error;
+use anyhow::{anyhow, Result};
+
 use super::packet::Packet;
 use super::Capture;
 
@@ -18,10 +18,9 @@ impl Offline {
 }
 
 impl Offline {
-    pub fn try_from_path<P: AsRef<Path>>(path: P) -> Result<Offline, Error> {
+    pub fn try_from_path<P: AsRef<Path>>(path: P) -> Result<Offline> {
         if !path.as_ref().exists() {
-            // check pcap file's existence
-            return Err(Error::CommonError(format!("File does not exist")));
+            return Err(anyhow!("File does not exist"));
         }
 
         let result = pcap::Capture::from_file(path);
@@ -43,11 +42,9 @@ impl Offline {
 impl Capture for Offline {
     #[inline]
     /// 获取下一个数据包
-    fn next(&mut self) -> Result<Packet, Error> {
-        match self.cap.as_mut().next() {
-            Ok(raw_pkt) => Ok(Packet::from(&raw_pkt)),
-            Err(e) => Err(Error::CaptureError(e)),
-        }
+    fn next(&mut self) -> Result<Packet> {
+        let raw_pkt = self.cap.as_mut().next()?;
+        Ok(Packet::from(&raw_pkt))
     }
 }
 
@@ -58,17 +55,15 @@ pub struct NetworkInterface {
 impl Capture for NetworkInterface {
     #[inline]
     /// 获取下一个数据包
-    fn next(&mut self) -> Result<Packet, Error> {
-        match self.cap.next() {
-            Ok(raw_pkt) => Ok(Packet::from(&raw_pkt)),
-            Err(e) => Err(Error::CaptureError(e)),
-        }
+    fn next(&mut self) -> Result<Packet> {
+        let raw_pkt = self.cap.as_mut().next()?;
+        Ok(Packet::from(&raw_pkt))
     }
 }
 
 impl NetworkInterface {
     /// Initialize a Libpcap instance from a network interface
-    pub fn try_from_str<S: AsRef<str>>(interface: S) -> Result<NetworkInterface, Error> {
+    pub fn try_from_str<S: AsRef<str>>(interface: S) -> Result<NetworkInterface> {
         let inter_string = String::from(interface.as_ref());
         match pcap::Device::list() {
             Ok(devices) => {

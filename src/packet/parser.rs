@@ -1,4 +1,7 @@
-use super::error::ParserError;
+use std::fmt::{Display, Formatter};
+
+use anyhow::Result;
+
 use super::{link, network, transport, Layer, Packet, Protocol};
 
 /// 仅解析协议在数据包中的开始位置和协议长度的 parser
@@ -12,8 +15,26 @@ pub trait SimpleProtocolParser {
     /// * `offset` - 本层协议距离数据包头部的距离
     ///
     /// * `pkt` - 数据包
-    fn parse(buf: &[u8], offset: u16) -> Result<Layer, ParserError>;
+    fn parse(buf: &[u8], offset: u16) -> Result<Layer, Error>;
 }
+
+#[derive(Debug)]
+pub enum Error {
+    UnsupportProtocol(String),
+    CorruptPacket(String),
+    UnknownProtocol,
+}
+
+impl Display for Error {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match &self {
+            Error::UnknownProtocol => write!(f, "Unknown Protocol"),
+            Error::UnsupportProtocol(s) | Error::CorruptPacket(s) => write!(f, "{}", s),
+        }
+    }
+}
+
+impl std::error::Error for Error {}
 
 pub struct Parser {
     /// SnapLen, Snap Length, or snapshot length is the amount of data for each frame
@@ -36,7 +57,7 @@ impl Parser {
 impl Parser {
     /// 解析单个数据包
     #[inline]
-    pub fn parse_pkt(&self, pkt: &mut Packet) -> Result<(), ParserError> {
+    pub fn parse_pkt(&self, pkt: &mut Packet) -> Result<(), Error> {
         let mut layer;
         // 根据 link type 解析数据链路层协议, 获取下一层协议的协议类型和起始位置
         let mut result = match self.link_type {
@@ -63,7 +84,7 @@ impl Parser {
                 Ok(layer)
             }
             _ => {
-                return Err(ParserError::UnsupportProtocol(format!(
+                return Err(Error::UnsupportProtocol(format!(
                     "Unsupport data link layer protocol, link type: {}",
                     self.link_type
                 )))
@@ -129,10 +150,10 @@ impl Parser {
                 }
                 Protocol::APPLICATION => return Ok(()),
                 Protocol::UNKNOWN => {
-                    return Err(ParserError::UnknownProtocol);
+                    return Err(Error::UnknownProtocol);
                 }
                 p => {
-                    return Err(ParserError::UnsupportProtocol(format!(
+                    return Err(Error::UnsupportProtocol(format!(
                         "Unsupport protocol {:?}",
                         p
                     )));

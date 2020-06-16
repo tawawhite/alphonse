@@ -1,5 +1,5 @@
-use super::error::ParserError;
-use super::{parser::SimpleProtocolParser, Layer, Protocol};
+use super::parser::{Error, SimpleProtocolParser};
+use super::{Layer, Protocol};
 
 pub mod icmp;
 pub mod ip_proto;

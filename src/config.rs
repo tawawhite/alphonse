@@ -2,13 +2,10 @@ use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 
-extern crate clap;
-extern crate yaml_rust;
-
+use anyhow::{anyhow, Result};
 use yaml_rust::{Yaml, YamlLoader};
 
 use super::commands::CliArg;
-use super::error::Error;
 
 #[derive(Default, Clone)]
 pub struct Config {
@@ -28,7 +25,7 @@ pub struct Config {
 }
 
 /// Parse command line arguments and set configuration
-pub fn parse_args(root_cmd: clap::App) -> Result<Config, Error> {
+pub fn parse_args(root_cmd: clap::App) -> Result<Config> {
     let mut config: Config = Default::default();
     let matches = root_cmd.get_matches();
 
@@ -39,15 +36,15 @@ pub fn parse_args(root_cmd: clap::App) -> Result<Config, Error> {
     set_config_by_cli_args(&mut config, &matches);
 
     if (config.pcap_dir.is_empty() || config.pcap_file.is_empty()) && config.interfaces.is_empty() {
-        return Err(Error::CommonError(format!(
+        return Err(anyhow!(
             "Launched without specify network interface nor pcap file/dir"
-        )));
+        ));
     }
 
     Ok(config)
 }
 
-fn parse_config_file(config_file: &str, config: &mut Config) -> Result<(), Error> {
+fn parse_config_file(config_file: &str, config: &mut Config) -> Result<()> {
     let cfg_path = Path::new(config_file);
     if !cfg_path.exists() {
         eprintln!(
@@ -64,29 +61,23 @@ fn parse_config_file(config_file: &str, config: &mut Config) -> Result<(), Error
 
     match &doc["threads.rx"] {
         Yaml::Integer(i) => config.rx_threads = *i as u8,
-        Yaml::BadValue => {
-            return Err(Error::CommonError(String::from(
-                "Option threads.rx not found or bad integer value",
-            )))
-        }
+        Yaml::BadValue => return Err(anyhow!("Option threads.rx not found or bad integer value",)),
         _ => {
-            return Err(Error::CommonError(String::from(
+            return Err(anyhow!(
                 "Wrong value type for threads.rx, expecting integer",
-            )))
+            ))
         }
     };
 
     match &doc["threads.session"] {
         Yaml::Integer(i) => config.ses_threads = *i as u8,
         Yaml::BadValue => {
-            return Err(Error::CommonError(String::from(
-                "Option threads.ses not found or bad integer value",
-            )))
+            return Err(anyhow!("Option threads.ses not found or bad integer value",))
         }
         _ => {
-            return Err(Error::CommonError(String::from(
+            return Err(anyhow!(
                 "Wrong value type for threads.rx, expecting integer",
-            )))
+            ))
         }
     };
 
@@ -95,18 +86,10 @@ fn parse_config_file(config_file: &str, config: &mut Config) -> Result<(), Error
             "dpdk" | "libpcap" => {
                 config.backend = String::from(s);
             }
-            _ => return Err(Error::CommonError(format!("Invalid backend option: {}", s))),
+            _ => return Err(anyhow!("Invalid backend option: {}", s)),
         },
-        Yaml::BadValue => {
-            return Err(Error::CommonError(String::from(
-                "Option backend not found or bad string value",
-            )))
-        }
-        _ => {
-            return Err(Error::CommonError(String::from(
-                "Wrong value type for backend, expecting string",
-            )))
-        }
+        Yaml::BadValue => return Err(anyhow!("Option backend not found or bad string value",)),
+        _ => return Err(anyhow!("Wrong value type for backend, expecting string",)),
     };
 
     match &doc["interfaces"] {
@@ -115,28 +98,18 @@ fn parse_config_file(config_file: &str, config: &mut Config) -> Result<(), Error
                 match element {
                     Yaml::String(s) => config.interfaces.push(s.clone()),
                     Yaml::BadValue => {
-                        return Err(Error::CommonError(String::from(
-                            "Bad string value for an interface value",
-                        )))
+                        return Err(anyhow!("Bad string value for an interface value",))
                     }
                     _ => {
-                        return Err(Error::CommonError(String::from(
+                        return Err(anyhow!(
                             "Wrong value type for interfaces' element, expecting string",
-                        )))
+                        ))
                     }
                 }
             }
         }
-        Yaml::BadValue => {
-            return Err(Error::CommonError(String::from(
-                "Option interfaces not found or bad array value",
-            )))
-        }
-        _ => {
-            return Err(Error::CommonError(String::from(
-                "Wrong value type for interfaces, expecting array",
-            )))
-        }
+        Yaml::BadValue => return Err(anyhow!("Option interfaces not found or bad array value",)),
+        _ => return Err(anyhow!("Wrong value type for interfaces, expecting array",)),
     }
 
     #[cfg(all(target_os = "linux", feature = "dpdk"))]
@@ -145,19 +118,14 @@ fn parse_config_file(config_file: &str, config: &mut Config) -> Result<(), Error
         match *&doc["dpdk"] {
             Yaml::Array(ref array) => {
                 for v in array {
-                    let s = v.as_str().ok_or(Error::CommonError(format!(
-                        "Failed to convert Yaml into &str"
-                    )))?;
+                    let s = v
+                        .as_str()
+                        .ok_or(anyhow!("Failed to convert Yaml into &str"))?;
                     config.dpdk_eal_args.push(String::from(s));
                 }
                 Ok(())
             }
-            _ => {
-                return Err(Error::CommonError(format!(
-                    "Invalid/Empty dpdk args in {}",
-                    config_file
-                )))
-            }
+            _ => return Err(anyhow!("Invalid/Empty dpdk args in {}", config_file)),
         };
     }
     Ok(())

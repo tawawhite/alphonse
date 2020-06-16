@@ -4,13 +4,13 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
+use anyhow::Result;
 use crossbeam_channel::Sender;
 use path_absolutize::Absolutize;
 
 use super::capture::{Capture, NetworkInterface, Offline};
 use super::config;
-use super::error::Error;
-use super::packet::{Packet, Parser};
+use super::packet::{parser, Packet, Parser};
 
 /// 收包线程
 pub struct RxThread {
@@ -78,14 +78,16 @@ impl RxThread {
     }
 
     #[inline]
-    fn rx<C: Capture>(&mut self, cap: &mut C) -> Result<(), Error> {
+    fn rx<C: Capture>(&mut self, cap: &mut C) -> Result<()> {
         while let Ok(mut pkt) = cap.next() {
             match self.parser.parse_pkt(&mut pkt) {
                 Ok(_) => {}
-                Err(e) => {
-                    return Err(Error::ParserError(e));
-                }
+                Err(e) => match e {
+                    parser::Error::UnsupportProtocol(_) => {}
+                    _ => todo!(),
+                },
             };
+
             // TODO: inline with_seed function
             let mut hasher = twox_hash::Xxh3Hash64::with_seed(0);
             pkt.hash(&mut hasher);
@@ -97,18 +99,10 @@ impl RxThread {
         Ok(())
     }
 
-    fn process_files(&mut self, files: &Vec<PathBuf>) -> Result<(), Error> {
+    fn process_files(&mut self, files: &Vec<PathBuf>) -> Result<()> {
         while !self.exit.load(Ordering::Relaxed) {
             for file in files {
-                let result = Offline::try_from_path(file);
-                let mut cap;
-                match result {
-                    Err(e) => {
-                        return Err(e);
-                    }
-                    Ok(c) => cap = c,
-                }
-
+                let mut cap = Offline::try_from_path(file)?;
                 self.rx(&mut cap)?;
             }
             break;
@@ -116,21 +110,13 @@ impl RxThread {
         Ok(())
     }
 
-    fn listen_network_interface(&mut self, cfg: &Arc<config::Config>) -> Result<(), Error> {
+    fn listen_network_interface(&mut self, cfg: &Arc<config::Config>) -> Result<()> {
         let interface = match cfg.interfaces.get(self.id as usize) {
             Some(i) => i,
             None => todo!(),
         };
 
-        let result = NetworkInterface::try_from_str(interface);
-        let mut cap;
-        match result {
-            Err(e) => {
-                return Err(e);
-            }
-            Ok(c) => cap = c,
-        }
-
+        let mut cap = NetworkInterface::try_from_str(interface)?;
         while !self.exit.load(Ordering::Relaxed) {
             self.rx(&mut cap)?;
         }
@@ -138,7 +124,7 @@ impl RxThread {
         Ok(())
     }
 
-    pub fn spawn(&mut self, cfg: Arc<config::Config>) -> Result<(), Error> {
+    pub fn spawn(&mut self, cfg: Arc<config::Config>) -> Result<()> {
         let files = RxThread::get_pcap_files(cfg.as_ref());
         if !files.is_empty() {
             return self.process_files(&files);

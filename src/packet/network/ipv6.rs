@@ -1,12 +1,12 @@
-use super::{ip_proto, Layer, ParserError, Protocol, SimpleProtocolParser};
+use super::{ip_proto, Error, Layer, Protocol, SimpleProtocolParser};
 
 pub struct Parser {}
 
 impl SimpleProtocolParser for Parser {
     #[inline]
-    fn parse(buf: &[u8], offset: u16) -> Result<Layer, ParserError> {
+    fn parse(buf: &[u8], offset: u16) -> Result<Layer, Error> {
         if buf.len() < 40 {
-            return Err(ParserError::CorruptPacket(format!(
+            return Err(Error::CorruptPacket(format!(
                 "Corrupted IPV6 packet, packet too short ({} bytes)",
                 buf.len()
             )));
@@ -16,7 +16,7 @@ impl SimpleProtocolParser for Parser {
         let ip_version = ip_vhl >> 4;
 
         if ip_version != 6 {
-            return Err(ParserError::CorruptPacket(format!(
+            return Err(Error::CorruptPacket(format!(
                 "Corrupted IPV6 packet, expecting ip vesrion is 6, actual version is: {}",
                 ip_version
             )));
@@ -25,7 +25,7 @@ impl SimpleProtocolParser for Parser {
         let ip_len = (buf[4] as u16) << 8 | (buf[5] as u16);
         if buf.len() < ip_len as usize {
             // 如果报文的长度小于 IP 报文中声明的数据报长度，数据包有错误
-            return Err(ParserError::CorruptPacket(format!(
+            return Err(Error::CorruptPacket(format!(
                 "The packet is a corrupt packet, payload length is less then claimed length"
             )));
         }
@@ -46,7 +46,7 @@ impl SimpleProtocolParser for Parser {
             ip_proto::GRE => layer.protocol = Protocol::GRE,
             ip_proto::SCTP => layer.protocol = Protocol::SCTP,
             _ => {
-                return Err(ParserError::UnsupportProtocol(format!(
+                return Err(Error::UnsupportProtocol(format!(
                     "Unsupport ipv6 protocol, ipv6 protocol: {}",
                     ip_proto
                 )));

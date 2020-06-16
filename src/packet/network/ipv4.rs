@@ -1,13 +1,13 @@
-use super::{ip_proto, Layer, ParserError, Protocol, SimpleProtocolParser};
+use super::{ip_proto, Error, Layer, Protocol, SimpleProtocolParser};
 
 pub struct Parser {}
 impl SimpleProtocolParser for Parser {
     #[inline]
-    fn parse(buf: &[u8], offset: u16) -> Result<Layer, ParserError> {
+    fn parse(buf: &[u8], offset: u16) -> Result<Layer, Error> {
         if buf.len() < 4 * 5 {
             // 如果报文内容长度小于IP报文最短长度(IP协议头长度)
             // 数据包有错误
-            return Err(ParserError::CorruptPacket(format!(
+            return Err(Error::CorruptPacket(format!(
                 "Corrupted IPV4 packet, packet too short ({} bytes)",
                 buf.len()
             )));
@@ -18,7 +18,7 @@ impl SimpleProtocolParser for Parser {
 
         if ip_version != 4 {
             // 如果报文中实际的 IP 版本号不是 IPv4，数据包有错误
-            return Err(ParserError::CorruptPacket(format!(
+            return Err(Error::CorruptPacket(format!(
                 "Corrupted IPV4 packet, expecting ip vesrion is 4, actual version is: {}",
                 ip_version
             )));
@@ -28,14 +28,14 @@ impl SimpleProtocolParser for Parser {
 
         if ip_hdr_len < 4 * 5 || buf.len() < ip_hdr_len as usize {
             // 如果报文中的IP头长度小于20字节或报文长度小于报文中声明的IP头长度, 数据包有错误
-            return Err(ParserError::CorruptPacket(format!("The packet is a corrupt packet, ip header too short nor payload length is less then claimed length")));
+            return Err(Error::CorruptPacket(format!("The packet is a corrupt packet, ip header too short nor payload length is less then claimed length")));
         }
 
         let ip_len = (buf[2] as u16) << 8 | (buf[3] as u16);
 
         if buf.len() < ip_len as usize {
             // 如果报文的长度小于 IP 报文中声明的数据报长度，数据包有错误
-            return Err(ParserError::CorruptPacket(format!(
+            return Err(Error::CorruptPacket(format!(
                 "The packet is a corrupt packet, payload length is less then claimed length"
             )));
         }
@@ -56,7 +56,7 @@ impl SimpleProtocolParser for Parser {
             ip_proto::GRE => layer.protocol = Protocol::GRE,
             ip_proto::SCTP => layer.protocol = Protocol::SCTP,
             _ => {
-                return Err(ParserError::UnsupportProtocol(format!(
+                return Err(Error::UnsupportProtocol(format!(
                     "Unsupport ipv4 protocol, ipv4 protocol: {}",
                     ip_proto
                 )))

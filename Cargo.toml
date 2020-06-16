@@ -5,6 +5,7 @@ authors = ["Jack Liar <15205739+JackLiar@users.noreply.github.com>"]
 edition = "2018"
 
 [dependencies]
+anyhow = "1.0.31"
 clap = "2.33.1"
 crossbeam-channel = "0.4.2"
 libc = "0.2.71"

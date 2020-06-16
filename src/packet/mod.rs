@@ -6,8 +6,6 @@
 
 use std::hash::{Hash, Hasher};
 
-use super::error;
-
 extern crate libc;
 extern crate pcap;
 

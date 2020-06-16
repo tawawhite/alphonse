@@ -1,7 +1,7 @@
 #![allow(non_camel_case_types)]
 
-use super::error;
-use super::{parser::SimpleProtocolParser, Layer, Protocol};
+use super::parser::{Error, SimpleProtocolParser};
+use super::{Layer, Protocol};
 
 pub mod ethernet;
 pub mod null;
