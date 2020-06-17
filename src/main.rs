@@ -98,6 +98,7 @@ fn main() -> Result<()> {
         }
         let thread = threadings::RxThread::new(i, packet::link::ETHERNET, senders, exit.clone());
         rx_threads.push(thread);
+        pkt_senders.clear(); // release all original senders
     }
 
     // start all session threads
