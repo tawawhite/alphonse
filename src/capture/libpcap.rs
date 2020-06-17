@@ -42,9 +42,13 @@ impl Offline {
 impl Capture for Offline {
     #[inline]
     /// 获取下一个数据包
-    fn next(&mut self) -> Result<Packet> {
+    fn next(&mut self) -> Result<Box<Packet>> {
         let raw_pkt = self.cap.as_mut().next()?;
-        Ok(Packet::from(&raw_pkt))
+        let mut pkt: Box<Packet> = Box::default();
+        pkt.ts = raw_pkt.header.ts;
+        pkt.caplen = raw_pkt.header.caplen;
+        pkt.data = Box::new(Vec::from(raw_pkt.data));
+        Ok(pkt)
     }
 }
 
@@ -55,9 +59,13 @@ pub struct NetworkInterface {
 impl Capture for NetworkInterface {
     #[inline]
     /// 获取下一个数据包
-    fn next(&mut self) -> Result<Packet> {
+    fn next(&mut self) -> Result<Box<Packet>> {
         let raw_pkt = self.cap.as_mut().next()?;
-        Ok(Packet::from(&raw_pkt))
+        let mut pkt: Box<Packet> = Box::default();
+        pkt.ts = raw_pkt.header.ts;
+        pkt.caplen = raw_pkt.header.caplen;
+        pkt.data = Box::new(Vec::from(raw_pkt.data));
+        Ok(pkt)
     }
 }
 

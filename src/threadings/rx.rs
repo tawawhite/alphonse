@@ -94,7 +94,7 @@ impl RxThread {
             pkt.hash = hasher.finish();
 
             let thread = (pkt.hash % self.senders.len() as u64) as usize;
-            self.senders[thread].send(Box::from(pkt)).unwrap() // pkt move happens here, could be optimized
+            self.senders[thread].send(pkt).unwrap()
         }
         Ok(())
     }

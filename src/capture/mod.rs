@@ -10,5 +10,5 @@ mod libpcap;
 pub use libpcap::{NetworkInterface, Offline};
 
 pub trait Capture {
-    fn next(&mut self) -> Result<Packet>;
+    fn next(&mut self) -> Result<Box<Packet>>;
 }

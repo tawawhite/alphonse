@@ -130,6 +130,25 @@ impl Packet {
     }
 }
 
+impl Default for Packet {
+    fn default() -> Self {
+        Packet {
+            ts: libc::timeval {
+                tv_sec: 0,
+                tv_usec: 0,
+            },
+            caplen: 0,
+            data: Box::new(Vec::new()),
+            data_link_layer: Layer::default(),
+            network_layer: Layer::default(),
+            trans_layer: Layer::default(),
+            app_layer: Layer::default(),
+            direction: DIRECTION_LEFT,
+            hash: 0,
+        }
+    }
+}
+
 impl Hash for Packet {
     #[inline]
     fn hash<H: Hasher>(&self, state: &mut H) {
