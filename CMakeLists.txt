@@ -27,6 +27,6 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND BUILD_DPDK)
     add_dependencies(alphonse dpdk)
 endif()
 
-add_dependencies(alphonse llhttp)
+add_dependencies(alphonse llhttp hyperscan)
 
 print_configuration()
