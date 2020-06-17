@@ -158,20 +158,41 @@ impl Hash for Packet {
 
         match self.trans_layer.protocol {
             Protocol::TCP | Protocol::UDP => {
-                self.get_src_port().hash(state);
-                self.get_dst_port().hash(state);
+                let src_port = self.get_src_port();
+                let dst_port = self.get_dst_port();
+                if src_port > dst_port {
+                    src_port.hash(state);
+                    dst_port.hash(state);
+                } else {
+                    dst_port.hash(state);
+                    src_port.hash(state);
+                }
             }
             _ => {}
         };
 
         match self.network_layer.protocol {
             Protocol::IPV4 => {
-                self.get_src_ipv4().hash(state);
-                self.get_dst_ipv4().hash(state);
+                let src_ip = self.get_src_ipv4();
+                let dst_ip = self.get_dst_ipv4();
+                if src_ip > dst_ip {
+                    src_ip.hash(state);
+                    dst_ip.hash(state);
+                } else {
+                    dst_ip.hash(state);
+                    src_ip.hash(state);
+                }
             }
             Protocol::IPV6 => {
-                (*self.get_src_ipv6()).hash(state);
-                (*self.get_dst_ipv6()).hash(state);
+                let src_ip = *self.get_src_ipv6();
+                let dst_ip = *self.get_dst_ipv6();
+                if src_ip > dst_ip {
+                    src_ip.hash(state);
+                    dst_ip.hash(state);
+                } else {
+                    dst_ip.hash(state);
+                    src_ip.hash(state);
+                }
             }
             _ => {}
         };
