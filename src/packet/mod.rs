@@ -81,7 +81,7 @@ impl Packet {
     #[inline]
     pub fn get_src_port(&self) -> u16 {
         let src_port_pos = (self.trans_layer.offset) as usize;
-        unsafe { *(&self.data[src_port_pos] as *const u8 as *const u16) }
+        unsafe { (*(&self.data[src_port_pos] as *const u8 as *const u16)).to_be() }
     }
 
     /// Get dst port
@@ -90,7 +90,7 @@ impl Packet {
     #[inline]
     pub fn get_dst_port(&self) -> u16 {
         let dst_port_pos = (self.trans_layer.offset + 2) as usize;
-        unsafe { *(&self.data[dst_port_pos] as *const u8 as *const u16) }
+        unsafe { (*(&self.data[dst_port_pos] as *const u8 as *const u16)).to_be() }
     }
 
     /// Get src ipv4 address
