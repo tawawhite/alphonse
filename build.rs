@@ -49,6 +49,11 @@ fn build_dpdk() {
 
 fn main() {
     let manifest_dir = var("CARGO_MANIFEST_DIR").unwrap();
+    println!(
+        "cargo:rustc-env=PKT_CONFIG_PATH={}/build/install/lib/pkgconfig:{}/build/install/lib64/pkgconfig",
+        manifest_dir,
+        manifest_dir
+    );
     println!("cargo:rustc-link-search={}/build/install/lib", manifest_dir);
     println!(
         "cargo:rustc-link-search={}/build/install/lib64",
@@ -62,8 +67,6 @@ fn main() {
         "cargo:rustc-link-search={}/build/install/lib64/x86_64-linux-gnu",
         manifest_dir
     );
-
-    // build_llhttp();
 
     #[cfg(all(target_os = "linux", feature = "dpdk"))]
     {
