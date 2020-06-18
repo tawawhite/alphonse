@@ -92,7 +92,7 @@ fn main() -> Result<()> {
     for i in 0..cfg.ses_threads {
         let (sender, receiver) = unbounded();
         pkt_senders.push(sender);
-        let thread = threadings::SessionThread::new(i, exit.clone(), receiver);
+        let thread = threadings::SessionThread::new(i, exit.clone(), receiver, classifier.clone());
         ses_threads.push(thread);
     }
 
@@ -116,10 +116,7 @@ fn main() -> Result<()> {
     // start all rx threads
     for mut thread in rx_threads {
         let cfg = cfg.clone();
-        handles.push(thread::spawn(move || match thread.spawn(cfg) {
-            Ok(_) => {}
-            Err(e) => println!("{}", e),
-        }));
+        handles.push(thread::spawn(move || thread.spawn(cfg)));
     }
 
     for handle in handles {
