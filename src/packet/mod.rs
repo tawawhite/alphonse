@@ -4,6 +4,7 @@
 //!
 //!
 
+use std::convert::TryFrom;
 use std::hash::{Hash, Hasher};
 
 extern crate libc;
@@ -14,8 +15,17 @@ pub mod network;
 pub mod parser;
 pub mod transport;
 
-pub const DIRECTION_LEFT: bool = false;
-pub const DIRECTION_RIGHT: bool = true;
+#[repr(u8)]
+pub enum Direction {
+    LEFT = 0,
+    RIGHT = 1,
+}
+
+impl Default for Direction {
+    fn default() -> Self {
+        Direction::LEFT
+    }
+}
 
 #[derive(Default)]
 #[repr(packed)]
@@ -49,7 +59,6 @@ pub struct Packet {
     /// application layer
     pub app_layer: Layer,
     /// Direction
-    pub direction: bool,
     /// Packet hash, improve hash performance
     pub hash: u64,
 }
@@ -58,6 +67,53 @@ impl Packet {
     #[inline]
     pub fn len(&self) -> u16 {
         self.data.len() as u16
+    }
+
+    #[inline]
+    pub fn bytes(&self) -> u16 {
+        self.data.len() as u16
+    }
+
+    #[inline]
+    pub fn data_bytes(&self) -> u16 {
+        match self.trans_layer.protocol {
+            Protocol::TCP | Protocol::UDP | Protocol::SCTP => self.bytes() - self.app_layer.offset,
+            _ => self.bytes() - self.trans_layer.offset,
+        }
+    }
+
+    #[inline]
+    pub fn direction(&self) -> Direction {
+        match self.trans_layer.protocol {
+            Protocol::TCP | Protocol::UDP | Protocol::SCTP => {
+                if self.src_port() > self.dst_port() {
+                    return Direction::LEFT;
+                } else {
+                    return Direction::RIGHT;
+                }
+            }
+            _ => {}
+        };
+
+        match self.network_layer.protocol {
+            Protocol::IPV4 => {
+                if self.src_ipv4() > self.src_ipv4() {
+                    return Direction::LEFT;
+                } else {
+                    return Direction::RIGHT;
+                }
+            }
+            Protocol::IPV6 => {
+                if *self.src_ipv6() > *self.src_ipv6() {
+                    return Direction::LEFT;
+                } else {
+                    return Direction::RIGHT;
+                }
+            }
+            _ => {}
+        }
+
+        Direction::LEFT
     }
 
     #[inline]
@@ -70,7 +126,6 @@ impl Packet {
             network_layer: Layer::default(),
             trans_layer: Layer::default(),
             app_layer: Layer::default(),
-            direction: DIRECTION_LEFT,
             hash: 0,
         }
     }
@@ -79,7 +134,7 @@ impl Packet {
     ///
     /// It's the caller's duty to guarantee transport layer is TCP/UDP
     #[inline]
-    pub fn get_src_port(&self) -> u16 {
+    pub fn src_port(&self) -> u16 {
         let src_port_pos = (self.trans_layer.offset) as usize;
         unsafe { (*(&self.data[src_port_pos] as *const u8 as *const u16)).to_be() }
     }
@@ -88,7 +143,7 @@ impl Packet {
     ///
     /// It's the caller's duty to guarantee transport layer is TCP/UDP
     #[inline]
-    pub fn get_dst_port(&self) -> u16 {
+    pub fn dst_port(&self) -> u16 {
         let dst_port_pos = (self.trans_layer.offset + 2) as usize;
         unsafe { (*(&self.data[dst_port_pos] as *const u8 as *const u16)).to_be() }
     }
@@ -97,7 +152,7 @@ impl Packet {
     ///
     /// It's the caller's duty to guarantee network layer is IPV4
     #[inline]
-    pub fn get_src_ipv4(&self) -> u32 {
+    pub fn src_ipv4(&self) -> u32 {
         let src_ip_pos = (self.network_layer.offset + 12) as usize;
         unsafe { *(&self.data[src_ip_pos] as *const u8 as *const u32) }
     }
@@ -106,7 +161,7 @@ impl Packet {
     ///
     /// It's the caller's duty to guarantee network layer is IPV4
     #[inline]
-    pub fn get_dst_ipv4(&self) -> u32 {
+    pub fn dst_ipv4(&self) -> u32 {
         let dst_ip_pos = (self.network_layer.offset + 16) as usize;
         unsafe { *(&self.data[dst_ip_pos] as *const u8 as *const u32) }
     }
@@ -115,7 +170,7 @@ impl Packet {
     ///
     /// It's the caller's duty to guarantee network layer is IPV6
     #[inline]
-    pub fn get_src_ipv6(&self) -> &u128 {
+    pub fn src_ipv6(&self) -> &u128 {
         let src_ip_pos = (self.network_layer.offset + 8) as usize;
         unsafe { &*(&self.data[src_ip_pos] as *const u8 as *const u128) }
     }
@@ -124,9 +179,25 @@ impl Packet {
     ///
     /// It's the caller's duty to guarantee network layer is IPV6
     #[inline]
-    pub fn get_dst_ipv6(&self) -> &u128 {
+    pub fn dst_ipv6(&self) -> &u128 {
         let dst_ip_pos = (self.network_layer.offset + 8 + 16) as usize;
         unsafe { &*(&self.data[dst_ip_pos] as *const u8 as *const u128) }
+    }
+
+    /// Get src mac address
+    ///
+    /// It's the caller's duty to guarantee datalink layer is Ethernet
+    #[inline]
+    pub fn src_mac(&self) -> &[u8; 6] {
+        <&[u8; 6]>::try_from(&self.data.as_slice()[6..12]).unwrap()
+    }
+
+    /// Get dst mac address
+    ///
+    /// It's the caller's duty to guarantee datalink layer is Ethernet
+    #[inline]
+    pub fn dst_mac(&self) -> &[u8; 6] {
+        <&[u8; 6]>::try_from(&self.data.as_slice()[0..6]).unwrap()
     }
 }
 
@@ -143,7 +214,6 @@ impl Default for Packet {
             network_layer: Layer::default(),
             trans_layer: Layer::default(),
             app_layer: Layer::default(),
-            direction: DIRECTION_LEFT,
             hash: 0,
         }
     }
@@ -157,9 +227,9 @@ impl Hash for Packet {
         }
 
         match self.trans_layer.protocol {
-            Protocol::TCP | Protocol::UDP => {
-                let src_port = self.get_src_port();
-                let dst_port = self.get_dst_port();
+            Protocol::TCP | Protocol::UDP | Protocol::SCTP => {
+                let src_port = self.src_port();
+                let dst_port = self.dst_port();
                 if src_port > dst_port {
                     src_port.hash(state);
                     dst_port.hash(state);
@@ -173,8 +243,8 @@ impl Hash for Packet {
 
         match self.network_layer.protocol {
             Protocol::IPV4 => {
-                let src_ip = self.get_src_ipv4();
-                let dst_ip = self.get_dst_ipv4();
+                let src_ip = self.src_ipv4();
+                let dst_ip = self.dst_ipv4();
                 if src_ip > dst_ip {
                     src_ip.hash(state);
                     dst_ip.hash(state);
@@ -184,8 +254,8 @@ impl Hash for Packet {
                 }
             }
             Protocol::IPV6 => {
-                let src_ip = *self.get_src_ipv6();
-                let dst_ip = *self.get_dst_ipv6();
+                let src_ip = *self.src_ipv6();
+                let dst_ip = *self.dst_ipv6();
                 if src_ip > dst_ip {
                     src_ip.hash(state);
                     dst_ip.hash(state);
@@ -211,11 +281,11 @@ impl PartialEq for Packet {
         }
 
         match self.trans_layer.protocol {
-            Protocol::TCP | Protocol::UDP => {
-                let self_src_port = self.get_src_port();
-                let self_dst_port = self.get_dst_port();
-                let other_src_port = self.get_src_port();
-                let other_dst_port = self.get_dst_port();
+            Protocol::TCP | Protocol::UDP | Protocol::SCTP => {
+                let self_src_port = self.src_port();
+                let self_dst_port = self.dst_port();
+                let other_src_port = self.src_port();
+                let other_dst_port = self.dst_port();
 
                 let self_cmp = self_src_port > self_dst_port;
                 let other_cmp = other_src_port > other_dst_port;
@@ -235,10 +305,10 @@ impl PartialEq for Packet {
 
         match self.network_layer.protocol {
             Protocol::IPV4 => {
-                let self_src_ip = self.get_src_ipv4();
-                let self_dst_ip = self.get_dst_ipv4();
-                let other_src_ip = other.get_src_ipv4();
-                let other_dst_ip = other.get_dst_ipv4();
+                let self_src_ip = self.src_ipv4();
+                let self_dst_ip = self.dst_ipv4();
+                let other_src_ip = other.src_ipv4();
+                let other_dst_ip = other.dst_ipv4();
 
                 let self_cmp = self_src_ip > self_dst_ip;
                 let other_cmp = other_src_ip > other_dst_ip;
@@ -253,10 +323,10 @@ impl PartialEq for Packet {
                 }
             }
             Protocol::IPV6 => {
-                let self_src_ip = self.get_src_ipv6();
-                let self_dst_ip = self.get_dst_ipv6();
-                let other_src_ip = other.get_src_ipv6();
-                let other_dst_ip = other.get_dst_ipv6();
+                let self_src_ip = self.src_ipv6();
+                let self_dst_ip = self.dst_ipv6();
+                let other_src_ip = other.src_ipv6();
+                let other_dst_ip = other.dst_ipv6();
 
                 let self_cmp = self_src_ip > self_dst_ip;
                 let other_cmp = other_src_ip > other_dst_ip;
