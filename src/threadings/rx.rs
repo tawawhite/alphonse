@@ -125,11 +125,17 @@ impl RxThread {
     }
 
     pub fn spawn(&mut self, cfg: Arc<config::Config>) -> Result<()> {
+        println!("rx thread {} started", self.id);
+
         let files = RxThread::get_pcap_files(cfg.as_ref());
         if !files.is_empty() {
-            return self.process_files(&files);
+            self.process_files(&files)?;
         } else {
-            return self.listen_network_interface(&cfg);
-        }
+            self.listen_network_interface(&cfg)?;
+        };
+
+        println!("rx thread {} exit", self.id);
+
+        Ok(())
     }
 }
