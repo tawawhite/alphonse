@@ -1,6 +1,7 @@
 #[macro_use]
 extern crate clap;
 extern crate crossbeam_channel;
+extern crate hyperscan;
 extern crate libc;
 extern crate path_absolutize;
 extern crate pcap;
@@ -20,6 +21,7 @@ mod config;
 #[cfg(all(target_os = "linux", feature = "dpdk"))]
 mod dpdk;
 mod packet;
+mod protocol;
 mod session;
 mod threadings;
 
@@ -82,6 +84,11 @@ fn main() -> Result<()> {
     // initialize session threads
     let mut ses_threads = Vec::new();
     let mut pkt_senders = Vec::new();
+
+    let mut classifier = protocol::Classifier::new();
+    classifier.prepare();
+    let classifier = Arc::new(classifier);
+
     for i in 0..cfg.ses_threads {
         let (sender, receiver) = unbounded();
         pkt_senders.push(sender);
