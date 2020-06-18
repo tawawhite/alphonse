@@ -148,6 +148,12 @@ impl Parser {
                     }
                     transport::udp::Parser::parse(buf, offset)
                 }
+                Protocol::SCTP => {
+                    if pkt.trans_layer.protocol == Protocol::UNKNOWN {
+                        pkt.trans_layer = layer;
+                    }
+                    transport::sctp::Parser::parse(buf, offset)
+                }
                 Protocol::APPLICATION => return Ok(()),
                 Protocol::UNKNOWN => {
                     return Err(Error::UnknownProtocol);
