@@ -9,7 +9,7 @@ anyhow = "1.0.31"
 clap = "2.33.1"
 crossbeam-channel = "0.4.2"
 libc = "0.2.71"
-path-absolutize = "2.0.2"
+path-absolutize = "3.0.0"
 pcap = "0.7.0"
 twox-hash = { git = "https://github.com/flier/twox-hash.git", branch="xxh3" }
 yaml-rust = "0.4.4"

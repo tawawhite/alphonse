@@ -49,7 +49,8 @@ impl RxThread {
         if !cfg.pcap_file.is_empty() {
             files.push(PathBuf::from(&cfg.pcap_file));
         } else if !cfg.pcap_dir.is_empty() {
-            let pcap_dir = PathBuf::from(&cfg.pcap_dir).absolutize().unwrap();
+            let path_buf = PathBuf::from(&cfg.pcap_dir);
+            let pcap_dir = path_buf.absolutize().unwrap();
             for entry in pcap_dir.read_dir().expect("read_dir call failed") {
                 if let Ok(entry) = entry {
                     let buf = entry.path();
