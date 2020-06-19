@@ -14,9 +14,13 @@ pcap = "0.7.0"
 twox-hash = { git = "https://github.com/flier/twox-hash.git", branch="xxh3" }
 yaml-rust = "0.4.4"
 
-[build-dependencies]
-cpp_build = "0.5.4"
-bindgen = "0.54.0"
+[dependencies.hyperscan]
+version = "0.2.0"
+features = ["chimera"]
 
-# [features]
-# dpdk=[]
+[build-dependencies]
+cpp_build = { version="0.5.4", optional=true }
+bindgen = { version="0.54.0", optional=true }
+
+[features]
+dpdk=["cpp_build", "bindgen"]
