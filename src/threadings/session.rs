@@ -5,7 +5,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use crossbeam_channel::Receiver;
 
-use super::packet::{Direction, Packet};
+use super::packet::Packet;
 use super::protocol::Classifier;
 use super::sessions::Session;
 
@@ -51,22 +51,23 @@ impl SessionThread {
 
                     match self.session_table.get_mut(&p) {
                         Some(ses) => {
-                            ses.pkts.push(p);
+                            ses.add_pkt(p);
                         }
                         None => {
+                            let key = Packet {
+                                ts: p.ts,
+                                caplen: p.caplen,
+                                data: Box::new(p.data.as_ref().clone()),
+                                data_link_layer: p.data_link_layer,
+                                network_layer: p.network_layer,
+                                trans_layer: p.trans_layer,
+                                app_layer: p.app_layer,
+                                hash: p.hash,
+                            };
                             let mut ses = Session::new();
                             ses.start_time = p.ts;
-                            match p.direction() {
-                                Direction::LEFT => {
-                                    ses.bytes[0] += p.bytes() as u64;
-                                    ses.data_bytes[0] += p.data_bytes() as u64;
-                                }
-                                Direction::RIGHT => {
-                                    ses.bytes[1] += p.bytes() as u64;
-                                    ses.data_bytes[1] += p.data_bytes() as u64;
-                                }
-                            }
-                            &mut self.session_table.insert(*p, ses);
+                            ses.add_pkt(p);
+                            &mut self.session_table.insert(key, ses);
                         }
                     }
                 }

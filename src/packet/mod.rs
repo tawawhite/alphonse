@@ -27,7 +27,7 @@ impl Default for Direction {
     }
 }
 
-#[derive(Default)]
+#[derive(Clone, Copy, Default)]
 #[repr(packed)]
 /// Packet protocol layer, 3 bytes
 pub struct Layer {

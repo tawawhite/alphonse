@@ -7,6 +7,8 @@ pub struct Session {
     /// Some protocols may work in that way
     /// but network problems could cause single direction
     pub single_direction: bool,
+    /// session total packets
+    pub pkt_count: [u32; 2],
     /// session total bytes
     pub bytes: [u64; 2],
     /// session total data bytes
@@ -27,6 +29,7 @@ impl Session {
         Session {
             id: String::new(),
             single_direction: false,
+            pkt_count: [0; 2],
             bytes: [0; 2],
             data_bytes: [0; 2],
             start_time: libc::timeval {
@@ -40,5 +43,23 @@ impl Session {
             pkts: Vec::new(),
             parse_finished: false,
         }
+    }
+
+    #[inline]
+    pub fn add_pkt(&mut self, pkt: Box<packet::Packet>) {
+        match pkt.direction() {
+            packet::Direction::LEFT => {
+                self.pkt_count[0] += 1;
+                self.bytes[0] += pkt.bytes() as u64;
+                self.data_bytes[0] += pkt.data_bytes() as u64;
+            }
+            packet::Direction::RIGHT => {
+                self.pkt_count[1] += 1;
+                self.bytes[1] += pkt.bytes() as u64;
+                self.data_bytes[1] += pkt.data_bytes() as u64;
+            }
+        }
+
+        self.pkts.push(pkt);
     }
 }
