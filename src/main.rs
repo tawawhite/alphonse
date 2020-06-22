@@ -5,6 +5,7 @@ extern crate hyperscan;
 extern crate libc;
 extern crate path_absolutize;
 extern crate pcap;
+extern crate signal_hook;
 extern crate twox_hash;
 extern crate yaml_rust;
 
@@ -77,6 +78,9 @@ fn main() -> Result<()> {
     let root_cmd = commands::new_root_command();
     let cfg = config::parse_args(root_cmd)?;
     let exit = Arc::new(AtomicBool::new(false));
+
+    signal_hook::flag::register(signal_hook::SIGTERM, Arc::clone(&exit))?;
+    signal_hook::flag::register(signal_hook::SIGINT, Arc::clone(&exit))?;
 
     let cfg = Arc::new(cfg);
     let mut handles = vec![];

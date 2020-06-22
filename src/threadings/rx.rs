@@ -80,7 +80,7 @@ impl RxThread {
 
     #[inline]
     fn rx<C: Capture>(&mut self, cap: &mut C) -> Result<()> {
-        while let Ok(mut pkt) = cap.next() {
+        while let (_, Ok(mut pkt)) = (!self.exit.load(Ordering::Relaxed), cap.next()) {
             match self.parser.parse_pkt(&mut pkt) {
                 Ok(_) => {}
                 Err(e) => match e {
@@ -95,18 +95,21 @@ impl RxThread {
             pkt.hash = hasher.finish();
 
             let thread = (pkt.hash % self.senders.len() as u64) as usize;
-            self.senders[thread].send(pkt).unwrap()
+            match self.senders[thread].send(pkt) {
+                Ok(_) => {}
+                Err(e) => {
+                    eprintln!("rx thread {} {}, {} will exit", self.id, e, crate_name!());
+                    break;
+                }
+            };
         }
         Ok(())
     }
 
     fn process_files(&mut self, files: &Vec<PathBuf>) -> Result<()> {
-        while !self.exit.load(Ordering::Relaxed) {
-            for file in files {
-                let mut cap = Offline::try_from_path(file)?;
-                self.rx(&mut cap)?;
-            }
-            break;
+        for file in files {
+            let mut cap = Offline::try_from_path(file)?;
+            self.rx(&mut cap)?;
         }
         Ok(())
     }
@@ -118,9 +121,7 @@ impl RxThread {
         };
 
         let mut cap = NetworkInterface::try_from_str(interface)?;
-        while !self.exit.load(Ordering::Relaxed) {
-            self.rx(&mut cap)?;
-        }
+        self.rx(&mut cap)?;
 
         Ok(())
     }
