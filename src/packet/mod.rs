@@ -116,20 +116,6 @@ impl Packet {
         Direction::LEFT
     }
 
-    #[inline]
-    pub fn from(raw_pkt: &pcap::Packet) -> Packet {
-        Packet {
-            ts: raw_pkt.header.ts,
-            caplen: raw_pkt.header.caplen,
-            data: Box::new(Vec::from(raw_pkt.data)),
-            data_link_layer: Layer::default(),
-            network_layer: Layer::default(),
-            trans_layer: Layer::default(),
-            app_layer: Layer::default(),
-            hash: 0,
-        }
-    }
-
     /// Get src port
     ///
     /// It's the caller's duty to guarantee transport layer is TCP/UDP
@@ -210,6 +196,22 @@ impl Default for Packet {
             },
             caplen: 0,
             data: Box::new(Vec::new()),
+            data_link_layer: Layer::default(),
+            network_layer: Layer::default(),
+            trans_layer: Layer::default(),
+            app_layer: Layer::default(),
+            hash: 0,
+        }
+    }
+}
+
+impl<'a> From<&pcap::Packet<'a>> for Packet {
+    #[inline]
+    fn from(raw_pkt: &pcap::Packet) -> Self {
+        Packet {
+            ts: raw_pkt.header.ts,
+            caplen: raw_pkt.header.caplen,
+            data: Box::new(Vec::from(raw_pkt.data)),
             data_link_layer: Layer::default(),
             network_layer: Layer::default(),
             trans_layer: Layer::default(),
