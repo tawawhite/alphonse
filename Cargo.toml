@@ -11,7 +11,7 @@ crossbeam-channel = "0.4.2"
 libc = "0.2.71"
 libloading = "0.6.2"
 # llhttp = {git = "https://github.com/JackLiar/rust-llhttp.git", branch="dev"}
-path-absolutize = "3.0.0"
+path-absolutize = "3.0.2"
 pcap = "0.7.0"
 signal-hook = "0.1.16"
 twox-hash = { git = "https://github.com/flier/twox-hash.git", branch = "xxh3" }
