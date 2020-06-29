@@ -49,6 +49,24 @@ pub fn parse_args(root_cmd: clap::App) -> Result<Config> {
     Ok(config)
 }
 
+fn set_integer<T: std::cmp::PartialOrd + std::fmt::Display + Copy>(
+    dst: &mut T,
+    src: T,
+    default: T,
+    max: T,
+    min: T,
+    name: &str,
+) {
+    if src > max || src < min {
+        *dst = default;
+        println!(
+            "{} is out of range: [{}, {}], set to default value: {}",
+            name, min, max, default
+        );
+    }
+    *dst = src;
+}
+
 fn parse_config_file(config_file: &str, config: &mut Config) -> Result<()> {
     let cfg_path = Path::new(config_file);
     if !cfg_path.exists() {
