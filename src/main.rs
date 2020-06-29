@@ -5,6 +5,7 @@ extern crate hyperscan;
 extern crate libc;
 extern crate path_absolutize;
 extern crate pcap;
+extern crate serde_json;
 extern crate signal_hook;
 extern crate twox_hash;
 extern crate yaml_rust;

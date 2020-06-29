@@ -21,6 +21,8 @@ pub struct Session {
     pub end_time: libc::timeval,
     /// indicate nothing to parse here
     pub parse_finished: bool,
+    /// custom fields
+    pub fields: serde_json::Value,
 }
 
 impl Session {
@@ -41,6 +43,7 @@ impl Session {
                 tv_usec: 0,
             },
             parse_finished: false,
+            fields: serde_json::Value::default(),
         }
     }
 
