@@ -1,11 +1,15 @@
 use std::collections::hash_map::HashMap;
+use std::os::raw::c_long;
+use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::time::SystemTime;
 
 use anyhow::Result;
 use crossbeam_channel::Receiver;
 
-use super::packet::Packet;
+use super::config;
+use super::packet::{Packet, Protocol};
 use super::protocol::Classifier;
 use super::sessions::Session;
 
@@ -15,7 +19,6 @@ pub struct SessionThread {
     id: u8,
     exit: Arc<AtomicBool>,
     receiver: Receiver<Box<Packet>>,
-    session_table: HashMap<Packet, Session>,
     classifier: Arc<Classifier>,
 }
 
@@ -30,18 +33,19 @@ impl SessionThread {
             id,
             exit,
             receiver,
-            session_table: Default::default(),
             classifier,
         }
     }
 
-    pub fn spawn(&mut self) -> Result<()> {
+    pub fn spawn(&mut self, cfg: Arc<config::Config>) -> Result<()> {
+        let mut session_table: HashMap<Packet, Rc<Session>> = Default::default();
         println!("session thread {} started", self.id);
         let classify_scratch = match self.classifier.alloc_scratch() {
             Ok(scratch) => scratch,
             Err(_) => todo!(),
         };
 
+        let mut timeout_epoch = 0;
         while !self.exit.load(Ordering::Relaxed) {
             match self.receiver.recv() {
                 Ok(p) => {
@@ -49,9 +53,14 @@ impl SessionThread {
                     self.classifier
                         .classify(&p, &mut protocols, &classify_scratch)?;
 
-                    match self.session_table.get_mut(&p) {
-                        Some(ses) => {
-                            ses.add_pkt(p);
+                    match session_table.get_mut(&p) {
+                        Some(mut ses) => {
+                            match Rc::get_mut(&mut ses) {
+                                Some(ses_rc) => {
+                                    ses_rc.update(&p);
+                                }
+                                None => todo!("handle session rc get_mut None"),
+                            };
                         }
                         None => {
                             let key = Packet {
@@ -64,11 +73,34 @@ impl SessionThread {
                                 app_layer: p.app_layer,
                                 hash: p.hash,
                             };
-                            let mut ses = Session::new();
-                            ses.start_time = p.ts;
-                            ses.add_pkt(p);
-                            &mut self.session_table.insert(key, ses);
+                            let mut ses = Rc::new(Session::new());
+                            let ses_rc = Rc::get_mut(&mut ses).unwrap();
+                            ses_rc.start_time = p.ts;
+                            ses_rc.update(&p);
+                            &mut session_table.insert(key, ses);
                         }
+                    }
+
+                    if timeout_epoch == cfg.timeout_pkt_epoch {
+                        let timestamp = SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap()
+                            .as_secs();
+                        &mut session_table.retain(|pkt, ses| match pkt.trans_layer.protocol {
+                            Protocol::TCP => {
+                                ses.timeout(cfg.tcp_timeout as c_long, timestamp as c_long)
+                            }
+                            Protocol::UDP => {
+                                ses.timeout(cfg.udp_timeout as c_long, timestamp as c_long)
+                            }
+                            Protocol::SCTP => {
+                                ses.timeout(cfg.sctp_timeout as c_long, timestamp as c_long)
+                            }
+                            _ => ses.timeout(cfg.default_timeout as c_long, timestamp as c_long),
+                        });
+                        timeout_epoch = 0;
+                    } else {
+                        timeout_epoch += 1;
                     }
                 }
                 Err(_) => break,

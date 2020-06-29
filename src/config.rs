@@ -11,17 +11,22 @@ use super::commands::CliArg;
 pub struct Config {
     pub backend: String,
     pub verbose_mode: bool,
+    pub default_timeout: u16,
     pub delete: bool,
     pub dpdk_eal_args: Vec<String>,
     pub dry_run: bool,
     pub interfaces: Vec<String>,
     pub pcap_file: String,
     pub pcap_dir: String,
-    pub rx_threads: u8,
-    pub ses_threads: u8,
     pub quiet: bool,
     pub recursive: bool,
+    pub rx_threads: u8,
+    pub ses_threads: u8,
+    pub sctp_timeout: u16,
     pub tags: Vec<String>,
+    pub tcp_timeout: u16,
+    pub timeout_pkt_epoch: u16,
+    pub udp_timeout: u16,
 }
 
 /// Parse command line arguments and set configuration
@@ -58,6 +63,92 @@ fn parse_config_file(config_file: &str, config: &mut Config) -> Result<()> {
 
     let docs = YamlLoader::load_from_str(&s)?;
     let doc = &docs[0];
+
+    match &doc["timeout.default"] {
+        Yaml::Integer(i) => set_integer(
+            &mut config.default_timeout,
+            *i as u16,
+            60,
+            0xffff,
+            10,
+            "timeout.default",
+        ),
+        Yaml::BadValue => {
+            println!("Option timeout.default not found or bad integer value, set timeout.default to 60 secs");
+            config.default_timeout = 60;
+        }
+        _ => {
+            return Err(anyhow!(
+                "Wrong value type for timeout.default, expecting integer",
+            ))
+        }
+    };
+
+    match &doc["timeout.tcp"] {
+        Yaml::Integer(i) => set_integer(
+            &mut config.tcp_timeout,
+            *i as u16,
+            60,
+            0xffff,
+            10,
+            "timeout.tcp",
+        ),
+        Yaml::BadValue => {
+            println!(
+                "Option timeout.tcp not found or bad integer value, set timeout.tcp to 480 secs"
+            );
+            config.tcp_timeout = 480;
+        }
+        _ => {
+            return Err(anyhow!(
+                "Wrong value type for timeout.tcp, expecting integer",
+            ))
+        }
+    };
+
+    match &doc["timeout.udp"] {
+        Yaml::Integer(i) => set_integer(
+            &mut config.udp_timeout,
+            *i as u16,
+            60,
+            0xffff,
+            10,
+            "timeout.udp",
+        ),
+        Yaml::BadValue => {
+            println!(
+                "Option timeout.udp not found or bad integer value, set timeout.udp to 480 secs"
+            );
+            config.udp_timeout = 480;
+        }
+        _ => {
+            return Err(anyhow!(
+                "Wrong value type for timeout.udp, expecting integer",
+            ))
+        }
+    };
+
+    match &doc["timeout.sctp"] {
+        Yaml::Integer(i) => set_integer(
+            &mut config.sctp_timeout,
+            *i as u16,
+            60,
+            0xffff,
+            10,
+            "timeout.sctp",
+        ),
+        Yaml::BadValue => {
+            println!(
+                "Option timeout.sctp not found or bad integer value, set timeout.udp to 480 secs"
+            );
+            config.udp_timeout = 480;
+        }
+        _ => {
+            return Err(anyhow!(
+                "Wrong value type for timeout.sctp, expecting integer",
+            ))
+        }
+    };
 
     match &doc["threads.rx"] {
         Yaml::Integer(i) => config.rx_threads = *i as u8,

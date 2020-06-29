@@ -64,7 +64,8 @@ fn main() -> Result<()> {
 
     // start all session threads
     for mut thread in ses_threads {
-        handles.push(thread::spawn(move || thread.spawn()));
+        let cfg = cfg.clone();
+        handles.push(thread::spawn(move || thread.spawn(cfg)));
     }
 
     // start all rx threads

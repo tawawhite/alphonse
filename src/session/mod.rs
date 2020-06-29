@@ -1,3 +1,5 @@
+use std::os::raw::c_long;
+
 use super::packet;
 
 /// network session
@@ -17,8 +19,6 @@ pub struct Session {
     pub start_time: libc::timeval,
     /// session end time
     pub end_time: libc::timeval,
-    /// session's packets
-    pub pkts: Vec<Box<packet::Packet>>,
     /// indicate nothing to parse here
     pub parse_finished: bool,
 }
@@ -40,13 +40,13 @@ impl Session {
                 tv_sec: 0,
                 tv_usec: 0,
             },
-            pkts: Vec::new(),
             parse_finished: false,
         }
     }
 
     #[inline]
-    pub fn add_pkt(&mut self, pkt: Box<packet::Packet>) {
+    /// update statistic information
+    pub fn update(&mut self, pkt: &Box<packet::Packet>) {
         match pkt.direction() {
             packet::Direction::LEFT => {
                 self.pkt_count[0] += 1;
@@ -59,7 +59,15 @@ impl Session {
                 self.data_bytes[1] += pkt.data_bytes() as u64;
             }
         }
+    }
 
-        self.pkts.push(pkt);
+    #[inline]
+    /// whether this session is too long
+    pub fn timeout(&self, timeout: c_long, timestamp: c_long) -> bool {
+        if self.end_time.tv_sec + timeout < timestamp {
+            true
+        } else {
+            false
+        }
     }
 }
