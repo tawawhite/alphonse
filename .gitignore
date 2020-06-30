@@ -4,6 +4,7 @@ third_party/
 .python-version
 *.pcap
 *.pcapng
+**/target/
 
 src/dpdk/raw.rs
 src/llhttp/raw.rs

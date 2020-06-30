@@ -1,10 +1,10 @@
 #[macro_use]
 extern crate clap;
+extern crate alphonse_api;
 extern crate crossbeam_channel;
 extern crate hyperscan;
 extern crate libc;
 extern crate path_absolutize;
-extern crate pcap;
 extern crate serde_json;
 extern crate signal_hook;
 extern crate twox_hash;
@@ -17,10 +17,12 @@ use std::thread;
 use anyhow::Result;
 use crossbeam_channel::unbounded;
 
+use alphonse_api as api;
+use api::packet;
+
 mod capture;
 mod commands;
 mod config;
-mod packet;
 mod protocol;
 mod session;
 mod threadings;

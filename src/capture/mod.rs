@@ -1,5 +1,3 @@
-extern crate pcap;
-
 use anyhow::Result;
 
 use super::packet;

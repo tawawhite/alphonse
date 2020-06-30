@@ -8,7 +8,6 @@ use std::convert::TryFrom;
 use std::hash::{Hash, Hasher};
 
 extern crate libc;
-extern crate pcap;
 
 pub mod link;
 pub mod network;
@@ -58,12 +57,25 @@ pub struct Packet {
     pub trans_layer: Layer,
     /// application layer
     pub app_layer: Layer,
-    /// Direction
     /// Packet hash, improve hash performance
     pub hash: u64,
 }
 
 impl Packet {
+    #[inline]
+    pub fn from(ts: &libc::timeval, caplen: u32, data: &[u8]) -> Self {
+        Packet {
+            ts: *ts,
+            caplen: caplen,
+            data: Box::new(Vec::from(data)),
+            data_link_layer: Layer::default(),
+            network_layer: Layer::default(),
+            trans_layer: Layer::default(),
+            app_layer: Layer::default(),
+            hash: 0,
+        }
+    }
+
     #[inline]
     pub fn len(&self) -> u16 {
         self.data.len() as u16
@@ -196,22 +208,6 @@ impl Default for Packet {
             },
             caplen: 0,
             data: Box::new(Vec::new()),
-            data_link_layer: Layer::default(),
-            network_layer: Layer::default(),
-            trans_layer: Layer::default(),
-            app_layer: Layer::default(),
-            hash: 0,
-        }
-    }
-}
-
-impl<'a> From<&pcap::Packet<'a>> for Packet {
-    #[inline]
-    fn from(raw_pkt: &pcap::Packet) -> Self {
-        Packet {
-            ts: raw_pkt.header.ts,
-            caplen: raw_pkt.header.caplen,
-            data: Box::new(Vec::from(raw_pkt.data)),
             data_link_layer: Layer::default(),
             network_layer: Layer::default(),
             trans_layer: Layer::default(),
