@@ -82,6 +82,26 @@ fn parse_config_file(config_file: &str, config: &mut Config) -> Result<()> {
     let docs = YamlLoader::load_from_str(&s)?;
     let doc = &docs[0];
 
+    match &doc["timeout.pkt-epoch"] {
+        Yaml::Integer(i) => set_integer(
+            &mut config.timeout_pkt_epoch,
+            *i as u16,
+            8,
+            0xffff,
+            1,
+            "timeout.pkt-epoch",
+        ),
+        Yaml::BadValue => {
+            println!("Option timeout.pkt-epoch not found or bad integer value, set timeout.pkt-epoch to 60 secs");
+            config.timeout_pkt_epoch = 8;
+        }
+        _ => {
+            return Err(anyhow!(
+                "Wrong value type for timeout.pkt-epoch, expecting integer",
+            ))
+        }
+    };
+
     match &doc["timeout.default"] {
         Yaml::Integer(i) => set_integer(
             &mut config.default_timeout,
@@ -113,7 +133,7 @@ fn parse_config_file(config_file: &str, config: &mut Config) -> Result<()> {
         ),
         Yaml::BadValue => {
             println!(
-                "Option timeout.tcp not found or bad integer value, set timeout.tcp to 480 secs"
+                "Option timeout.tcp not found or bad integer value, set timeout.tcp to 60 secs"
             );
             config.tcp_timeout = 480;
         }
@@ -135,7 +155,7 @@ fn parse_config_file(config_file: &str, config: &mut Config) -> Result<()> {
         ),
         Yaml::BadValue => {
             println!(
-                "Option timeout.udp not found or bad integer value, set timeout.udp to 480 secs"
+                "Option timeout.udp not found or bad integer value, set timeout.udp to 60 secs"
             );
             config.udp_timeout = 480;
         }
@@ -157,7 +177,7 @@ fn parse_config_file(config_file: &str, config: &mut Config) -> Result<()> {
         ),
         Yaml::BadValue => {
             println!(
-                "Option timeout.sctp not found or bad integer value, set timeout.udp to 480 secs"
+                "Option timeout.sctp not found or bad integer value, set timeout.udp to 60 secs"
             );
             config.udp_timeout = 480;
         }
