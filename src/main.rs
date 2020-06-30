@@ -18,13 +18,12 @@ use anyhow::Result;
 use crossbeam_channel::unbounded;
 
 use alphonse_api as api;
-use api::packet;
+use api::{packet, session};
 
 mod capture;
 mod commands;
 mod config;
 mod protocol;
-mod session;
 mod threadings;
 
 fn main() -> Result<()> {
