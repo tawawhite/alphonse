@@ -18,12 +18,11 @@ use anyhow::Result;
 use crossbeam_channel::unbounded;
 
 use alphonse_api as api;
-use api::{packet, session};
+use api::{classifier, packet, session};
 
 mod capture;
 mod commands;
 mod config;
-mod protocol;
 mod threadings;
 
 fn main() -> Result<()> {
@@ -41,14 +40,15 @@ fn main() -> Result<()> {
     let mut ses_threads = Vec::new();
     let mut pkt_senders = Vec::new();
 
-    let mut classifier = protocol::Classifier::new();
-    classifier.prepare();
-    let classifier = Arc::new(classifier);
+    let mut classifier_manager = classifier::ClassifierManager::new();
+    classifier_manager.prepare();
+    let classifier_manager = Arc::new(classifier_manager);
 
     for i in 0..cfg.ses_threads {
         let (sender, receiver) = unbounded();
         pkt_senders.push(sender);
-        let thread = threadings::SessionThread::new(i, exit.clone(), receiver, classifier.clone());
+        let thread =
+            threadings::SessionThread::new(i, exit.clone(), receiver, classifier_manager.clone());
         ses_threads.push(thread);
     }
 

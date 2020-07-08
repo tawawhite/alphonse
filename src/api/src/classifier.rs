@@ -4,7 +4,6 @@ use anyhow::Result;
 use hyperscan::{BlockDatabase, Builder};
 
 use super::packet;
-use super::Protocol;
 
 type ProtocolID = u8;
 
@@ -14,10 +13,11 @@ struct DpiRule {
     protocols: Vec<ProtocolID>,
 }
 
-/// Protocol Classifier
-pub struct Classifier {
-    protocol_table: Box<Vec<Protocol>>,
+/// Register a protocol classifier
+pub type register_classifier_func = fn(manager: &mut ClassifierManager) -> Result<()>;
 
+/// Protocol Classifier
+pub struct ClassifierManager {
     all_pkt_protocols: Box<Vec<u8>>,
 
     tcp_port_protocols: Box<Vec<Vec<u8>>>,
@@ -36,8 +36,8 @@ pub struct ClassifyScratch {
     hs_scratch: Option<hyperscan::Scratch>,
 }
 
-impl Classifier {
-    pub fn new() -> Classifier {
+impl ClassifierManager {
+    pub fn new() -> ClassifierManager {
         fn initialize_vec_of_vec(size: usize) -> Vec<Vec<u8>> {
             let mut v: Vec<Vec<u8>> = Vec::with_capacity(size);
             for _ in 0..size {
@@ -46,8 +46,7 @@ impl Classifier {
             v
         }
 
-        Classifier {
-            protocol_table: Box::new(Vec::with_capacity(256)),
+        ClassifierManager {
             all_pkt_protocols: Box::new(Vec::new()),
             tcp_port_protocols: Box::new(initialize_vec_of_vec(65536)),
             udp_port_protocols: Box::new(initialize_vec_of_vec(65536)),
@@ -59,10 +58,9 @@ impl Classifier {
 
     /// Allocate a protocol classifier scratch
     pub fn alloc_scratch(&self) -> Result<ClassifyScratch> {
-        let scratch;
-        match &self.hs_db {
-            Some(db) => scratch = Some(db.alloc_scratch()?),
-            None => scratch = None,
+        let scratch = match &self.hs_db {
+            Some(db) => Some(db.alloc_scratch()?),
+            None => None,
         };
         Ok(ClassifyScratch {
             hs_scratch: scratch,
@@ -169,7 +167,7 @@ mod tests {
     use super::*;
     #[test]
     fn classifier_add_all_pkt_rule() {
-        let mut classifier = Classifier::new();
+        let mut classifier = ClassifierManager::new();
         classifier.add_all_pkt_rule(0);
         assert_eq!(classifier.all_pkt_protocols.len(), 1);
         assert_eq!(classifier.all_pkt_protocols[0], 0);
@@ -177,7 +175,7 @@ mod tests {
 
     #[test]
     fn classifier_add_port_rule() {
-        let mut classifier = Classifier::new();
+        let mut classifier = ClassifierManager::new();
         classifier.add_port_rule(0, 443, packet::Protocol::TCP);
         assert_eq!(classifier.tcp_port_protocols[443][0], 0);
 
@@ -192,7 +190,7 @@ mod tests {
 
     #[test]
     fn classifier_add_dpi_rule() {
-        let mut classifier = Classifier::new();
+        let mut classifier = ClassifierManager::new();
         let expression = String::from("regex");
         let pattern = hyperscan::Pattern::new(expression.clone()).unwrap();
         classifier.add_dpi_rule(pattern, 100);
@@ -215,7 +213,7 @@ mod tests {
     }
 
     fn classifier_add_dpi_rule_with_existing_expression() {
-        let mut classifier = Classifier::new();
+        let mut classifier = ClassifierManager::new();
         let expression = String::from("regex");
         let pattern = hyperscan::Pattern::new(expression.clone()).unwrap();
         classifier.add_dpi_rule(pattern, 100);

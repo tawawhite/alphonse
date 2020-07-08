@@ -8,9 +8,9 @@ use std::time::SystemTime;
 use anyhow::Result;
 use crossbeam_channel::Receiver;
 
+use super::classifier::ClassifierManager;
 use super::config;
 use super::packet::{Packet, Protocol};
-use super::protocol::Classifier;
 use super::sessions::Session;
 
 /// 数据包处理线程
@@ -19,7 +19,7 @@ pub struct SessionThread {
     id: u8,
     exit: Arc<AtomicBool>,
     receiver: Receiver<Box<Packet>>,
-    classifier: Arc<Classifier>,
+    classifier: Arc<ClassifierManager>,
 }
 
 impl SessionThread {
@@ -27,7 +27,7 @@ impl SessionThread {
         id: u8,
         exit: Arc<AtomicBool>,
         receiver: Receiver<Box<Packet>>,
-        classifier: Arc<Classifier>,
+        classifier: Arc<ClassifierManager>,
     ) -> SessionThread {
         SessionThread {
             id,
