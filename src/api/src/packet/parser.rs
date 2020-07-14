@@ -154,7 +154,10 @@ impl Parser {
                     }
                     transport::sctp::Parser::parse(buf, offset)
                 }
-                Protocol::APPLICATION => return Ok(()),
+                Protocol::APPLICATION => {
+                    pkt.app_layer = layer;
+                    return Ok(());
+                }
                 Protocol::UNKNOWN => {
                     return Err(Error::UnknownProtocol);
                 }
