@@ -4,6 +4,7 @@ extern crate alphonse_api;
 extern crate crossbeam_channel;
 extern crate hyperscan;
 extern crate libc;
+extern crate libloading;
 extern crate path_absolutize;
 extern crate serde_json;
 extern crate signal_hook;
@@ -18,7 +19,7 @@ use anyhow::Result;
 use crossbeam_channel::unbounded;
 
 use alphonse_api as api;
-use api::{classifier, packet, session};
+use api::{classifier, packet, parsers::RegisterProtocolParserFunc, session};
 
 mod capture;
 mod commands;
@@ -36,13 +37,29 @@ fn main() -> Result<()> {
     let cfg = Arc::new(cfg);
     let mut handles = vec![];
 
+    let mut protocol_parsers = Vec::new();
+
+    for p in &cfg.as_ref().parsers {
+        let lib = libloading::Library::new(p)?;
+        let register_protocol_parser: libloading::Symbol<RegisterProtocolParserFunc>;
+        unsafe {
+            register_protocol_parser = lib.get(b"register_protocol_parser\0")?;
+        }
+        register_protocol_parser(&mut protocol_parsers)?;
+    }
+
+    let mut classifier_manager = classifier::ClassifierManager::new();
+    for mut parser in protocol_parsers {
+        parser.register_classifier(&mut classifier_manager)?;
+        parser.init()?;
+    }
+
+    classifier_manager.prepare();
+    let classifier_manager = Arc::new(classifier_manager);
+
     // initialize session threads
     let mut ses_threads = Vec::new();
     let mut pkt_senders = Vec::new();
-
-    let mut classifier_manager = classifier::ClassifierManager::new();
-    classifier_manager.prepare();
-    let classifier_manager = Arc::new(classifier_manager);
 
     for i in 0..cfg.ses_threads {
         let (sender, receiver) = unbounded();

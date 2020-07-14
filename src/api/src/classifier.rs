@@ -4,25 +4,21 @@ use anyhow::Result;
 use hyperscan::{BlockDatabase, Builder};
 
 use super::packet;
-
-type ProtocolID = u8;
+use super::parsers::ParserID;
 
 #[derive(Clone)]
 struct DpiRule {
     hs_pattern: hyperscan::Pattern,
-    protocols: Vec<ProtocolID>,
+    protocols: Vec<ParserID>,
 }
-
-/// Register a protocol classifier
-pub type register_classifier_func = fn(manager: &mut ClassifierManager) -> Result<()>;
 
 /// Protocol Classifier
 pub struct ClassifierManager {
-    all_pkt_protocols: Box<Vec<u8>>,
+    all_pkt_protocols: Box<Vec<ParserID>>,
 
-    tcp_port_protocols: Box<Vec<Vec<u8>>>,
-    udp_port_protocols: Box<Vec<Vec<u8>>>,
-    sctp_port_protocols: Box<Vec<Vec<u8>>>,
+    tcp_port_protocols: Box<Vec<Vec<ParserID>>>,
+    udp_port_protocols: Box<Vec<Vec<ParserID>>>,
+    sctp_port_protocols: Box<Vec<Vec<ParserID>>>,
 
     dpi_rules: Box<Vec<DpiRule>>,
 
@@ -38,8 +34,8 @@ pub struct ClassifyScratch {
 
 impl ClassifierManager {
     pub fn new() -> ClassifierManager {
-        fn initialize_vec_of_vec(size: usize) -> Vec<Vec<u8>> {
-            let mut v: Vec<Vec<u8>> = Vec::with_capacity(size);
+        fn initialize_vec_of_vec(size: usize) -> Vec<Vec<ParserID>> {
+            let mut v: Vec<Vec<ParserID>> = Vec::with_capacity(size);
             for _ in 0..size {
                 v.push(Vec::new());
             }
@@ -67,24 +63,29 @@ impl ClassifierManager {
         })
     }
 
-    pub fn add_all_pkt_rule(&mut self, protocol_id: u8) {
-        self.all_pkt_protocols.push(protocol_id);
+    pub fn add_all_pkt_rule(&mut self, parser_id: ParserID) {
+        self.all_pkt_protocols.push(parser_id);
     }
 
     /// Add port classify rule for a protocol
-    pub fn add_port_rule(&mut self, protocol_id: u8, src_port: u16, trans_proto: packet::Protocol) {
+    pub fn add_port_rule(
+        &mut self,
+        parser_id: ParserID,
+        src_port: u16,
+        trans_proto: packet::Protocol,
+    ) {
         match trans_proto {
             packet::Protocol::TCP => match (*self.tcp_port_protocols).get_mut(src_port as usize) {
-                Some(vec) => vec.push(protocol_id),
+                Some(vec) => vec.push(parser_id),
                 None => unimplemented!(),
             },
             packet::Protocol::UDP => match (*self.udp_port_protocols).get_mut(src_port as usize) {
-                Some(vec) => vec.push(protocol_id),
+                Some(vec) => vec.push(parser_id),
                 None => unimplemented!(),
             },
             packet::Protocol::SCTP => {
                 match (*self.sctp_port_protocols).get_mut(src_port as usize) {
-                    Some(vec) => vec.push(protocol_id),
+                    Some(vec) => vec.push(parser_id),
                     None => unimplemented!(),
                 }
             }
@@ -92,7 +93,7 @@ impl ClassifierManager {
         };
     }
 
-    pub fn add_dpi_rule(&mut self, pattern: hyperscan::Pattern, protocol_id: ProtocolID) {
+    pub fn add_dpi_rule(&mut self, pattern: hyperscan::Pattern, parser_id: ParserID) {
         let mut same_pattern_index: i32 = -1;
         for (i, dpi_rule) in (&*self.dpi_rules).iter().enumerate() {
             if dpi_rule.hs_pattern.expression == pattern.expression {
@@ -104,20 +105,20 @@ impl ClassifierManager {
         if same_pattern_index < 0 {
             let dpi_rule = DpiRule {
                 hs_pattern: pattern,
-                protocols: vec![protocol_id],
+                protocols: vec![parser_id],
             };
             self.dpi_rules.push(dpi_rule);
         } else {
             let dpi_rule = self.dpi_rules.get_mut(same_pattern_index as usize).unwrap();
             let mut id_conflict = false;
             for p_id in &dpi_rule.protocols {
-                if *p_id == protocol_id {
+                if *p_id == parser_id {
                     id_conflict = true;
                     break;
                 }
             }
             if !id_conflict {
-                dpi_rule.protocols.push(protocol_id);
+                dpi_rule.protocols.push(parser_id);
             } else {
                 panic!("DpiRule protocol id conflict!");
             }
@@ -143,20 +144,23 @@ impl ClassifierManager {
     pub fn classify(
         &self,
         pkt: &packet::Packet,
-        protocols: &mut Vec<u8>,
+        protocols: &mut Vec<ParserID>,
         scratch: &ClassifyScratch,
     ) -> Result<()> {
         match (&self.hs_db, &scratch.hs_scratch) {
-            (Some(db), Some(s)) => Ok(db.scan(
-                &pkt.data.as_slice()[pkt.app_layer.offset as usize..],
-                s,
-                |id, _from, _to, _flags| {
-                    // !!! use direct access for performance, very dangerous, may panic !!!
-                    let dpi_rule = &self.dpi_rules[id as usize];
-                    protocols.extend(&dpi_rule.protocols);
-                    hyperscan::Matching::Continue
-                },
-            )?),
+            (Some(db), Some(s)) => {
+                db.scan(
+                    &pkt.data.as_slice()[pkt.app_layer.offset as usize..],
+                    s,
+                    |id, _from, _to, _flags| {
+                        // !!! use direct access for performance, very dangerous, may panic !!!
+                        let dpi_rule = &self.dpi_rules[id as usize];
+                        protocols.extend(&dpi_rule.protocols);
+                        hyperscan::Matching::Continue
+                    },
+                )?;
+                Ok(())
+            }
             _ => Ok(()),
         }
     }
@@ -212,6 +216,7 @@ mod tests {
         assert_eq!(protocols[0], 100);
     }
 
+    #[test]
     fn classifier_add_dpi_rule_with_existing_expression() {
         let mut classifier = ClassifierManager::new();
         let expression = String::from("regex");

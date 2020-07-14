@@ -16,6 +16,7 @@ pub struct Config {
     pub dpdk_eal_args: Vec<String>,
     pub dry_run: bool,
     pub interfaces: Vec<String>,
+    pub parsers: Vec<String>,
     pub pcap_file: String,
     pub pcap_dir: String,
     pub quiet: bool,
@@ -220,6 +221,27 @@ fn parse_config_file(config_file: &str, config: &mut Config) -> Result<()> {
         Yaml::BadValue => return Err(anyhow!("Option backend not found or bad string value",)),
         _ => return Err(anyhow!("Wrong value type for backend, expecting string",)),
     };
+
+    match &doc["parsers"] {
+        Yaml::Array(a) => {
+            for parser in a {
+                match parser {
+                    Yaml::String(s) => config.parsers.push(String::from(s)),
+
+                    Yaml::BadValue => {
+                        return Err(anyhow!("Bad string value for an interface value",))
+                    }
+                    _ => {
+                        return Err(anyhow!(
+                            "Wrong value type for interfaces' element, expecting string",
+                        ))
+                    }
+                }
+            }
+        }
+        Yaml::BadValue => return Err(anyhow!("Option parsers not found or bad array value",)),
+        _ => return Err(anyhow!("Wrong value type for parsers, expecting array",)),
+    }
 
     match &doc["interfaces"] {
         Yaml::Array(a) => {
