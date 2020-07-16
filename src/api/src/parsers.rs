@@ -14,7 +14,10 @@ pub type ParserInitFunc = fn() -> Result<()>;
 // Release parser required global resources
 pub type ParserExitFunc = fn() -> Result<()>;
 
-pub trait ProtocolParser {
+pub trait ProtocolParser: Send + Sync {
+    /// Clone a Protocol Parser
+    fn box_clone(&self) -> Box<dyn ProtocolParser>;
+
     /// Get parser id
     fn id(&self) -> ParserID;
 
