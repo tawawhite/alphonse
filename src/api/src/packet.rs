@@ -348,6 +348,21 @@ impl PartialEq for Packet {
 
 impl Eq for Packet {}
 
+impl Clone for Packet {
+    fn clone(&self) -> Self {
+        Packet {
+            ts: self.ts,
+            caplen: self.caplen,
+            data: self.data.clone(),
+            data_link_layer: self.data_link_layer,
+            network_layer: self.network_layer,
+            trans_layer: self.trans_layer,
+            app_layer: self.app_layer,
+            hash: self.hash,
+        }
+    }
+}
+
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 /// Protocol collection, 1 byte

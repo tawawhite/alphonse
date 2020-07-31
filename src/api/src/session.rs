@@ -1,6 +1,7 @@
 use std::os::raw::c_long;
 
 use super::packet;
+use super::parsers;
 
 /// network session
 pub struct Session {
@@ -23,6 +24,8 @@ pub struct Session {
     pub parse_finished: bool,
     /// custom fields
     pub fields: serde_json::Value,
+    /// protocol parsers, registered dynamically
+    pub parsers: Vec<Box<dyn parsers::ProtocolParser>>,
 }
 
 impl Session {
@@ -44,6 +47,7 @@ impl Session {
             },
             parse_finished: false,
             fields: serde_json::Value::default(),
+            parsers: Vec::with_capacity(1),
         }
     }
 

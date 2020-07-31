@@ -28,6 +28,19 @@ mod packet;
 mod threadings;
 
 fn main() -> Result<()> {
+    // let mut p = packet::Packet::default();
+    // p.data.push(0);
+    // let p1 = Box::new(p);
+    // let p2 = p1.clone();
+
+    // println!("{:?}", p1.as_ref() as *const packet::Packet);
+    // println!("{:?}", p1.as_ref().data.as_ptr());
+
+    // println!("{:?}", p2.as_ref() as *const packet::Packet);
+    // println!("{:?}", p2.as_ref().data.as_ptr());
+
+    // return Ok(());
+
     let root_cmd = commands::new_root_command();
     let cfg = config::parse_args(root_cmd)?;
     let exit = Arc::new(AtomicBool::new(false));
@@ -50,7 +63,7 @@ fn main() -> Result<()> {
     }
 
     let mut classifier_manager = classifier::ClassifierManager::new();
-    for mut parser in protocol_parsers {
+    for parser in &mut protocol_parsers {
         parser.register_classifier(&mut classifier_manager)?;
         parser.init()?;
     }
@@ -85,7 +98,11 @@ fn main() -> Result<()> {
     // start all session threads
     for mut thread in ses_threads {
         let cfg = cfg.clone();
-        handles.push(thread::spawn(move || thread.spawn(cfg)));
+        let mut parsers: Box<Vec<Box<dyn api::parsers::ProtocolParser>>> = Box::new(Vec::new());
+        for parser in &protocol_parsers {
+            parsers.push(parser.box_clone());
+        }
+        handles.push(thread::spawn(move || thread.spawn(cfg, parsers)));
     }
 
     // start all rx threads
