@@ -149,16 +149,12 @@ impl ClassifierManager {
     ) -> Result<()> {
         match (&self.hs_db, &scratch.hs_scratch) {
             (Some(db), Some(s)) => {
-                db.scan(
-                    &pkt.data.as_slice()[pkt.app_layer.offset as usize..],
-                    s,
-                    |id, _from, _to, _flags| {
-                        // !!! use direct access for performance, very dangerous, may panic !!!
-                        let dpi_rule = &self.dpi_rules[id as usize];
-                        protocols.extend(&dpi_rule.protocols);
-                        hyperscan::Matching::Continue
-                    },
-                )?;
+                db.scan(pkt.payload(), s, |id, _from, _to, _flags| {
+                    // !!! use direct access for performance, very dangerous, may panic !!!
+                    let dpi_rule = &self.dpi_rules[id as usize];
+                    protocols.extend(&dpi_rule.protocols);
+                    hyperscan::Matching::Continue
+                })?;
                 Ok(())
             }
             _ => Ok(()),

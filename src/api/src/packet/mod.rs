@@ -197,6 +197,12 @@ impl Packet {
     pub fn dst_mac(&self) -> &[u8; 6] {
         <&[u8; 6]>::try_from(&self.data.as_slice()[0..6]).unwrap()
     }
+
+    #[inline]
+    /// Get packet's application layer payload
+    pub fn payload(&self) -> &[u8] {
+        &self.data.as_slice()[self.app_layer.offset as usize..]
+    }
 }
 
 impl Default for Packet {
