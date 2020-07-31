@@ -9,11 +9,6 @@ use std::hash::{Hash, Hasher};
 
 extern crate libc;
 
-pub mod link;
-pub mod network;
-pub mod parser;
-pub mod transport;
-
 #[repr(u8)]
 pub enum Direction {
     LEFT = 0,
@@ -405,5 +400,3 @@ impl Default for Protocol {
         Protocol::UNKNOWN
     }
 }
-
-pub type Parser = parser::Parser;

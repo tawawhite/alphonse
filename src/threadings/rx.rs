@@ -8,9 +8,11 @@ use anyhow::Result;
 use crossbeam_channel::Sender;
 use path_absolutize::Absolutize;
 
+use alphonse_api::packet::Packet;
+
 use super::capture::{Capture, NetworkInterface, Offline};
 use super::config;
-use super::packet::{parser, Packet, Parser};
+use super::packet::{parser, Parser};
 
 /// 收包线程
 pub struct RxThread {

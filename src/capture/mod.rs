@@ -1,7 +1,6 @@
 use anyhow::Result;
 
-use super::packet;
-use super::packet::Packet;
+use alphonse_api::packet::Packet;
 
 mod libpcap;
 

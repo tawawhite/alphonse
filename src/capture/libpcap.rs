@@ -2,7 +2,8 @@ use std::path::Path;
 
 use anyhow::{anyhow, Result};
 
-use super::packet::Packet;
+use alphonse_api::packet::Packet;
+
 use super::Capture;
 
 pub struct Offline {

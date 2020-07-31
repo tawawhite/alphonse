@@ -8,9 +8,11 @@ use std::time::SystemTime;
 use anyhow::Result;
 use crossbeam_channel::Receiver;
 
-use super::classifier::ClassifierManager;
+use alphonse_api as api;
+use api::packet::{Packet, Protocol};
+use api::{classifier::ClassifierManager, parsers::ProtocolParser};
+
 use super::config;
-use super::packet::{Packet, Protocol};
 use super::sessions::Session;
 
 /// 数据包处理线程

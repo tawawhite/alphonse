@@ -19,11 +19,12 @@ use anyhow::Result;
 use crossbeam_channel::unbounded;
 
 use alphonse_api as api;
-use api::{classifier, packet, parsers::RegisterProtocolParserFunc, session};
+use api::{classifier, parsers::RegisterProtocolParserFunc, session};
 
 mod capture;
 mod commands;
 mod config;
+mod packet;
 mod threadings;
 
 fn main() -> Result<()> {
