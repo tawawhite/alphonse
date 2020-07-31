@@ -37,5 +37,5 @@ pub trait ProtocolParser: Send + Sync {
     fn register_classifier(&self, manager: &mut ClassifierManager) -> Result<()>;
 
     /// Parse a single packet and maybe update session information
-    fn parse_pkt(&self, pkt: &packet::Packet, ses: &mut session::Session);
+    fn parse_pkt(&mut self, pkt: &packet::Packet, ses: &mut session::Session);
 }
