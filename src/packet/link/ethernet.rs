@@ -192,7 +192,7 @@ pub struct Parser {}
 
 impl SimpleProtocolParser for Parser {
     #[inline]
-    fn parse(buf: &[u8], _offset: u16) -> Result<Layer, Error> {
+    fn parse(buf: &[u8], offset: u16) -> Result<Layer, Error> {
         if buf.len() < 14 {
             return Err(Error::CorruptPacket(format!(
                 "The ethernet packet is corrupted, packet too short ({} bytes)",
@@ -205,7 +205,7 @@ impl SimpleProtocolParser for Parser {
             offset: 0,
         };
 
-        let etype = (buf[12] as u16) << 8 | buf[12 + 1] as u16;
+        let etype = (buf[12 + offset as usize] as u16) << 8 | buf[12 + 1 + offset as usize] as u16;
         layer.offset = 6 + 6 + 2;
         match etype {
             IPV4 => layer.protocol = Protocol::IPV4,
@@ -219,7 +219,7 @@ impl SimpleProtocolParser for Parser {
             }
             _ => {
                 return Err(Error::UnsupportProtocol(format!(
-                    "Unsupport protocol, ether type: {}",
+                    "Unsupport protocol, ether type: {:x}",
                     etype
                 )));
             }
