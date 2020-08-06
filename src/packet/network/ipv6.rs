@@ -12,7 +12,7 @@ impl SimpleProtocolParser for Parser {
             )));
         }
 
-        let ip_vhl = buf[0];
+        let ip_vhl = buf[offset as usize];
         let ip_version = ip_vhl >> 4;
 
         if ip_version != 6 {
@@ -22,7 +22,7 @@ impl SimpleProtocolParser for Parser {
             )));
         }
 
-        let ip_len = (buf[4] as u16) << 8 | (buf[5] as u16);
+        let ip_len = (buf[4 + offset as usize] as u16) << 8 | (buf[5 + offset as usize] as u16);
         if buf.len() < ip_len as usize {
             // 如果报文的长度小于 IP 报文中声明的数据报长度，数据包有错误
             return Err(Error::CorruptPacket(format!(
@@ -34,7 +34,7 @@ impl SimpleProtocolParser for Parser {
             protocol: Protocol::default(),
             offset: offset + 40,
         };
-        let ip_proto = buf[(6) as usize];
+        let ip_proto = buf[6 + offset as usize];
 
         match ip_proto {
             ip_proto::ICMP => layer.protocol = Protocol::ICMP,
