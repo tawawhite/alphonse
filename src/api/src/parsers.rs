@@ -28,10 +28,14 @@ pub trait ProtocolParser: Send + Sync {
     fn name(&self) -> String;
 
     /// Initialize parser required global resources
-    fn init(&mut self) -> Result<()>;
+    fn init(&mut self) -> Result<()> {
+        Ok(())
+    }
 
     // Release parser required global resources
-    fn exit(&mut self) -> Result<()>;
+    fn exit(&mut self) -> Result<()> {
+        Ok(())
+    }
 
     /// Register a protocol classifier
     fn register_classifier(&self, manager: &mut ClassifierManager) -> Result<()>;
