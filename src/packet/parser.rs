@@ -2,7 +2,7 @@ use std::fmt::{Display, Formatter};
 
 use anyhow::Result;
 
-use super::{link, network, transport, Layer, Packet, Protocol};
+use super::{link, network, transport, tunnel, Layer, Packet, Protocol};
 
 /// 仅解析协议在数据包中的开始位置和协议长度的 parser
 pub trait SimpleProtocolParser {
@@ -13,8 +13,6 @@ pub trait SimpleProtocolParser {
     /// * `buf` - 该层协议的内容，包含协议头
     ///
     /// * `offset` - 本层协议距离数据包头部的距离
-    ///
-    /// * `pkt` - 数据包
     fn parse(buf: &[u8], offset: u16) -> Result<Layer, Error>;
 }
 
@@ -112,6 +110,7 @@ impl Parser {
                     }
                     link::null::Parser::parse(buf, offset)
                 }
+                Protocol::MPLS => tunnel::mpls::Parser::parse(buf, offset),
                 Protocol::RAW | Protocol::IPV4 => {
                     if pkt.network_layer.protocol == Protocol::UNKNOWN {
                         pkt.network_layer = layer;

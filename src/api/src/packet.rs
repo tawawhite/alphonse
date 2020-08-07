@@ -22,12 +22,12 @@ impl Default for Direction {
 }
 
 #[derive(Clone, Copy, Default)]
-#[repr(packed)]
+#[repr(C)]
 /// Packet protocol layer, 3 bytes
 pub struct Layer {
-    pub protocol: Protocol,
     /// protocol start offset
     pub offset: u16,
+    pub protocol: Protocol,
 }
 
 impl Hash for Layer {
