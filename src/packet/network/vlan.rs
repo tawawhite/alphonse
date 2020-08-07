@@ -11,7 +11,7 @@ impl SimpleProtocolParser for Parser {
             offset: offset + 4 + 2,
         };
 
-        let etype = (buf[0] as u16) << 8 | buf[0] as u16;
+        let etype = (buf[0] as u16) << 8 | buf[1] as u16;
         match etype {
             link::ethernet::IPV4 => layer.protocol = Protocol::IPV4,
             link::ethernet::IPV6 => layer.protocol = Protocol::IPV6,
@@ -28,5 +28,24 @@ impl SimpleProtocolParser for Parser {
         };
 
         Ok(layer)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_ok() {
+        let buf = [0x08, 0x00, 0xc2, 0x00, 0x00, 0x00];
+        assert!(matches!(Parser::parse(&buf, 0), Ok(_)));
+    }
+
+    #[test]
+    fn test_err_unsupport_protocol() {
+        let buf = [0x08, 0x01, 0xc2, 0x00, 0x00, 0x00];
+        let result = Parser::parse(&buf, 0);
+        let err = result.unwrap_err();
+        assert!(matches!(err, Error::UnsupportProtocol(_)));
     }
 }
