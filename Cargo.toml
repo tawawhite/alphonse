@@ -6,7 +6,7 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0.32"
-clap = "2.33.1"
+clap = "2.33.2"
 crossbeam-channel = "0.4.3"
 libc = "0.2.74"
 libloading = "0.6.2"
