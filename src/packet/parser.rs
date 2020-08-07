@@ -10,9 +10,9 @@ pub trait SimpleProtocolParser {
     ///
     /// # Arguments
     ///
-    /// * `buf` - 该层协议的内容，包含协议头
+    /// * `buf` - Buffer of this layer and its payload
     ///
-    /// * `offset` - 本层协议距离数据包头部的距离
+    /// * `offset` - Position to start of the packet
     fn parse(buf: &[u8], offset: u16) -> Result<Layer, Error>;
 }
 
