@@ -93,7 +93,16 @@ impl ClassifierManager {
         };
     }
 
-    pub fn add_dpi_rule(&mut self, pattern: hyperscan::Pattern, parser_id: ParserID) {
+    /// Rigister a dpi rule for a protocol parser
+    ///
+    /// # Arguments
+    ///
+    /// * `pattern` - Hyperscan pattern
+    ///
+    /// * `parser_id` - protocol parser's id
+    ///
+    /// # Returns
+    pub fn add_dpi_rule(&mut self, pattern: hyperscan::Pattern, parser_id: ParserID) -> usize {
         let mut same_pattern_index: i32 = -1;
         for (i, dpi_rule) in (&*self.dpi_rules).iter().enumerate() {
             if dpi_rule.hs_pattern.expression == pattern.expression {
@@ -102,12 +111,14 @@ impl ClassifierManager {
             }
         }
 
+        let rule_id;
         if same_pattern_index < 0 {
             let dpi_rule = DpiRule {
                 hs_pattern: pattern,
                 protocols: vec![parser_id],
             };
             self.dpi_rules.push(dpi_rule);
+            rule_id = self.dpi_rules.len() - 1;
         } else {
             let dpi_rule = self.dpi_rules.get_mut(same_pattern_index as usize).unwrap();
             let mut id_conflict = false;
@@ -117,12 +128,16 @@ impl ClassifierManager {
                     break;
                 }
             }
+
             if !id_conflict {
                 dpi_rule.protocols.push(parser_id);
             } else {
                 panic!("DpiRule protocol id conflict!");
             }
+            rule_id = same_pattern_index as usize;
         }
+
+        rule_id
     }
 
     pub fn prepare(&mut self) {
