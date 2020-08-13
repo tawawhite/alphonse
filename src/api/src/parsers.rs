@@ -41,5 +41,21 @@ pub trait ProtocolParser: Send + Sync {
     fn register_classifier(&mut self, manager: &mut ClassifierManager) -> Result<()>;
 
     /// Parse a single packet and maybe update session information
-    fn parse_pkt(&mut self, pkt: &packet::Packet, ses: &mut session::Session);
+    fn parse_pkt(&mut self, _pkt: &packet::Packet, ses: &mut session::Session) {
+        if self.is_classified() {
+            // If this session is already classified as Bittorrent protocol, skip
+            return;
+        }
+
+        self.classified_as_this_protocol();
+
+        ses.add_protocol(self.name());
+    }
+
+    /// Check whether the session is classfied as this protocol
+    fn is_classified(&self) -> bool {
+        false
+    }
+
+    fn classified_as_this_protocol(&mut self);
 }
