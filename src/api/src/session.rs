@@ -77,4 +77,18 @@ impl Session {
             false
         }
     }
+
+    /// Add session protocol information
+    pub fn add_protocol(&mut self, protocol: String) {
+        match self.fields.get_mut("protocols") {
+            Some(protocols) => match protocols.as_array_mut() {
+                Some(ps) => ps.push(serde_json::value::Value::String(protocol)),
+                None => todo!("decide how to handle non array type protocols field"),
+            },
+            None => {
+                let protocols = vec![serde_json::value::Value::String(protocol)];
+                self.fields["protocols"] = serde_json::Value::Array(protocols);
+            }
+        }
+    }
 }
