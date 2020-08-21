@@ -31,3 +31,4 @@ bindgen = { version = "0.54.1", optional = true }
 
 [features]
 dpdk = ["cpp_build", "bindgen"]
+heuristic-mpls = []
