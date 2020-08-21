@@ -5,8 +5,10 @@ use super::{packet, session};
 
 pub type ParserID = u8;
 
-/// register a protocol parser into alphonse
-pub type RegisterProtocolParserFunc = fn(&mut Vec<Box<dyn ProtocolParser>>) -> Result<()>;
+/// Create a Box of the protocol parser
+pub type NewProtocolParserBoxFunc = fn() -> Result<Box<dyn ProtocolParser>>;
+/// Create a Vector of Box of the protocol parser
+pub type NewProtocolParserBoxesFunc = fn() -> Result<Vec<Box<dyn ProtocolParser>>>;
 
 // Initialize parser required global resources
 pub type ParserInitFunc = fn() -> Result<()>;
@@ -42,14 +44,11 @@ pub trait ProtocolParser: Send + Sync {
 
     /// Parse a single packet and maybe update session information
     fn parse_pkt(&mut self, _pkt: &packet::Packet, ses: &mut session::Session) {
-        if self.is_classified() {
+        if !self.is_classified() {
             // If this session is already classified as Bittorrent protocol, skip
-            return;
+            self.classified_as_this_protocol();
+            ses.add_protocol(self.name());
         }
-
-        self.classified_as_this_protocol();
-
-        ses.add_protocol(self.name());
     }
 
     /// Check whether the session is classfied as this protocol
