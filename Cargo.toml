@@ -6,9 +6,9 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0.32"
-clap = "2.33.2"
+clap = "2.33.3"
 crossbeam-channel = "0.4.3"
-libc = "0.2.74"
+libc = "0.2.76"
 libloading = "0.6.2"
 path-absolutize = "3.0.6"
 pcap = "0.7.0"
