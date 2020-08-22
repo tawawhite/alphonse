@@ -19,7 +19,9 @@ use anyhow::Result;
 use crossbeam_channel::unbounded;
 
 use alphonse_api as api;
-use api::{classifier, parsers::RegisterProtocolParserFunc, session};
+use api::{
+    classifier, parsers::NewProtocolParserBoxFunc, parsers::NewProtocolParserBoxesFunc, session,
+};
 
 mod capture;
 mod commands;
@@ -53,13 +55,39 @@ fn main() -> Result<()> {
 
     let mut protocol_parsers = Vec::new();
 
+    let mut id = 0;
     for p in &cfg.as_ref().parsers {
         let lib = libloading::Library::new(p)?;
-        let register_protocol_parser: libloading::Symbol<RegisterProtocolParserFunc>;
+
+        let new_protocol_parser: libloading::Symbol<NewProtocolParserBoxFunc>;
         unsafe {
-            register_protocol_parser = lib.get(b"register_protocol_parser\0")?;
+            match lib.get(b"new_protocol_parser\0") {
+                Ok(func) => {
+                    new_protocol_parser = func;
+                    let mut parser = new_protocol_parser()?;
+                    parser.set_id(id);
+                    id += 1;
+                    protocol_parsers.push(parser);
+                }
+                Err(e) => {
+                    eprintln!("{:?}", e);
+                }
+            }
         }
-        register_protocol_parser(&mut protocol_parsers)?;
+
+        let new_protocol_parsers: libloading::Symbol<NewProtocolParserBoxesFunc>;
+        unsafe {
+            match lib.get(b"new_protocol_parsers\0") {
+                Ok(func) => new_protocol_parsers = func,
+                Err(e) => continue,
+            };
+        }
+        let mut parsers = new_protocol_parsers()?;
+        for parser in &mut parsers {
+            parser.set_id(id);
+            id += 1;
+            protocol_parsers.push(parser.box_clone());
+        }
     }
 
     let mut classifier_manager = classifier::ClassifierManager::new();
