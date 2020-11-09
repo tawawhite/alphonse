@@ -4,7 +4,7 @@ pub struct Parser {}
 
 impl SimpleProtocolParser for Parser {
     #[inline]
-    fn parse(buf: &[u8], offset: u16) -> Result<Layer, Error> {
+    fn parse(buf: &[u8], offset: u16) -> Result<Option<Layer>, Error> {
         if buf.len() < 40 {
             return Err(Error::CorruptPacket(format!(
                 "Corrupted IPV6 packet, packet too short ({} bytes)",
@@ -52,7 +52,7 @@ impl SimpleProtocolParser for Parser {
                 )));
             }
         };
-        Ok(layer)
+        Ok(Some(layer))
     }
 }
 

@@ -3,7 +3,7 @@ use super::{Error, Layer, Protocol, SimpleProtocolParser};
 pub struct Parser {}
 impl SimpleProtocolParser for Parser {
     #[inline]
-    fn parse(buf: &[u8], offset: u16) -> Result<Layer, Error> {
+    fn parse(buf: &[u8], offset: u16) -> Result<Option<Layer>, Error> {
         if buf.len() < 20 {
             // 如果报文内容长度小于IP报文最短长度(IP协议头长度)
             // 数据包有错误
@@ -26,7 +26,7 @@ impl SimpleProtocolParser for Parser {
             offset: offset + tcp_hdr_len as u16,
         };
 
-        Ok(layer)
+        Ok(Some(layer))
     }
 }
 

@@ -6,7 +6,7 @@ pub struct Parser;
 
 impl SimpleProtocolParser for Parser {
     #[inline]
-    fn parse(buf: &[u8], offset: u16) -> Result<Layer, Error> {
+    fn parse(buf: &[u8], offset: u16) -> Result<Option<Layer>, Error> {
         if buf.len() < 4 {
             // 如果报文内容长度小于IP报文最短长度(IP协议头长度)
             // 数据包有错误
@@ -31,8 +31,14 @@ impl SimpleProtocolParser for Parser {
             {
                 // Try to decode it as an Ethernet protocol first
                 // If failed, then try to decode it other ways
-                match link::ethernet::Parser::parse(buf, offset + pos as u16) {
-                    Ok(l) => {
+                let layer = match link::ethernet::Parser::parse(&buf[pos..], offset + pos as u16) {
+                    Err(_) => None, // If can't detect next layer
+                    Ok(l) => l,
+                };
+
+                match layer {
+                    None => {}
+                    Some(l) => {
                         match l.protocol {
                             Protocol::IPV4 => {
                                 match network::ipv4::Parser::parse(
@@ -44,7 +50,7 @@ impl SimpleProtocolParser for Parser {
                                             protocol: Protocol::ETHERNET,
                                             offset: offset + pos as u16,
                                         };
-                                        return Ok(layer);
+                                        return Ok(Some(layer));
                                     }
                                     Err(_) => {}
                                 }
@@ -59,7 +65,7 @@ impl SimpleProtocolParser for Parser {
                                             protocol: Protocol::ETHERNET,
                                             offset: offset + pos as u16,
                                         };
-                                        return Ok(layer);
+                                        return Ok(Some(layer));
                                     }
                                     Err(_) => {}
                                 }
@@ -79,7 +85,6 @@ impl SimpleProtocolParser for Parser {
                             _ => {} // do nothing, unsupported protocol
                         };
                     }
-                    Err(_) => {} // If can't detect next layer
                 };
             }
 
@@ -90,21 +95,21 @@ impl SimpleProtocolParser for Parser {
                         protocol: Protocol::ETHERNET,
                         offset: offset + 4 + pos as u16,
                     };
-                    return Ok(layer);
+                    return Ok(Some(layer));
                 }
                 0b0100 => {
                     let layer = Layer {
                         protocol: Protocol::IPV4,
                         offset: offset + pos as u16,
                     };
-                    return Ok(layer);
+                    return Ok(Some(layer));
                 }
                 0b0110 => {
                     let layer = Layer {
                         protocol: Protocol::IPV6,
                         offset: offset + pos as u16,
                     };
-                    return Ok(layer);
+                    return Ok(Some(layer));
                 }
                 _ => {}
             };
@@ -137,8 +142,8 @@ mod tests {
 
         match Parser::parse(&buffer, offset) {
             Ok(l) => {
-                assert_eq!(l.protocol, Protocol::IPV4);
-                assert_eq!(l.offset, 4);
+                assert_eq!(l.unwrap().protocol, Protocol::IPV4);
+                assert_eq!(l.unwrap().offset, 4);
             }
             Err(_) => {}
         }
@@ -160,8 +165,8 @@ mod tests {
 
         match Parser::parse(&buffer, offset) {
             Ok(l) => {
-                assert_eq!(l.protocol, Protocol::IPV6);
-                assert_eq!(l.offset, 4);
+                assert_eq!(l.unwrap().protocol, Protocol::IPV6);
+                assert_eq!(l.unwrap().offset, 4);
             }
             Err(_) => {}
         }
@@ -185,8 +190,8 @@ mod tests {
 
         match Parser::parse(&buffer, offset) {
             Ok(l) => {
-                assert_eq!(l.protocol, Protocol::ETHERNET);
-                assert_eq!(l.offset, 8);
+                assert_eq!(l.unwrap().protocol, Protocol::ETHERNET);
+                assert_eq!(l.unwrap().offset, 8);
             }
             Err(_) => {}
         }
@@ -210,8 +215,8 @@ mod tests {
 
         match Parser::parse(&buffer, offset) {
             Ok(l) => {
-                assert_eq!(l.protocol, Protocol::ETHERNET);
-                assert_eq!(l.offset, 8);
+                assert_eq!(l.unwrap().protocol, Protocol::ETHERNET);
+                assert_eq!(l.unwrap().offset, 8);
             }
             Err(_) => {}
         }
@@ -237,8 +242,8 @@ mod tests {
 
         match Parser::parse(&buffer, offset) {
             Ok(l) => {
-                assert_eq!(l.protocol, Protocol::ETHERNET);
-                assert_eq!(l.offset, 4);
+                assert_eq!(l.unwrap().protocol, Protocol::ETHERNET);
+                assert_eq!(l.unwrap().offset, 4);
             }
             Err(_) => {}
         }

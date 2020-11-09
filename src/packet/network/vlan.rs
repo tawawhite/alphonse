@@ -5,7 +5,7 @@ use super::Protocol;
 
 pub struct Parser {}
 impl SimpleProtocolParser for Parser {
-    fn parse(buf: &[u8], offset: u16) -> Result<Layer, Error> {
+    fn parse(buf: &[u8], offset: u16) -> Result<Option<Layer>, Error> {
         let mut layer = Layer {
             protocol: Protocol::default(),
             offset: offset + 4 + 2,
@@ -27,7 +27,7 @@ impl SimpleProtocolParser for Parser {
             }
         };
 
-        Ok(layer)
+        Ok(Some(layer))
     }
 }
 

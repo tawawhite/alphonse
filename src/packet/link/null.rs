@@ -4,7 +4,7 @@ pub struct Parser {}
 
 impl SimpleProtocolParser for Parser {
     #[inline]
-    fn parse(buf: &[u8], _offset: u16) -> Result<Layer, Error> {
+    fn parse(buf: &[u8], _offset: u16) -> Result<Option<Layer>, Error> {
         if buf.len() < 4 {
             return Err(Error::CorruptPacket(format!(
                 "The packet is corrupted, packet too short ({} bytes)",
@@ -43,7 +43,7 @@ impl SimpleProtocolParser for Parser {
             }
         }
 
-        Ok(layer)
+        Ok(Some(layer))
     }
 }
 
@@ -60,7 +60,8 @@ mod tests {
         assert!(matches!(result, Ok(_)));
 
         let l = result.unwrap();
-        assert!(matches!(l.protocol, Protocol::IPV4));
+        assert!(matches!(l, Some(_)));
+        assert!(matches!(l.unwrap().protocol, Protocol::IPV4));
     }
 
     #[test]
@@ -72,7 +73,8 @@ mod tests {
         assert!(matches!(result, Ok(_)));
 
         let l = result.unwrap();
-        assert!(matches!(l.protocol, Protocol::IPV6));
+        assert!(matches!(l, Some(_)));
+        assert!(matches!(l.unwrap().protocol, Protocol::IPV6));
 
         let buf = [
             28, 0x80, 0xc2, 0x00, 0x00, 0x00, 0xcc, 0x04, 0x0d, 0x5c, 0xf0, 0x00, 0x08, 0x00,
@@ -81,7 +83,8 @@ mod tests {
         assert!(matches!(result, Ok(_)));
 
         let l = result.unwrap();
-        assert!(matches!(l.protocol, Protocol::IPV6));
+        assert!(matches!(l, Some(_)));
+        assert!(matches!(l.unwrap().protocol, Protocol::IPV6));
 
         let buf = [
             28, 0x80, 0xc2, 0x00, 0x00, 0x00, 0xcc, 0x04, 0x0d, 0x5c, 0xf0, 0x00, 0x08, 0x00,
@@ -90,7 +93,8 @@ mod tests {
         assert!(matches!(result, Ok(_)));
 
         let l = result.unwrap();
-        assert!(matches!(l.protocol, Protocol::IPV6));
+        assert!(matches!(l, Some(_)));
+        assert!(matches!(l.unwrap().protocol, Protocol::IPV6));
     }
 
     #[test]

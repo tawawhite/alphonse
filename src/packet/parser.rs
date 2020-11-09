@@ -12,8 +12,8 @@ pub trait SimpleProtocolParser {
     ///
     /// * `buf` - Buffer of this layer and its payload
     ///
-    /// * `offset` - Position to start of the packet
-    fn parse(buf: &[u8], offset: u16) -> Result<Layer, Error>;
+    /// * `offset` - Position to the start of the packet
+    fn parse(buf: &[u8], offset: u16) -> Result<Option<Layer>, Error>;
 }
 
 #[derive(Debug)]
@@ -72,14 +72,14 @@ impl Parser {
                     protocol: Protocol::IPV4,
                     offset: 0,
                 };
-                Ok(layer)
+                Ok(Some(layer))
             }
             link::IPV6 => {
                 let layer = Layer {
                     protocol: Protocol::IPV6,
                     offset: 0,
                 };
-                Ok(layer)
+                Ok(Some(layer))
             }
             _ => {
                 return Err(Error::UnsupportProtocol(format!(
@@ -92,6 +92,11 @@ impl Parser {
         layer = match result {
             Ok(l) => l,
             Err(e) => return Err(e),
+        };
+
+        let mut layer = match layer {
+            None => return Ok(()),
+            Some(l) => l,
         };
 
         loop {
@@ -170,7 +175,11 @@ impl Parser {
 
             match result {
                 Ok(l) => {
-                    layer = l;
+                    layer = match l {
+                        None => return Ok(()),
+                        Some(l) => l,
+                    };
+                    // layer = l;
                 }
                 Err(e) => return Err(e),
             };
