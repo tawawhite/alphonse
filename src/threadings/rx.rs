@@ -82,28 +82,30 @@ impl RxThread {
 
     #[inline]
     fn rx<C: Capture>(&mut self, cap: &mut C) -> Result<()> {
-        while let (_, Ok(mut pkt)) = (!self.exit.load(Ordering::Relaxed), cap.next()) {
-            match self.parser.parse_pkt(&mut pkt) {
-                Ok(_) => {}
-                Err(e) => match e {
-                    parser::Error::UnsupportProtocol(_) => {}
-                    _ => todo!(),
-                },
-            };
+        while !self.exit.load(Ordering::Relaxed) {
+            while let Ok(mut pkt) = cap.next() {
+                match self.parser.parse_pkt(&mut pkt) {
+                    Ok(_) => {}
+                    Err(e) => match e {
+                        parser::Error::UnsupportProtocol(_) => {}
+                        _ => todo!(),
+                    },
+                };
 
-            // TODO: inline with_seed function
-            let mut hasher = twox_hash::Xxh3Hash64::with_seed(0);
-            pkt.hash(&mut hasher);
-            pkt.hash = hasher.finish();
+                // TODO: inline with_seed function
+                let mut hasher = twox_hash::Xxh3Hash64::with_seed(0);
+                pkt.hash(&mut hasher);
+                pkt.hash = hasher.finish();
 
-            let thread = (pkt.hash % self.senders.len() as u64) as usize;
-            match self.senders[thread].send(pkt) {
-                Ok(_) => {}
-                Err(e) => {
-                    eprintln!("rx thread {} {}, {} will exit", self.id, e, crate_name!());
-                    break;
-                }
-            };
+                let thread = (pkt.hash % self.senders.len() as u64) as usize;
+                match self.senders[thread].send(pkt) {
+                    Ok(_) => {}
+                    Err(e) => {
+                        eprintln!("rx thread {} {}, {} will exit", self.id, e, crate_name!());
+                        break;
+                    }
+                };
+            }
         }
         Ok(())
     }
