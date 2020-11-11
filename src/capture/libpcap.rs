@@ -84,6 +84,7 @@ impl NetworkInterface {
                 let cap = pcap::Capture::from_device(interface.as_ref())
                     .unwrap()
                     .promisc(true)
+                    .timeout(1000)
                     .open()
                     .unwrap();
                 Ok(NetworkInterface { cap: Box::new(cap) })
