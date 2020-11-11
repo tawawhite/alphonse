@@ -129,7 +129,7 @@ impl Packet {
     #[inline]
     pub fn src_port(&self) -> u16 {
         let src_port_pos = (self.trans_layer.offset) as usize;
-        unsafe { (*(&self.data[src_port_pos] as *const u8 as *const u16)).to_be() }
+        unsafe { (*(self.data.as_ptr().add(src_port_pos) as *const u16)).to_be() }
     }
 
     /// Get dst port
@@ -138,7 +138,7 @@ impl Packet {
     #[inline]
     pub fn dst_port(&self) -> u16 {
         let dst_port_pos = (self.trans_layer.offset + 2) as usize;
-        unsafe { (*(&self.data[dst_port_pos] as *const u8 as *const u16)).to_be() }
+        unsafe { (*(self.data.as_ptr().add(dst_port_pos) as *const u16)).to_be() }
     }
 
     /// Get src ipv4 address
@@ -147,7 +147,7 @@ impl Packet {
     #[inline]
     pub fn src_ipv4(&self) -> u32 {
         let src_ip_pos = (self.network_layer.offset + 12) as usize;
-        unsafe { *(&self.data[src_ip_pos] as *const u8 as *const u32) }
+        unsafe { (*(self.data.as_ptr().add(src_ip_pos) as *const u32)).to_be() }
     }
 
     /// Get dst ipv4 address
@@ -156,7 +156,7 @@ impl Packet {
     #[inline]
     pub fn dst_ipv4(&self) -> u32 {
         let dst_ip_pos = (self.network_layer.offset + 16) as usize;
-        unsafe { *(&self.data[dst_ip_pos] as *const u8 as *const u32) }
+        unsafe { (*(self.data.as_ptr().add(dst_ip_pos) as *const u32)).to_be() }
     }
 
     /// Get src ipv6 address
@@ -165,7 +165,7 @@ impl Packet {
     #[inline]
     pub fn src_ipv6(&self) -> &u128 {
         let src_ip_pos = (self.network_layer.offset + 8) as usize;
-        unsafe { &*(&self.data[src_ip_pos] as *const u8 as *const u128) }
+        unsafe { &*(self.data.as_ptr().add(src_ip_pos) as *const u128) }
     }
 
     /// Get dst ipv6 address
@@ -174,7 +174,7 @@ impl Packet {
     #[inline]
     pub fn dst_ipv6(&self) -> &u128 {
         let dst_ip_pos = (self.network_layer.offset + 8 + 16) as usize;
-        unsafe { &*(&self.data[dst_ip_pos] as *const u8 as *const u128) }
+        unsafe { &*(self.data.as_ptr().add(dst_ip_pos) as *const u128) }
     }
 
     /// Get src mac address
@@ -413,5 +413,77 @@ impl Default for Protocol {
     #[inline]
     fn default() -> Self {
         Protocol::UNKNOWN
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_data_bytes() {}
+
+    #[test]
+    fn test_src_port() {
+        let mut pkt = Packet::default();
+        pkt.data = Box::new(vec![0x14, 0xe9]);
+        pkt.trans_layer.offset = 0;
+        assert_eq!(pkt.src_port(), 5353);
+    }
+
+    #[test]
+    fn test_dst_port() {
+        let mut pkt = Packet::default();
+        pkt.data = Box::new(vec![0, 0, 0x14, 0xe9]);
+        pkt.trans_layer.offset = 0;
+        assert_eq!(pkt.dst_port(), 5353);
+    }
+
+    #[test]
+    fn test_src_ipv4() {
+        let mut pkt = Packet::default();
+        pkt.data = Box::new(vec![
+            0x45, 0x00, 0x02, 0x2d, 0x00, 0x00, 0x40, 0x00, 0x40, 0x06, 0x79, 0x1d, 0xc0, 0xa8,
+            0x02, 0xde, 0xda, 0x62, 0x21, 0xc5, 0xe2, 0xb2, 0x01, 0xbb, 0x2b, 0xd5, 0x16, 0xf7,
+            0x66, 0x96, 0xcf, 0xb8, 0x50, 0x18, 0x10, 0x00, 0x8a, 0xcf, 0x00, 0x00,
+        ]);
+        pkt.network_layer.offset = 0;
+        assert_eq!(pkt.src_ipv4(), 0xc0a802de);
+    }
+
+    #[test]
+    fn test_dst_ipv4() {
+        let mut pkt = Packet::default();
+        pkt.data = Box::new(vec![
+            0x45, 0x00, 0x02, 0x2d, 0x00, 0x00, 0x40, 0x00, 0x40, 0x06, 0x79, 0x1d, 0xc0, 0xa8,
+            0x02, 0xde, 0xda, 0x62, 0x21, 0xc5, 0xe2, 0xb2, 0x01, 0xbb, 0x2b, 0xd5, 0x16, 0xf7,
+            0x66, 0x96, 0xcf, 0xb8, 0x50, 0x18, 0x10, 0x00, 0x8a, 0xcf, 0x00, 0x00,
+        ]);
+        pkt.network_layer.offset = 0;
+        assert_eq!(pkt.dst_ipv4(), 0xda6221c5);
+    }
+
+    #[test]
+    fn test_src_ipv6() {
+        let mut pkt = Packet::default();
+        pkt.data = Box::new(vec![
+            0x60, 0x0c, 0x6b, 0x7b, 0x00, 0xb8, 0x11, 0xff, 0xfe, 0x80, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x10, 0x08, 0xfa, 0x70, 0x46, 0xe8, 0x42, 0x04, 0xff, 0x02, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xfb,
+        ]);
+        pkt.network_layer.offset = 0;
+        assert_eq!(pkt.src_ipv6().to_be(), 0xfe800000000000001008fa7046e84204);
+    }
+
+    #[test]
+    fn test_dst_ipv6() {
+        let mut pkt = Packet::default();
+        pkt.data = Box::new(vec![
+            0x60, 0x0c, 0x6b, 0x7b, 0x00, 0xb8, 0x11, 0xff, 0xfe, 0x80, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x10, 0x08, 0xfa, 0x70, 0x46, 0xe8, 0x42, 0x04, 0xff, 0x02, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xfb,
+        ]);
+        pkt.network_layer.offset = 0;
+        assert_eq!(pkt.dst_ipv6().to_be(), 0xff0200000000000000000000000000fb);
     }
 }
