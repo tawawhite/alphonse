@@ -218,6 +218,25 @@ impl Default for Packet {
     }
 }
 
+impl std::fmt::Debug for Packet {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let stime = std::time::UNIX_EPOCH
+            + std::time::Duration::from_nanos(
+                self.ts.tv_sec as u64 * 1000000000 + self.ts.tv_usec as u64 * 1000,
+            );
+        let datetime = chrono::DateTime::<chrono::Utc>::from(stime);
+        let timestamp_str = datetime.format("%Y-%m-%d %H:%M:%S.%f").to_string();
+        f.debug_struct("Packet")
+            .field("ts", &timestamp_str)
+            .field("caplen", &self.caplen)
+            .field("data_link_layer", &self.data_link_layer)
+            .field("network_layer", &self.network_layer)
+            .field("trans_layer", &self.trans_layer)
+            .field("app_layer", &self.app_layer)
+            .finish()
+    }
+}
+
 impl Hash for Packet {
     #[inline]
     fn hash<H: Hasher>(&self, state: &mut H) {
