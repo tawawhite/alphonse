@@ -202,11 +202,13 @@ fn parse_config_file(config_file: &str, config: &mut Config) -> Result<()> {
     match &doc["threads.session"] {
         Yaml::Integer(i) => config.ses_threads = *i as u8,
         Yaml::BadValue => {
-            return Err(anyhow!("Option threads.ses not found or bad integer value",))
+            return Err(anyhow!(
+                "Option threads.session not found or bad integer value",
+            ))
         }
         _ => {
             return Err(anyhow!(
-                "Wrong value type for threads.rx, expecting integer",
+                "Wrong value type for threads.session, expecting integer",
             ))
         }
     };
@@ -227,9 +229,8 @@ fn parse_config_file(config_file: &str, config: &mut Config) -> Result<()> {
             for parser in a {
                 match parser {
                     Yaml::String(s) => config.parsers.push(String::from(s)),
-
                     Yaml::BadValue => {
-                        return Err(anyhow!("Bad string value for an interface value",))
+                        return Err(anyhow!("Option parsers not found or bad array value",))
                     }
                     _ => {
                         return Err(anyhow!(
@@ -249,7 +250,7 @@ fn parse_config_file(config_file: &str, config: &mut Config) -> Result<()> {
                 match element {
                     Yaml::String(s) => config.interfaces.push(s.clone()),
                     Yaml::BadValue => {
-                        return Err(anyhow!("Bad string value for an interface value",))
+                        return Err(anyhow!("Bad string value for an network interface",))
                     }
                     _ => {
                         return Err(anyhow!(
