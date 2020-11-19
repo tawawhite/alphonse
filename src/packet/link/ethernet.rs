@@ -192,7 +192,7 @@ pub struct Parser {}
 
 impl SimpleProtocolParser for Parser {
     #[inline]
-    fn parse(buf: &[u8], _offset: u16) -> Result<Option<Layer>, Error> {
+    fn parse(buf: &[u8], offset: u16) -> Result<Option<Layer>, Error> {
         if buf.len() < 14 {
             return Err(Error::CorruptPacket(format!(
                 "The ethernet packet is corrupted, packet too short ({} bytes)",
@@ -202,11 +202,11 @@ impl SimpleProtocolParser for Parser {
 
         let mut layer = Layer {
             protocol: Protocol::default(),
-            offset: 0,
+            offset,
         };
 
         let etype = (buf[12] as u16) << 8 | buf[12 + 1] as u16;
-        layer.offset = 6 + 6 + 2;
+        layer.offset = layer.offset + 6 + 6 + 2;
         match etype {
             IPV4 => layer.protocol = Protocol::IPV4,
             IPV6 => layer.protocol = Protocol::IPV6,
@@ -215,7 +215,7 @@ impl SimpleProtocolParser for Parser {
             PPPOES => layer.protocol = Protocol::PPPOE,
             VLAN => {
                 layer.protocol = Protocol::VLAN;
-                layer.offset = 6 + 6;
+                layer.offset = layer.offset + 6 + 6;
             }
             _ => {
                 return Err(Error::UnsupportProtocol(format!(
@@ -234,7 +234,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_ok() {
+    fn ok() {
         let buf = [
             0x01, 0x80, 0xc2, 0x00, 0x00, 0x00, 0xcc, 0x04, 0x0d, 0x5c, 0xf0, 0x00, 0x08, 0x00,
         ];
@@ -242,7 +242,7 @@ mod tests {
     }
 
     #[test]
-    fn test_err_pkt_too_short() {
+    fn pkt_too_short() {
         let buf = [
             0x01, 0x80, 0xc2, 0x00, 0x00, 0x00, 0xcc, 0x04, 0x0d, 0x5c, 0xf0, 0x00,
         ];
@@ -252,7 +252,7 @@ mod tests {
     }
 
     #[test]
-    fn test_err_unsupport_protocol() {
+    fn unsupport_protocol() {
         let buf = [
             0x01, 0x80, 0xc2, 0x00, 0x00, 0x00, 0xcc, 0x04, 0x0d, 0x5c, 0xf0, 0x00, 0x06, 0x00,
         ];

@@ -42,8 +42,8 @@ impl SimpleProtocolParser for Parser {
                         match l.protocol {
                             Protocol::IPV4 => {
                                 match network::ipv4::Parser::parse(
-                                    buf,
-                                    offset + l.offset + pos as u16,
+                                    &buf[l.offset as usize..],
+                                    l.offset,
                                 ) {
                                     Ok(_) => {
                                         let layer = Layer {
@@ -57,8 +57,8 @@ impl SimpleProtocolParser for Parser {
                             }
                             Protocol::IPV6 => {
                                 match network::ipv6::Parser::parse(
-                                    buf,
-                                    offset + l.offset + pos as u16,
+                                    &buf[l.offset as usize..],
+                                    l.offset,
                                 ) {
                                     Ok(_) => {
                                         let layer = Layer {
@@ -126,7 +126,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_single_layer_mpls_with_ipv4() {
+    fn single_layer_mpls_with_ipv4() {
         let buffer = [
             0x00, 0x01, 0xd1, 0xff, // mpls
             0x45, 0x00, 0x00, 0x64, 0x00, 0x0a, 0x00, 0x00, 0xff, 0x01, 0xa5, 0x6a, 0x0a, 0x01,
@@ -138,9 +138,8 @@ mod tests {
             0xab, 0xcd, 0xab, 0xcd, 0xab, 0xcd, 0xab, 0xcd, 0xab, 0xcd, 0xab, 0xcd, 0xab, 0xcd,
             0xab, 0xcd, 0xab, 0xcd, 0xab, 0xcd, 0xab, 0xcd, 0xab, 0xcd, // icmp
         ];
-        let offset = 0;
 
-        match Parser::parse(&buffer, offset) {
+        match Parser::parse(&buffer, 0) {
             Ok(l) => {
                 assert_eq!(l.unwrap().protocol, Protocol::IPV4);
                 assert_eq!(l.unwrap().offset, 4);
@@ -150,7 +149,7 @@ mod tests {
     }
 
     #[test]
-    fn test_single_layer_mpls_with_ipv6() {
+    fn single_layer_mpls_with_ipv6() {
         let buffer = [
             0x00, 0x01, 0xd1, 0xff, // mpls
             0x60, 0x0c, 0x6b, 0x7b, 0x00, 0xb8, 0x11, 0xff, 0xfe, 0x80, 0x00, 0x00, 0x00, 0x00,
@@ -161,9 +160,8 @@ mod tests {
             0x77, 0x2d, 0x75, 0x70, 0x64, 0x61, 0x74, 0x65, 0x05, 0x6f, 0x62, 0x64, 0x65, 0x76,
             0x02, 0x61, 0x74, 0x00, 0x00, 0x01, 0x00, 0x01, // dns,
         ];
-        let offset = 0;
 
-        match Parser::parse(&buffer, offset) {
+        match Parser::parse(&buffer, 0) {
             Ok(l) => {
                 assert_eq!(l.unwrap().protocol, Protocol::IPV6);
                 assert_eq!(l.unwrap().offset, 4);
@@ -173,7 +171,7 @@ mod tests {
     }
 
     #[test]
-    fn test_double_layer_mpls_with_ethernet() {
+    fn double_layer_mpls_with_ethernet() {
         let buffer = [
             0x00, 0x01, 0x20, 0xfe, // mpls
             0x00, 0x01, 0x01, 0xff, // mpls
@@ -186,9 +184,8 @@ mod tests {
             0x00, 0x14, 0x00, 0x02, 0x00, 0x0f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, // Spanning Tree Protocol
         ];
-        let offset = 0;
 
-        match Parser::parse(&buffer, offset) {
+        match Parser::parse(&buffer, 0) {
             Ok(l) => {
                 assert_eq!(l.unwrap().protocol, Protocol::ETHERNET);
                 assert_eq!(l.unwrap().offset, 8);
@@ -198,7 +195,7 @@ mod tests {
     }
 
     #[test]
-    fn test_ethernet_over_mpls_with_pw_control_word() {
+    fn ethernet_over_mpls_with_pw_control_word() {
         let buffer = [
             0x00, 0x01, 0x20, 0xfe, // mpls
             0x00, 0x01, 0x01, 0xff, // mpls
@@ -211,9 +208,8 @@ mod tests {
             0x00, 0x14, 0x00, 0x02, 0x00, 0x0f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, // Spanning Tree Protocol
         ];
-        let offset = 0;
 
-        match Parser::parse(&buffer, offset) {
+        match Parser::parse(&buffer, 0) {
             Ok(l) => {
                 assert_eq!(l.unwrap().protocol, Protocol::ETHERNET);
                 assert_eq!(l.unwrap().offset, 8);
@@ -224,7 +220,7 @@ mod tests {
 
     #[test]
     #[cfg(feature = "heuristic-mpls")]
-    fn test_ethernet_over_mpls_without_pw_contrtol_word() {
+    fn ethernet_over_mpls_without_pw_contrtol_word() {
         let buffer = [
             0x00, 0x01, 0x01, 0xff, // mpls
             0x01, 0x80, 0xc2, 0x00, 0x00, 0x00, 0xcc, 0x04, 0x0d, 0x5c, 0xf0, 0x00, 0x08,
@@ -238,9 +234,8 @@ mod tests {
             0xab, 0xcd, 0xab, 0xcd, 0xab, 0xcd, 0xab, 0xcd, 0xab, 0xcd, 0xab, 0xcd, 0xab, 0xcd,
             0xab, 0xcd, 0xab, 0xcd, 0xab, 0xcd, 0xab, 0xcd, 0xab, 0xcd, // icmp
         ];
-        let offset = 0;
 
-        match Parser::parse(&buffer, offset) {
+        match Parser::parse(&buffer, 0) {
             Ok(l) => {
                 assert_eq!(l.unwrap().protocol, Protocol::ETHERNET);
                 assert_eq!(l.unwrap().offset, 4);
