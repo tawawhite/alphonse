@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use crossbeam_channel::Sender;
 use path_absolutize::Absolutize;
 
@@ -101,8 +101,8 @@ impl RxThread {
                 match self.senders[thread].send(pkt) {
                     Ok(_) => {}
                     Err(e) => {
-                        eprintln!("rx thread {} {}, {} will exit", self.id, e, crate_name!());
-                        break;
+                        eprintln!("rx thread {} {}, thread exit", self.id, e);
+                        return Err(anyhow!("Channel diconnected"));
                     }
                 };
             }
