@@ -4,11 +4,11 @@ version = "0.1.0"
 authors = ["Jack Liar"]
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 anyhow = "1.0"
 chrono = "0.4"
+enum-primitive-derive = "0.2"
 hyperscan = "0.2.0"
 libc = "0.2"
+num-traits = "0.2"
 serde_json = "1.0"

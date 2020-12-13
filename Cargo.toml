@@ -6,15 +6,15 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0"
-arc-swap = "*"
+arc-swap = "1.1"
 clap = "2.33.3"
 crossbeam-channel = "0.5"
 libc = "0.2"
 libloading = "0.6"
-path-absolutize = "3.0.6"
+path-absolutize = "3.0"
 pcap = "0.7.0"
 serde_json = "1.0"
-signal-hook = "0.1.16"
+signal-hook = "0.2"
 twox-hash = { git = "https://github.com/flier/twox-hash.git", branch = "xxh3" }
 yaml-rust = "0.4.4"
 
@@ -27,9 +27,13 @@ version = "0.2.0"
 features = ["chimera"]
 
 [build-dependencies]
-cpp_build = { version = "0.5.5", optional = true }
-bindgen = { version = "0.55.1", optional = true }
+cpp_build = { version = "0.5", optional = true }
+bindgen = { version = "0.56", optional = true }
 
 [features]
 dpdk = ["cpp_build", "bindgen"]
 heuristic-mpls = []
+
+[workspace]
+
+members = [ "src/api" ]

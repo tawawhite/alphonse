@@ -20,7 +20,7 @@ use crossbeam_channel::unbounded;
 
 use alphonse_api as api;
 use api::{
-    classifier, parsers::NewProtocolParserBoxFunc, parsers::NewProtocolParserBoxesFunc, session,
+    classifiers, parsers::NewProtocolParserBoxFunc, parsers::NewProtocolParserBoxesFunc, session,
 };
 
 mod capture;
@@ -30,19 +30,6 @@ mod packet;
 mod threadings;
 
 fn main() -> Result<()> {
-    // let mut p = packet::Packet::default();
-    // p.data.push(0);
-    // let p1 = Box::new(p);
-    // let p2 = p1.clone();
-
-    // println!("{:?}", p1.as_ref() as *const packet::Packet);
-    // println!("{:?}", p1.as_ref().data.as_ptr());
-
-    // println!("{:?}", p2.as_ref() as *const packet::Packet);
-    // println!("{:?}", p2.as_ref().data.as_ptr());
-
-    // return Ok(());
-
     let root_cmd = commands::new_root_command();
     let cfg = config::parse_args(root_cmd)?;
     let exit = Arc::new(AtomicBool::new(false));
@@ -90,13 +77,13 @@ fn main() -> Result<()> {
         }
     }
 
-    let mut classifier_manager = classifier::ClassifierManager::new();
+    let mut classifier_manager = classifiers::ClassifierManager::new();
     for parser in &mut protocol_parsers {
         parser.register_classifier(&mut classifier_manager)?;
         parser.init()?;
     }
 
-    classifier_manager.prepare();
+    classifier_manager.prepare()?;
     let classifier_manager = Arc::new(classifier_manager);
 
     // initialize session threads

@@ -10,7 +10,7 @@ use crossbeam_channel::Receiver;
 
 use alphonse_api as api;
 use api::packet::{Packet, Protocol};
-use api::{classifier::ClassifierManager, parsers::ProtocolParser};
+use api::{classifiers::ClassifierManager, parsers::ProtocolParser};
 
 use super::config;
 use super::sessions::Session;
@@ -42,15 +42,14 @@ impl SessionThread {
     #[inline]
     fn parse_pkt(
         &self,
-        scratch: &api::classifier::ClassifyScratch,
+        scratch: &mut api::classifiers::ClassifyScratch,
         protocol_parsers: &mut Box<Vec<Box<dyn ProtocolParser>>>,
-        pkt: &Packet,
+        pkt: &mut Packet,
         ses: &mut Session,
     ) -> Result<()> {
-        let mut protocols = Vec::new();
-        self.classifier.classify(pkt, &mut protocols, &scratch)?;
+        self.classifier.classify(pkt, scratch)?;
 
-        for parser_id in &protocols {
+        for parser_id in pkt.parsers().iter() {
             let parser = &mut protocol_parsers[*parser_id as usize];
             ses.parsers.push(parser.box_clone());
             parser.parse_pkt(pkt, ses);
@@ -90,7 +89,7 @@ impl SessionThread {
     ) -> Result<()> {
         let mut session_table: HashMap<Box<Packet>, Rc<Session>> = Default::default();
         println!("session thread {} started", self.id);
-        let classify_scratch = match self.classifier.alloc_scratch() {
+        let mut classify_scratch = match self.classifier.alloc_scratch() {
             Ok(scratch) => scratch,
             Err(_) => todo!(),
         };
@@ -98,15 +97,15 @@ impl SessionThread {
         let mut timeout_epoch = 0;
         while !self.exit.load(Ordering::Relaxed) {
             match self.receiver.recv() {
-                Ok(p) => {
+                Ok(mut p) => {
                     match session_table.get_mut(&p) {
                         Some(mut ses) => {
                             match Rc::get_mut(&mut ses) {
                                 Some(ses_rc) => {
                                     self.parse_pkt(
-                                        &classify_scratch,
+                                        &mut classify_scratch,
                                         &mut protocol_parsers,
-                                        &p,
+                                        &mut p,
                                         ses_rc,
                                     )
                                     .unwrap();
@@ -121,8 +120,13 @@ impl SessionThread {
                             let ses_rc = Rc::get_mut(&mut ses).unwrap();
                             ses_rc.start_time = p.ts;
                             ses_rc.update(&p);
-                            self.parse_pkt(&classify_scratch, &mut protocol_parsers, &p, ses_rc)
-                                .unwrap();
+                            self.parse_pkt(
+                                &mut classify_scratch,
+                                &mut protocol_parsers,
+                                &mut p,
+                                ses_rc,
+                            )
+                            .unwrap();
                             &mut session_table.insert(key, ses);
                         }
                     }

@@ -9,6 +9,9 @@ use std::hash::{Hash, Hasher};
 
 extern crate libc;
 
+use super::classifiers::matched::Rule;
+use super::parsers::ParserID;
+
 #[repr(u8)]
 pub enum Direction {
     LEFT = 0,
@@ -54,6 +57,7 @@ pub struct Packet {
     pub app_layer: Layer,
     /// Packet hash, improve hash performance
     pub hash: u64,
+    pub rules: Box<Vec<Rule>>,
 }
 
 impl Packet {
@@ -68,6 +72,7 @@ impl Packet {
             trans_layer: Layer::default(),
             app_layer: Layer::default(),
             hash: 0,
+            rules: Box::new(Vec::new()),
         }
     }
 
@@ -198,6 +203,17 @@ impl Packet {
     pub fn payload(&self) -> &[u8] {
         &self.data.as_slice()[self.app_layer.offset as usize..]
     }
+
+    #[inline]
+    pub fn parsers(&self) -> Box<Vec<ParserID>> {
+        let mut parsers = Box::new(Vec::new());
+        for rule in self.rules.iter() {
+            for i in 0..rule.parsers_count as usize {
+                parsers.push(rule.parsers[i]);
+            }
+        }
+        return parsers;
+    }
 }
 
 impl Default for Packet {
@@ -214,6 +230,7 @@ impl Default for Packet {
             trans_layer: Layer::default(),
             app_layer: Layer::default(),
             hash: 0,
+            rules: Box::new(Vec::new()),
         }
     }
 }
@@ -378,6 +395,7 @@ impl Clone for Packet {
             trans_layer: self.trans_layer,
             app_layer: self.app_layer,
             hash: self.hash,
+            rules: self.rules.clone(),
         }
     }
 }

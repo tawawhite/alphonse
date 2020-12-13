@@ -1,6 +1,6 @@
 use anyhow::Result;
 
-use super::classifier::ClassifierManager;
+use super::classifiers::ClassifierManager;
 use super::{packet, session};
 
 pub type ParserID = u8;
