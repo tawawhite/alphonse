@@ -52,7 +52,7 @@ impl SessionThread {
         for parser_id in pkt.parsers().iter() {
             let parser = &mut protocol_parsers[*parser_id as usize];
             ses.parsers.push(parser.box_clone());
-            parser.parse_pkt(pkt, ses);
+            parser.parse_pkt(pkt, ses)?;
         }
 
         Ok(())
@@ -71,10 +71,10 @@ impl SessionThread {
                 .unwrap()
                 .as_secs();
             &mut session_table.retain(|pkt, ses| match pkt.trans_layer.protocol {
-                Protocol::TCP => ses.timeout(cfg.tcp_timeout as c_long, timestamp as c_long),
-                Protocol::UDP => ses.timeout(cfg.udp_timeout as c_long, timestamp as c_long),
-                Protocol::SCTP => ses.timeout(cfg.sctp_timeout as c_long, timestamp as c_long),
-                _ => ses.timeout(cfg.default_timeout as c_long, timestamp as c_long),
+                Protocol::TCP => !ses.timeout(cfg.tcp_timeout as c_long, timestamp as c_long),
+                Protocol::UDP => !ses.timeout(cfg.udp_timeout as c_long, timestamp as c_long),
+                Protocol::SCTP => !ses.timeout(cfg.sctp_timeout as c_long, timestamp as c_long),
+                _ => !ses.timeout(cfg.default_timeout as c_long, timestamp as c_long),
             });
             *timeout_epoch = 0;
         } else {

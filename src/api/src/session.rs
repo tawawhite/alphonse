@@ -52,7 +52,7 @@ impl Session {
     }
 
     #[inline]
-    /// update statistic information
+    /// update session information
     pub fn update(&mut self, pkt: &Box<packet::Packet>) {
         match pkt.direction() {
             packet::Direction::LEFT => {
@@ -66,6 +66,7 @@ impl Session {
                 self.data_bytes[1] += pkt.data_bytes() as u64;
             }
         }
+        self.end_time = pkt.ts;
     }
 
     #[inline]
