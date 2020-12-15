@@ -20,7 +20,7 @@ use crossbeam_channel::unbounded;
 
 use alphonse_api as api;
 use api::{
-    classifiers, parsers::NewProtocolParserBoxFunc, parsers::NewProtocolParserBoxesFunc, session,
+    classifiers, parsers::NewProtocolParserBoxesFunc, parsers::NewProtocolParserFunc, session,
 };
 
 mod capture;
@@ -46,9 +46,9 @@ fn main() -> Result<()> {
     for p in &cfg.as_ref().parsers {
         let lib = libloading::Library::new(p)?;
 
-        let new_protocol_parser: libloading::Symbol<NewProtocolParserBoxFunc>;
+        let new_protocol_parser: libloading::Symbol<NewProtocolParserFunc>;
         unsafe {
-            match lib.get(b"new_protocol_parser\0") {
+            match lib.get(b"al_new_protocol_parser\0") {
                 Ok(func) => {
                     new_protocol_parser = func;
                     let mut parser = new_protocol_parser()?;
@@ -79,7 +79,7 @@ fn main() -> Result<()> {
 
     let mut classifier_manager = classifiers::ClassifierManager::new();
     for parser in &mut protocol_parsers {
-        parser.register_classifier(&mut classifier_manager)?;
+        parser.register_classify_rules(&mut classifier_manager)?;
         parser.init()?;
     }
 
