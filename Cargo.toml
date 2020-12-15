@@ -6,7 +6,7 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0"
-arc-swap = "1.1"
+# arc-swap = "1.1"
 clap = "2.33.3"
 crossbeam-channel = "0.5"
 libc = "0.2"
@@ -35,4 +35,4 @@ heuristic-mpls = []
 
 [workspace]
 
-members = [ "src/api" ]
+members = [ "src/api", "parsers/http" ]
