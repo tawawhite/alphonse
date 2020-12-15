@@ -3,10 +3,12 @@ use anyhow::Result;
 use super::classifiers::ClassifierManager;
 use super::{packet, session};
 
+mod ffi;
+
 pub type ParserID = u8;
 
 /// Create a Box of the protocol parser
-pub type NewProtocolParserBoxFunc = fn() -> Result<Box<dyn ProtocolParser>>;
+pub type NewProtocolParserFunc = fn() -> Result<Box<dyn ProtocolParser>>;
 /// Create a Vector of Box of the protocol parser
 pub type NewProtocolParserBoxesFunc = fn() -> Result<Vec<Box<dyn ProtocolParser>>>;
 
@@ -39,22 +41,23 @@ pub trait ProtocolParser: Send + Sync {
         Ok(())
     }
 
-    /// Register a protocol classifier
-    fn register_classifier(&mut self, manager: &mut ClassifierManager) -> Result<()>;
+    /// Register protocol classify rules
+    fn register_classify_rules(&mut self, manager: &mut ClassifierManager) -> Result<()>;
 
     /// Parse a single packet and maybe update session information
-    fn parse_pkt(&mut self, _pkt: &packet::Packet, ses: &mut session::Session) {
+    fn parse_pkt(&mut self, _pkt: &packet::Packet, ses: &mut session::Session) -> Result<()> {
         if !self.is_classified() {
-            // If this session is already classified as Bittorrent protocol, skip
-            self.classified_as_this_protocol();
-            ses.add_protocol(self.name());
+            // If this session is already classified as this protocol, skip
+            self.classified_as_this_protocol()?;
+            ses.add_protocol(Box::new(self.name()));
         }
+
+        Ok(())
     }
 
     /// Check whether the session is classfied as this protocol
-    fn is_classified(&self) -> bool {
-        false
-    }
+    fn is_classified(&self) -> bool;
 
-    fn classified_as_this_protocol(&mut self);
+    /// Change this protocol parser's internal state to indicate this session is classfied as this protocol
+    fn classified_as_this_protocol(&mut self) -> Result<()>;
 }
