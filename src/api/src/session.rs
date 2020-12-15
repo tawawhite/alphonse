@@ -1,9 +1,14 @@
+use std::collections::HashSet;
 use std::os::raw::c_long;
+
+use serde::Serialize;
 
 use super::packet;
 use super::parsers;
+use super::utils::timeval::{precision, TimeVal};
 
-/// network session
+/// Network session
+#[derive(Serialize)]
 pub struct Session {
     pub id: String,
     /// Some session only contains one direction's packets
@@ -17,15 +22,22 @@ pub struct Session {
     /// session total data bytes
     pub data_bytes: [u64; 2],
     /// session start time
-    pub start_time: libc::timeval,
+    pub start_time: TimeVal<precision::Millisecond>,
     /// session end time
-    pub end_time: libc::timeval,
+    pub end_time: TimeVal<precision::Millisecond>,
     /// indicate nothing to parse here
+    #[serde(skip_serializing)]
     pub parse_finished: bool,
     /// custom fields
+    #[serde(flatten)]
     pub fields: serde_json::Value,
     /// protocol parsers, registered dynamically
+    #[serde(skip_serializing)]
     pub parsers: Vec<Box<dyn parsers::ProtocolParser>>,
+    /// Tags
+    tags: HashSet<Box<String>>,
+    /// Protocols
+    protocols: HashSet<Box<String>>,
 }
 
 impl Session {
@@ -37,17 +49,19 @@ impl Session {
             pkt_count: [0; 2],
             bytes: [0; 2],
             data_bytes: [0; 2],
-            start_time: libc::timeval {
+            start_time: TimeVal::new(libc::timeval {
                 tv_sec: 0,
                 tv_usec: 0,
-            },
-            end_time: libc::timeval {
+            }),
+            end_time: TimeVal::new(libc::timeval {
                 tv_sec: 0,
                 tv_usec: 0,
-            },
+            }),
             parse_finished: false,
             fields: serde_json::Value::default(),
             parsers: Vec::with_capacity(1),
+            tags: HashSet::new(),
+            protocols: HashSet::new(),
         }
     }
 
@@ -66,7 +80,7 @@ impl Session {
                 self.data_bytes[1] += pkt.data_bytes() as u64;
             }
         }
-        self.end_time = pkt.ts;
+        self.end_time = TimeVal::new(pkt.ts);
     }
 
     #[inline]
@@ -80,16 +94,14 @@ impl Session {
     }
 
     /// Add session protocol information
-    pub fn add_protocol(&mut self, protocol: String) {
-        match self.fields.get_mut("protocols") {
-            Some(protocols) => match protocols.as_array_mut() {
-                Some(ps) => ps.push(serde_json::value::Value::String(protocol)),
-                None => todo!("decide how to handle non array type protocols field"),
-            },
-            None => {
-                let protocols = vec![serde_json::value::Value::String(protocol)];
-                self.fields["protocols"] = serde_json::Value::Array(protocols);
-            }
-        }
+    #[inline]
+    pub fn add_protocol(&mut self, protocol: Box<String>) {
+        self.protocols.insert(protocol.clone());
+    }
+
+    /// Add tag
+    #[inline]
+    pub fn add_tag(&mut self, tag: Box<String>) {
+        self.tags.insert(tag.clone());
     }
 }

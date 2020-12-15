@@ -10,7 +10,7 @@ use crossbeam_channel::Receiver;
 
 use alphonse_api as api;
 use api::packet::{Packet, Protocol};
-use api::{classifiers::ClassifierManager, parsers::ProtocolParser};
+use api::{classifiers::ClassifierManager, parsers::ProtocolParser, utils::timeval::TimeVal};
 
 use super::config;
 use super::sessions::Session;
@@ -118,7 +118,7 @@ impl SessionThread {
                             let key = p.clone();
                             let mut ses = Rc::new(Session::new());
                             let ses_rc = Rc::get_mut(&mut ses).unwrap();
-                            ses_rc.start_time = p.ts;
+                            ses_rc.start_time = TimeVal::new(p.ts);
                             ses_rc.update(&p);
                             self.parse_pkt(
                                 &mut classify_scratch,
