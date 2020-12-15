@@ -1,7 +1,7 @@
 if(OFFLINE_ENVIRONMENT)
-    set(dpdk_url ${CMAKE_CURRENT_SOURCE_DIR}/third_party/dpdk-19.11.tar.xz)
+    set(dpdk_url ${CMAKE_CURRENT_SOURCE_DIR}/third_party/dpdk-20.11.tar.xz)
 else()
-    set(dpdk_url http://fast.dpdk.org/rel/dpdk-19.11.tar.xz)
+    set(dpdk_url http://fast.dpdk.org/rel/dpdk-20.11.tar.xz)
 endif()
 
 ExternalProject_Add(dpdk
