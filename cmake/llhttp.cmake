@@ -1,7 +1,7 @@
 if(OFFLINE_ENVIRONMENT)
-    set(llhttp_url ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llhttp-2.1.1.tar.gz)
+    set(llhttp_url ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llhttp-3.0.0.tar.gz)
 else()
-    set(llhttp_url https://github.com/JackLiar/llhttp-cmake/releases/download/v2.1.1/llhttp-2.1.1.tar.gz)
+    set(llhttp_url https://github.com/JackLiar/llhttp-cmake/releases/download/v3.0.0/llhttp-3.0.0.tar.gz)
 endif()
 
 ExternalProject_Add(llhttp
