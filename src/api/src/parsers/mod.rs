@@ -3,8 +3,6 @@ use anyhow::Result;
 use super::classifiers::ClassifierManager;
 use super::{packet, session};
 
-mod ffi;
-
 pub type ParserID = u8;
 
 /// Create a Box of the protocol parser
