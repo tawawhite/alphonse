@@ -17,6 +17,7 @@ serde_json = "1.0"
 signal-hook = "0.2"
 twox-hash = { git = "https://github.com/flier/twox-hash.git", branch = "xxh3" }
 yaml-rust = "0.4.4"
+rte = { git = "https://github.com/JackLiar/rust-dpdk.git", optional = true }
 
 [dependencies.alphonse-api]
 path = "./src/api"
@@ -25,9 +26,6 @@ optional = false
 [dependencies.hyperscan]
 version = "0.2.0"
 features = ["chimera"]
-
-[build-dependencies]
-rte = { git = "https://github.com/jackliar/rust-dpdk.git", optional = true }
 
 [features]
 dpdk = ["rte"]
