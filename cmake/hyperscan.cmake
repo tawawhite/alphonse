@@ -4,6 +4,8 @@ else()
     set(hyperscan_url https://github.com/intel/hyperscan/archive/v5.3.0.tar.gz)
 endif()
 
+set(FLAGS "-I${CMAKE_CURRENT_BINARY_DIR}/install/include -L${CMAKE_CURRENT_BINARY_DIR}/install/${CMAKE_INSTALL_LIBDIR}")
+
 ExternalProject_Add(hyperscan
     URL ${hyperscan_url}
     EXCLUDE_FROM_ALL ON
@@ -15,5 +17,7 @@ ExternalProject_Add(hyperscan
                 -D BOOST_ROOT=${CMAKE_CURRENT_BINARY_DIR}/boost/src/boost
                 -D PCRE_SOURCE=${CMAKE_CURRENT_BINARY_DIR}/pcre/src/libpcre
                 -D CMAKE_PREFIX_PATH=${CMAKE_CURRENT_BINARY_DIR}/install/bin
+                -D CMAKE_C_FLAGS=${FLAGS}
+                -D CMAKE_CXX_FLAGS=${FLAGS}
                 -D CMAKE_POSITION_INDEPENDENT_CODE=ON
 )
