@@ -154,6 +154,7 @@ impl api::parsers::ProtocolParser for ProtocolParser {
     }
 }
 
+#[no_mangle]
 pub fn al_new_protocol_parser() -> Result<Box<dyn api::parsers::ProtocolParser>> {
     Ok(Box::new(ProtocolParser::new()))
 }
