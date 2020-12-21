@@ -46,7 +46,7 @@ fn main() -> Result<()> {
         unsafe {
             match lib.get::<NewProtocolParserFunc>(b"al_new_protocol_parser\0") {
                 Ok(func) => {
-                    let mut parser = func()?;
+                    let mut parser = func();
                     parser.set_id(protocol_parsers.len() as ParserID);
                     protocol_parsers.push(parser);
                 }

@@ -6,9 +6,9 @@ use super::{packet, session};
 pub type ParserID = u8;
 
 /// Create a Box of the protocol parser
-pub type NewProtocolParserFunc = fn() -> Result<Box<dyn ProtocolParser>>;
+pub type NewProtocolParserFunc = extern "C" fn() -> Box<Box<dyn ProtocolParser>>;
 /// Create a Vector of Box of the protocol parser
-pub type NewProtocolParserBoxesFunc = fn() -> Result<Vec<Box<dyn ProtocolParser>>>;
+pub type NewProtocolParserBoxesFunc = extern "C" fn() -> Box<Vec<Box<dyn ProtocolParser>>>;
 
 // Initialize parser required global resources
 pub type ParserInitFunc = fn() -> Result<()>;
