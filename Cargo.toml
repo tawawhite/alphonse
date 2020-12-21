@@ -22,6 +22,7 @@ rte = { git = "https://github.com/JackLiar/rust-dpdk.git", optional = true }
 [dependencies.alphonse-api]
 path = "./src/api"
 optional = false
+version = "0.1.0"
 
 [dependencies.hyperscan]
 version = "0.2.0"
