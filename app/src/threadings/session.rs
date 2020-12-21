@@ -10,7 +10,7 @@ use crossbeam_channel::Receiver;
 
 use alphonse_api as api;
 use api::packet::{Packet, Protocol};
-use api::{classifiers::ClassifierManager, parsers::ProtocolParser, utils::timeval::TimeVal};
+use api::{classifiers::ClassifierManager, parsers::ProtocolParserTrait, utils::timeval::TimeVal};
 
 use super::config;
 use super::sessions::Session;
@@ -43,7 +43,7 @@ impl SessionThread {
     fn parse_pkt(
         &self,
         scratch: &mut api::classifiers::ClassifyScratch,
-        protocol_parsers: &mut Box<Vec<Box<dyn ProtocolParser>>>,
+        protocol_parsers: &mut Box<Vec<Box<dyn ProtocolParserTrait>>>,
         pkt: &mut Packet,
         ses: &mut Session,
     ) -> Result<()> {
@@ -85,7 +85,7 @@ impl SessionThread {
     pub fn spawn(
         &mut self,
         cfg: Arc<config::Config>,
-        mut protocol_parsers: Box<Vec<Box<dyn ProtocolParser>>>,
+        mut protocol_parsers: Box<Vec<Box<dyn ProtocolParserTrait>>>,
     ) -> Result<()> {
         let mut session_table: HashMap<Box<Packet>, Rc<Session>> = Default::default();
         println!("session thread {} started", self.id);

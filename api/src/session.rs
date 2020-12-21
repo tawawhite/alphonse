@@ -33,7 +33,7 @@ pub struct Session {
     pub fields: serde_json::Value,
     /// protocol parsers, registered dynamically
     #[serde(skip_serializing)]
-    pub parsers: Vec<Box<dyn parsers::ProtocolParser>>,
+    pub parsers: Vec<Box<dyn parsers::ProtocolParserTrait>>,
     /// Tags
     tags: HashSet<Box<String>>,
     /// Protocols

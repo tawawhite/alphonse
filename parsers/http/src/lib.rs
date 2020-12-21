@@ -34,8 +34,8 @@ impl ProtocolParser {
     }
 }
 
-impl api::parsers::ProtocolParser for ProtocolParser {
-    fn box_clone(&self) -> Box<dyn api::parsers::ProtocolParser> {
+impl api::parsers::ProtocolParserTrait for ProtocolParser {
+    fn box_clone(&self) -> Box<dyn api::parsers::ProtocolParserTrait> {
         Box::new(self.clone())
     }
 
@@ -155,6 +155,6 @@ impl api::parsers::ProtocolParser for ProtocolParser {
 }
 
 #[no_mangle]
-pub extern "C" fn al_new_protocol_parser() -> Box<Box<dyn api::parsers::ProtocolParser>> {
+pub extern "C" fn al_new_protocol_parser() -> Box<Box<dyn api::parsers::ProtocolParserTrait>> {
     Box::new(Box::new(ProtocolParser::new()))
 }

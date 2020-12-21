@@ -1,3 +1,6 @@
+use std::ops::{Deref, DerefMut};
+use std::sync::Arc;
+
 use anyhow::Result;
 
 use super::classifiers::ClassifierManager;
@@ -6,9 +9,9 @@ use super::{packet, session};
 pub type ParserID = u8;
 
 /// Create a Box of the protocol parser
-pub type NewProtocolParserFunc = extern "C" fn() -> Box<Box<dyn ProtocolParser>>;
+pub type NewProtocolParserFunc = extern "C" fn() -> Box<Box<dyn ProtocolParserTrait>>;
 /// Create a Vector of Box of the protocol parser
-pub type NewProtocolParserBoxesFunc = extern "C" fn() -> Box<Vec<Box<dyn ProtocolParser>>>;
+pub type NewProtocolParserBoxesFunc = extern "C" fn() -> Box<Vec<Box<dyn ProtocolParserTrait>>>;
 
 // Initialize parser required global resources
 pub type ParserInitFunc = fn() -> Result<()>;
@@ -16,9 +19,33 @@ pub type ParserInitFunc = fn() -> Result<()>;
 // Release parser required global resources
 pub type ParserExitFunc = fn() -> Result<()>;
 
-pub trait ProtocolParser: Send + Sync {
+pub struct ProtocolParser {
+    parser: Box<Box<dyn ProtocolParserTrait>>,
+    _lib: Arc<libloading::Library>,
+}
+
+impl ProtocolParser {
+    pub fn new(parser: Box<Box<dyn ProtocolParserTrait>>, lib: Arc<libloading::Library>) -> Self {
+        ProtocolParser { parser, _lib: lib }
+    }
+}
+
+impl Deref for ProtocolParser {
+    type Target = Box<dyn ProtocolParserTrait>;
+    fn deref(&self) -> &Self::Target {
+        &self.parser
+    }
+}
+
+impl DerefMut for ProtocolParser {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.parser
+    }
+}
+
+pub trait ProtocolParserTrait: Send + Sync {
     /// Clone a Protocol Parser
-    fn box_clone(&self) -> Box<dyn ProtocolParser>;
+    fn box_clone(&self) -> Box<dyn ProtocolParserTrait>;
 
     /// Get parser id
     fn id(&self) -> ParserID;

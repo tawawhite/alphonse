@@ -41,13 +41,14 @@ fn main() -> Result<()> {
     let mut protocol_parsers = Vec::new();
 
     for p in &cfg.as_ref().parsers {
-        let lib = libloading::Library::new(p)?;
+        let lib = Arc::new(libloading::Library::new(p)?);
 
         unsafe {
             match lib.get::<NewProtocolParserFunc>(b"al_new_protocol_parser\0") {
                 Ok(func) => {
                     let mut parser = func();
                     parser.set_id(protocol_parsers.len() as ParserID);
+                    let parser = api::parsers::ProtocolParser::new(parser, lib.clone());
                     protocol_parsers.push(parser);
                 }
                 Err(e) => {
@@ -93,7 +94,8 @@ fn main() -> Result<()> {
     // start all session threads
     for mut thread in ses_threads {
         let cfg = cfg.clone();
-        let mut parsers: Box<Vec<Box<dyn api::parsers::ProtocolParser>>> = Box::new(Vec::new());
+        let mut parsers: Box<Vec<Box<dyn api::parsers::ProtocolParserTrait>>> =
+            Box::new(Vec::new());
         for parser in &protocol_parsers {
             parsers.push(parser.box_clone());
         }
