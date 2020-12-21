@@ -14,5 +14,5 @@ hyperscan = "0.2"
 llhttp = { git = "https://github.com/JackLiar/rust-llhttp.git", branch = "dev" }
 
 [dependencies.alphonse-api]
-path = "../../src/api"
+path = "../../api"
 optional = false
