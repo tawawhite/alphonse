@@ -61,20 +61,17 @@ impl SessionThread {
     /// Check whether a session is timeout
     #[inline]
     pub fn timeout(
+        ts: u64,
         session_table: &mut HashMap<Box<Packet>, Rc<Session>>,
         timeout_epoch: &mut u16,
         cfg: &Arc<config::Config>,
     ) {
         if *timeout_epoch == cfg.timeout_pkt_epoch {
-            let timestamp = SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs();
             &mut session_table.retain(|pkt, ses| match pkt.trans_layer.protocol {
-                Protocol::TCP => !ses.timeout(cfg.tcp_timeout as c_long, timestamp as c_long),
-                Protocol::UDP => !ses.timeout(cfg.udp_timeout as c_long, timestamp as c_long),
-                Protocol::SCTP => !ses.timeout(cfg.sctp_timeout as c_long, timestamp as c_long),
-                _ => !ses.timeout(cfg.default_timeout as c_long, timestamp as c_long),
+                Protocol::TCP => !ses.timeout(cfg.tcp_timeout as c_long, ts as c_long),
+                Protocol::UDP => !ses.timeout(cfg.udp_timeout as c_long, ts as c_long),
+                Protocol::SCTP => !ses.timeout(cfg.sctp_timeout as c_long, ts as c_long),
+                _ => !ses.timeout(cfg.default_timeout as c_long, ts as c_long),
             });
             *timeout_epoch = 0;
         } else {
@@ -87,6 +84,10 @@ impl SessionThread {
         cfg: Arc<config::Config>,
         mut protocol_parsers: Box<Vec<Box<dyn ProtocolParserTrait>>>,
     ) -> Result<()> {
+        let mut lastPacketTime: u64 = SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
         let mut session_table: HashMap<Box<Packet>, Rc<Session>> = Default::default();
         println!("session thread {} started", self.id);
         let mut classify_scratch = match self.classifier.alloc_scratch() {
@@ -98,6 +99,7 @@ impl SessionThread {
         while !self.exit.load(Ordering::Relaxed) {
             match self.receiver.recv() {
                 Ok(mut p) => {
+                    lastPacketTime = p.ts.tv_sec as u64;
                     match session_table.get_mut(&p) {
                         Some(mut ses) => {
                             match Rc::get_mut(&mut ses) {
@@ -131,7 +133,12 @@ impl SessionThread {
                         }
                     }
 
-                    SessionThread::timeout(&mut session_table, &mut timeout_epoch, &cfg);
+                    SessionThread::timeout(
+                        lastPacketTime,
+                        &mut session_table,
+                        &mut timeout_epoch,
+                        &cfg,
+                    );
                 }
                 Err(_) => break,
             };
