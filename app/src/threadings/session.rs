@@ -50,9 +50,9 @@ impl SessionThread {
         self.classifier.classify(pkt, scratch)?;
 
         for parser_id in pkt.parsers().iter() {
-            let parser = &mut protocol_parsers[*parser_id as usize];
-            ses.parsers.push(parser.box_clone());
+            let mut parser = (&mut protocol_parsers[*parser_id as usize]).box_clone();
             parser.parse_pkt(pkt, ses)?;
+            ses.parsers.push(parser);
         }
 
         Ok(())
