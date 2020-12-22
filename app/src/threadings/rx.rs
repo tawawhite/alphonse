@@ -1,3 +1,4 @@
+use std::any::TypeId;
 use std::ffi::OsString;
 use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
@@ -81,31 +82,39 @@ impl RxThread {
     }
 
     #[inline]
-    fn rx<C: Capture>(&mut self, cap: &mut C) -> Result<()> {
+    fn rx<C: 'static + Capture>(&mut self, cap: &mut C) -> Result<()> {
         while !self.exit.load(Ordering::Relaxed) {
-            while let Ok(mut pkt) = cap.next() {
-                match self.parser.parse_pkt(&mut pkt) {
-                    Ok(_) => {}
-                    Err(e) => match e {
-                        parser::Error::UnsupportProtocol(_) => {}
-                        _ => todo!(),
-                    },
-                };
-
-                // TODO: inline with_seed function
-                let mut hasher = twox_hash::Xxh3Hash64::with_seed(0);
-                pkt.hash(&mut hasher);
-                pkt.hash = hasher.finish();
-
-                let thread = (pkt.hash % self.senders.len() as u64) as usize;
-                match self.senders[thread].send(pkt) {
-                    Ok(_) => {}
-                    Err(e) => {
-                        eprintln!("rx thread {} {}, thread exit", self.id, e);
-                        return Err(anyhow!("Channel diconnected"));
+            let mut pkt = match cap.next() {
+                Ok(pkt) => pkt,
+                Err(err) => {
+                    if TypeId::of::<C>() == TypeId::of::<super::capture::Offline>() {
+                        return Ok(());
                     }
-                };
-            }
+                    return Err(err);
+                }
+            };
+
+            match self.parser.parse_pkt(&mut pkt) {
+                Ok(_) => {}
+                Err(e) => match e {
+                    parser::Error::UnsupportProtocol(_) => {}
+                    _ => todo!(),
+                },
+            };
+
+            // TODO: inline with_seed function
+            let mut hasher = twox_hash::Xxh3Hash64::with_seed(0);
+            pkt.hash(&mut hasher);
+            pkt.hash = hasher.finish();
+
+            let thread = (pkt.hash % self.senders.len() as u64) as usize;
+            match self.senders[thread].send(pkt) {
+                Ok(_) => {}
+                Err(e) => {
+                    eprintln!("rx thread {} {}, thread exit", self.id, e);
+                    return Err(anyhow!("Channel diconnected"));
+                }
+            };
         }
         Ok(())
     }
