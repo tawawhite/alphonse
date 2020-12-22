@@ -32,8 +32,8 @@ fn main() -> Result<()> {
     let cfg = config::parse_args(root_cmd)?;
     let exit = Arc::new(AtomicBool::new(false));
 
-    signal_hook::flag::register(signal_hook::SIGTERM, Arc::clone(&exit))?;
-    signal_hook::flag::register(signal_hook::SIGINT, Arc::clone(&exit))?;
+    signal_hook::flag::register(signal_hook::consts::SIGTERM, Arc::clone(&exit))?;
+    signal_hook::flag::register(signal_hook::consts::SIGINT, Arc::clone(&exit))?;
 
     let cfg = Arc::new(cfg);
     let mut handles = vec![];
