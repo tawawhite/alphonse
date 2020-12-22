@@ -29,5 +29,6 @@ version = "0.2.0"
 features = ["chimera"]
 
 [features]
-dpdk = ["rte"]
+arkime = [ "alphonse-api/arkime" ]
+dpdk = [ "rte" ]
 heuristic-mpls = []

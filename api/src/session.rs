@@ -9,6 +9,7 @@ use super::utils::timeval::{precision, TimeVal};
 
 /// Network session
 #[derive(Serialize)]
+#[cfg_attr(feature = "arkime", serde(rename_all = "camelCase"))]
 pub struct Session {
     pub id: String,
     /// Some session only contains one direction's packets
@@ -22,8 +23,10 @@ pub struct Session {
     /// session total data bytes
     pub data_bytes: [u64; 2],
     /// session start time
+    #[cfg_attr(feature = "arkime", serde(rename = "firstPacket"))]
     pub start_time: TimeVal<precision::Millisecond>,
     /// session end time
+    #[cfg_attr(feature = "arkime", serde(rename = "lastPacket"))]
     pub end_time: TimeVal<precision::Millisecond>,
     /// indicate nothing to parse here
     #[serde(skip_serializing)]
