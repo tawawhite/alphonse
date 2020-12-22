@@ -33,27 +33,28 @@ pub struct Rule {
     /// Rule type, see details in RuleType
     pub rule_type: RuleType,
     /// Matched protocol parsers
-    pub parsers: [ParserID; MAX_PARSER_NUM],
+    parsers: [ParserID; MAX_PARSER_NUM],
     /// Actual matched protocol parsers count
-    pub parsers_count: u8,
-}
-
-impl Default for Rule {
-    fn default() -> Self {
-        Rule {
-            id: 0,
-            priority: 0,
-            rule_type: RuleType::All,
-            parsers: [0; MAX_PARSER_NUM],
-            parsers_count: 0,
-        }
-    }
+    parsers_count: u8,
 }
 
 impl Rule {
     /// Get rule's id
     pub fn id(&self) -> RuleID {
         self.id
+    }
+
+    /// Create a new classify rule
+    pub fn new(parser_id: ParserID) -> Self {
+        let mut rule = Rule {
+            id: 0,
+            priority: 0,
+            rule_type: RuleType::All,
+            parsers: [0; MAX_PARSER_NUM],
+            parsers_count: 1,
+        };
+        rule.parsers[0] = parser_id;
+        rule
     }
 }
 

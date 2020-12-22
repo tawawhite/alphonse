@@ -146,7 +146,7 @@ mod test {
     #[test]
     fn add_invalid_rule_type_rule() {
         let mut classifier = Classifier::default();
-        let mut rule = super::super::Rule::default();
+        let mut rule = super::super::Rule::new(0);
         rule.rule_type = super::super::RuleType::All;
         assert!(matches!(classifier.add_rule(&rule), Err(_)));
     }

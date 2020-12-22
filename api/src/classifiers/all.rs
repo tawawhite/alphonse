@@ -68,13 +68,11 @@ mod test {
     #[test]
     fn add_rule_with_same_parser_id() {
         let mut classifier = Classifier::default();
-        let mut rule = super::super::Rule::default();
-        rule.parsers[0] = 1;
+        let mut rule = super::super::Rule::new(1);
 
         assert!(matches!(classifier.add_rule(&rule), Ok(_)));
 
-        let mut rule = super::super::Rule::default();
-        rule.parsers[0] = 1;
+        let mut rule = super::super::Rule::new(1);
         assert!(matches!(classifier.add_rule(&rule), Ok(_)));
         assert_eq!(classifier.rule.parsers_count, 1);
     }
@@ -82,7 +80,7 @@ mod test {
     #[test]
     fn add_invalid_rule_type_rule() {
         let mut classifier = Classifier::default();
-        let mut rule = super::super::Rule::default();
+        let mut rule = super::super::Rule::new(0);
         rule.rule_type = super::super::RuleType::Protocol;
         assert!(matches!(classifier.add_rule(&rule), Err(_)));
     }
@@ -91,15 +89,13 @@ mod test {
     fn rule_exceed_max_parser_num() {
         let mut classifier = Box::new(Classifier::default());
         for i in 0..8 {
-            let mut rule = super::super::Rule::default();
-            rule.parsers[0] = i as super::super::ParserID;
+            let mut rule = super::super::Rule::new(i as super::super::ParserID);
             rule.id = i as RuleID;
             assert!(matches!(classifier.add_rule(&rule), Ok(_)));
         }
         assert_eq!(classifier.rule.parsers_count, 8);
 
-        let mut rule = super::super::Rule::default();
-        rule.parsers[0] = 9;
+        let mut rule = super::super::Rule::new(9);
         rule.id = 9;
         assert!(matches!(classifier.add_rule(&rule), Err(_)));
     }
@@ -107,8 +103,7 @@ mod test {
     #[test]
     fn classify() {
         let mut classifier = Classifier::default();
-        let mut rule = super::super::Rule::default();
-        rule.parsers[0] = 1;
+        let mut rule = super::super::Rule::new(1);
 
         assert!(matches!(classifier.add_rule(&rule), Ok(_)));
 

@@ -114,9 +114,8 @@ mod test {
             port: 80,
             protocol: packet::Protocol::TCP,
         };
-        let mut rule = super::super::Rule::default();
+        let mut rule = super::super::Rule::new(1);
         rule.rule_type = super::super::RuleType::Port(port_rule);
-        rule.parsers[0] = 1;
         assert!(matches!(classifier.add_rule(&rule), Ok(_)));
 
         let rule = &classifier.rules[(port_rule.port) as usize];
@@ -127,9 +126,8 @@ mod test {
             port: 80,
             protocol: packet::Protocol::TCP,
         };
-        let mut rule = super::super::Rule::default();
+        let mut rule = super::super::Rule::new(12);
         rule.rule_type = super::super::RuleType::Port(port_rule);
-        rule.parsers[0] = 12;
         assert!(matches!(classifier.add_rule(&rule), Ok(rule) if rule.id == 0));
 
         let rule = &classifier.rules[(port_rule.port) as usize];
@@ -145,9 +143,8 @@ mod test {
                 port: 80,
                 protocol: packet::Protocol::UDP,
             };
-            let mut rule = super::super::Rule::default();
+            let mut rule = super::super::Rule::new(i as super::super::ParserID);
             rule.rule_type = super::super::RuleType::Port(port_rule);
-            rule.parsers[0] = i as super::super::ParserID;
             rule.id = i as RuleID;
             assert!(matches!(classifier.add_rule(&rule), Ok(_)));
         }
@@ -156,9 +153,8 @@ mod test {
             port: 80,
             protocol: packet::Protocol::UDP,
         };
-        let mut rule = super::super::Rule::default();
+        let mut rule = super::super::Rule::new(9);
         rule.rule_type = super::super::RuleType::Port(port_rule);
-        rule.parsers[0] = 9;
         rule.id = 9;
         assert!(matches!(classifier.add_rule(&rule), Err(_)));
     }
@@ -166,7 +162,7 @@ mod test {
     #[test]
     fn add_invalid_rule_type_rule() {
         let mut classifier = Classifier::default();
-        let mut rule = super::super::Rule::default();
+        let mut rule = super::super::Rule::new(0);
         rule.rule_type = super::super::RuleType::All;
         assert!(matches!(classifier.add_rule(&rule), Err(_)));
     }
@@ -174,7 +170,7 @@ mod test {
     #[test]
     fn add_invalid_transport_protocol_rule() {
         let mut classifier = Classifier::default();
-        let mut rule = super::super::Rule::default();
+        let mut rule = super::super::Rule::new(0);
         rule.rule_type = super::super::RuleType::Port(Rule {
             port: 0,
             protocol: packet::Protocol::ETHERNET,
@@ -189,9 +185,8 @@ mod test {
             port: 80,
             protocol: packet::Protocol::TCP,
         };
-        let mut rule = super::super::Rule::default();
+        let mut rule = super::super::Rule::new(1);
         rule.rule_type = super::super::RuleType::Port(port_rule);
-        rule.parsers[0] = 1;
 
         classifier.add_rule(&rule).unwrap();
 
@@ -238,9 +233,8 @@ mod test {
             port: 53,
             protocol: packet::Protocol::UDP,
         };
-        let mut rule = super::super::Rule::default();
+        let mut rule = super::super::Rule::new(2);
         rule.rule_type = super::super::RuleType::Port(port_rule);
-        rule.parsers[0] = 2;
 
         classifier.add_rule(&rule).unwrap();
 
@@ -268,9 +262,8 @@ mod test {
             port: 32836,
             protocol: packet::Protocol::SCTP,
         };
-        let mut rule = super::super::Rule::default();
+        let mut rule = super::super::Rule::new(3);
         rule.rule_type = super::super::RuleType::Port(port_rule);
-        rule.parsers[0] = 3;
 
         classifier.add_rule(&rule).unwrap();
 
