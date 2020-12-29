@@ -4,7 +4,6 @@ use std::os::raw::c_long;
 use serde::Serialize;
 
 use super::packet;
-use super::parsers;
 use super::utils::timeval::{precision, TimeVal};
 
 /// Network session
@@ -34,9 +33,6 @@ pub struct Session {
     /// custom fields
     #[serde(flatten)]
     pub fields: serde_json::Value,
-    /// protocol parsers, registered dynamically
-    #[serde(skip_serializing)]
-    pub parsers: Vec<Box<dyn parsers::ProtocolParserTrait>>,
     /// Tags
     tags: HashSet<Box<String>>,
     /// Protocols
@@ -62,7 +58,6 @@ impl Session {
             }),
             parse_finished: false,
             fields: serde_json::Value::default(),
-            parsers: Vec::with_capacity(1),
             tags: HashSet::new(),
             protocols: HashSet::new(),
         }

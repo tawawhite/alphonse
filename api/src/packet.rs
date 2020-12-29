@@ -10,7 +10,6 @@ use std::hash::{Hash, Hasher};
 extern crate libc;
 
 use super::classifiers::matched::Rule;
-use super::parsers::ParserID;
 
 #[repr(u8)]
 pub enum Direction {
@@ -65,7 +64,7 @@ impl Packet {
     pub fn from(ts: &libc::timeval, caplen: u32, data: &[u8]) -> Self {
         Packet {
             ts: *ts,
-            caplen: caplen,
+            caplen,
             data: Box::new(Vec::from(data)),
             data_link_layer: Layer::default(),
             network_layer: Layer::default(),
@@ -202,17 +201,6 @@ impl Packet {
     /// Get packet's application layer payload
     pub fn payload(&self) -> &[u8] {
         &self.data.as_slice()[self.app_layer.offset as usize..]
-    }
-
-    #[inline]
-    pub fn parsers(&self) -> Box<Vec<ParserID>> {
-        let mut parsers = Box::new(Vec::new());
-        for rule in self.rules.iter() {
-            for i in 0..rule.parsers_count as usize {
-                parsers.push(rule.parsers[i]);
-            }
-        }
-        return parsers;
     }
 }
 
