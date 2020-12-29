@@ -28,7 +28,7 @@ impl ProtocolParser {
             id: 0,
             name: String::from("http"),
             classified: false,
-            parser: llhttp::Parser::new(settings, llhttp::Type::BOTH),
+            parser: llhttp::Parser::new(),
             settings,
         }
     }
