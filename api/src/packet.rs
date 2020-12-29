@@ -234,10 +234,10 @@ impl std::fmt::Debug for Packet {
         f.debug_struct("Packet")
             .field("ts", &timestamp_str)
             .field("caplen", &self.caplen)
-            .field("data_link_layer", &self.data_link_layer)
-            .field("network_layer", &self.network_layer)
-            .field("trans_layer", &self.trans_layer)
-            .field("app_layer", &self.app_layer)
+            .field("data link layer", &self.data_link_layer)
+            .field("network layer", &self.network_layer)
+            .field("trans layer", &self.trans_layer)
+            .field("app layer", &self.app_layer)
             .finish()
     }
 }
