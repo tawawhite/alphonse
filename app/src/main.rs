@@ -16,7 +16,7 @@ use std::sync::Arc;
 use std::thread;
 
 use anyhow::Result;
-use crossbeam_channel::unbounded;
+use crossbeam_channel::bounded;
 
 use alphonse_api as api;
 use api::{classifiers, parsers::NewProtocolParserFunc, parsers::ParserID, session};
@@ -72,7 +72,7 @@ fn main() -> Result<()> {
     let mut pkt_senders = Vec::new();
 
     for i in 0..cfg.ses_threads {
-        let (sender, receiver) = unbounded();
+        let (sender, receiver) = bounded(cfg.pkt_channel_size as usize);
         pkt_senders.push(sender);
         let thread =
             threadings::SessionThread::new(i, exit.clone(), receiver, classifier_manager.clone());

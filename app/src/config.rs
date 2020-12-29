@@ -11,6 +11,7 @@ use super::commands::CliArg;
 pub struct Config {
     pub backend: String,
     pub verbose_mode: bool,
+    pub pkt_channel_size: u32,
     pub default_timeout: u16,
     pub delete: bool,
     pub dpdk_eal_args: Vec<String>,
@@ -82,6 +83,28 @@ fn parse_config_file(config_file: &str, config: &mut Config) -> Result<()> {
 
     let docs = YamlLoader::load_from_str(&s)?;
     let doc = &docs[0];
+
+    match &doc["channel.pkt.size"] {
+        Yaml::Integer(i) => set_integer(
+            &mut config.pkt_channel_size,
+            *i as u32,
+            1000000,
+            0xffffffff,
+            100000,
+            "channel.pkt.size",
+        ),
+        Yaml::BadValue => {
+            println!(
+                "Option channel.pkt.size not found or bad integer value, set channel.pkt.size to 1000000"
+            );
+            config.pkt_channel_size = 1000000;
+        }
+        _ => {
+            return Err(anyhow!(
+                "Wrong value type for channel.pkt.size, expecting integer",
+            ))
+        }
+    };
 
     match &doc["timeout.pkt-epoch"] {
         Yaml::Integer(i) => set_integer(

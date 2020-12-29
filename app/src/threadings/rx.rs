@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
-use crossbeam_channel::Sender;
+use crossbeam_channel::{Sender, TrySendError};
 use path_absolutize::Absolutize;
 
 use alphonse_api::packet::Packet;
@@ -108,11 +108,18 @@ impl RxThread {
             pkt.hash = hasher.finish();
 
             let thread = (pkt.hash % self.senders.len() as u64) as usize;
-            match self.senders[thread].send(pkt) {
+            match self.senders[thread].try_send(pkt) {
                 Ok(_) => {}
                 Err(e) => {
-                    eprintln!("rx thread {} {}, thread exit", self.id, e);
-                    return Err(anyhow!("Channel diconnected"));
+                    match e {
+                        TrySendError::Full(_) => {
+                            eprintln!("pkt channel {} is full, overflowing", self.id);
+                        }
+                        TrySendError::Disconnected(_) => {
+                            eprintln!("rx thread {} {}, thread exit", self.id, e);
+                            return Err(anyhow!("Channel diconnected"));
+                        }
+                    };
                 }
             };
         }
