@@ -50,8 +50,8 @@ impl api::parsers::ProtocolParserTrait for ProtocolParser {
     }
 
     /// Get parser name
-    fn name(&self) -> String {
-        self.name.clone()
+    fn name(&self) -> &String {
+        &self.name
     }
 
     fn register_classify_rules(
@@ -142,12 +142,13 @@ impl api::parsers::ProtocolParserTrait for ProtocolParser {
     fn parse_pkt(
         &mut self,
         _pkt: &api::packet::Packet,
+        _rule: &api::classifiers::matched::Rule,
         ses: &mut api::session::Session,
     ) -> Result<()> {
         if !self.is_classified() {
             // If this session is already classified as this protocol, skip
             self.classified_as_this_protocol()?;
-            ses.add_protocol(Box::new(self.name()));
+            ses.add_protocol(Box::new(self.name().clone()));
         }
 
         Ok(())
