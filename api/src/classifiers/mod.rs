@@ -8,8 +8,6 @@ pub mod all;
 pub mod dpi;
 pub mod port;
 
-const MAX_PARSER_NUM: usize = 8;
-
 type RuleID = u32;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -33,9 +31,7 @@ pub struct Rule {
     /// Rule type, see details in RuleType
     pub rule_type: RuleType,
     /// Matched protocol parsers
-    parsers: [ParserID; MAX_PARSER_NUM],
-    /// Actual matched protocol parsers count
-    parsers_count: u8,
+    parsers: Vec<ParserID>,
 }
 
 impl Rule {
@@ -46,20 +42,17 @@ impl Rule {
 
     /// Create a new classify rule
     pub fn new(parser_id: ParserID) -> Self {
-        let mut rule = Rule {
+        Rule {
             id: 0,
             priority: 0,
             rule_type: RuleType::All,
-            parsers: [0; MAX_PARSER_NUM],
-            parsers_count: 1,
-        };
-        rule.parsers[0] = parser_id;
-        rule
+            parsers: vec![parser_id],
+        }
     }
 }
 
 pub mod matched {
-    use super::{ParserID, RuleID, MAX_PARSER_NUM};
+    use super::{ParserID, RuleID};
     #[repr(u8)]
     #[derive(Debug, Clone, Copy, PartialEq, Primitive)]
     pub enum RuleType {
@@ -84,13 +77,12 @@ pub mod matched {
         }
     }
 
-    #[derive(Debug, Clone, Copy, PartialEq)]
+    #[derive(Debug, Clone, PartialEq)]
     pub struct Rule {
         pub id: RuleID,
         pub priority: u8,
         pub rule_type: RuleType,
-        pub parsers: [ParserID; MAX_PARSER_NUM],
-        pub parsers_count: u8,
+        pub parsers: Vec<ParserID>,
     }
 
     impl Default for Rule {
@@ -99,8 +91,7 @@ pub mod matched {
                 id: 0,
                 priority: 255,
                 rule_type: RuleType::All,
-                parsers: [0; MAX_PARSER_NUM],
-                parsers_count: 0,
+                parsers: Vec::new(),
             }
         }
     }
@@ -111,8 +102,7 @@ pub mod matched {
                 id: rule.id,
                 priority: rule.priority,
                 rule_type: RuleType::from(&rule.rule_type),
-                parsers: rule.parsers,
-                parsers_count: rule.parsers_count,
+                parsers: rule.parsers.clone(),
             }
         }
     }
@@ -159,8 +149,7 @@ impl ClassifierManager {
                 id: 0,
                 priority: 255,
                 rule_type: RuleType::All,
-                parsers: [0; MAX_PARSER_NUM],
-                parsers_count: 0,
+                parsers: Vec::new(),
             })], // first rule is always the receive all pkt rule
             all_pkt_classifier: all::Classifier::default(),
             port_classifier: port::Classifier::default(),
@@ -213,8 +202,7 @@ impl ClassifierManager {
             }
         };
 
-        self.rules[rule.id() as usize].parsers = rule.parsers;
-        self.rules[rule.id() as usize].parsers_count = rule.parsers_count;
+        self.rules[rule.id() as usize].parsers = rule.parsers.clone();
 
         Ok(rule.id())
     }
@@ -266,17 +254,16 @@ mod tests {
         let mut rule: Rule = Rule {
             id: 0,
             priority: 255,
-            parsers: [0; MAX_PARSER_NUM],
-            parsers_count: 1,
+            parsers: Vec::new(),
             rule_type: RuleType::All,
         };
-        rule.parsers[0] = 1;
+        rule.parsers.push(1);
 
         classifier.add_rule(&mut rule).unwrap();
         assert_eq!(classifier.rules.len(), 1);
         assert_eq!(classifier.rules[0].id(), 0);
         assert_eq!(classifier.rules[0].priority, 255);
-        assert_eq!(classifier.rules[0].parsers_count, 1);
+        assert_eq!(classifier.rules[0].parsers.len(), 1);
         assert_eq!(classifier.rules[0].parsers[0], 1);
         assert!(matches!(classifier.rules[0].rule_type, RuleType::All));
 
@@ -284,16 +271,15 @@ mod tests {
         let mut rule: Rule = Rule {
             id: 1,
             priority: 0,
-            parsers: [0; MAX_PARSER_NUM],
-            parsers_count: 1,
+            parsers: Vec::new(),
             rule_type: RuleType::All,
         };
-        rule.parsers[0] = 2;
+        rule.parsers.push(2);
         classifier.add_rule(&mut rule).unwrap();
         assert_eq!(classifier.rules.len(), 1);
         assert_eq!(classifier.rules[0].id(), 0);
         assert_eq!(classifier.rules[0].priority, 255);
-        assert_eq!(classifier.rules[0].parsers_count, 2);
+        assert_eq!(classifier.rules[0].parsers.len(), 2);
         assert_eq!(classifier.rules[0].parsers[0], 1);
         assert_eq!(classifier.rules[0].parsers[1], 2);
     }
@@ -305,19 +291,18 @@ mod tests {
         let mut rule: Rule = Rule {
             id: 0,
             priority: 255,
-            parsers: [0; MAX_PARSER_NUM],
-            parsers_count: 1,
+            parsers: Vec::new(),
             rule_type: RuleType::Port(port::Rule {
                 port: 80,
                 protocol: packet::Protocol::TCP,
             }),
         };
-        rule.parsers[0] = 1;
+        rule.parsers.push(1);
         classifier.add_rule(&mut rule).unwrap();
         assert_eq!(classifier.rules.len(), 2);
         assert_eq!(classifier.rules[1].id(), 1);
         assert_eq!(classifier.rules[1].priority, 255);
-        assert_eq!(classifier.rules[1].parsers_count, 1);
+        assert_eq!(classifier.rules[1].parsers.len(), 1);
         assert_eq!(classifier.rules[1].parsers[0], 1);
         assert!(matches!(classifier.rules[1].rule_type, RuleType::Port(r) if r.port == 80));
         match classifier.rules[1].rule_type {

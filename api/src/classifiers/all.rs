@@ -28,24 +28,14 @@ impl super::Classifier for Classifier {
         };
 
         // Prevent add same parser again, unlikely happen
-        if self.rule.parsers_count > 0 {
+        if self.rule.parsers.len() > 0 {
             match self.rule.parsers.iter().find(|id| **id == parser_id) {
                 Some(_) => return Ok(&self.rule),
                 None => {}
             };
         }
 
-        match self.rule.parsers_count as usize {
-            super::MAX_PARSER_NUM => {
-                return Err(anyhow!(
-                    "Rule {:?} associated with too many parsers, dropping parser",
-                    self.rule,
-                ))
-            }
-            _ => {}
-        }
-        self.rule.parsers[self.rule.parsers_count as usize] = parser_id;
-        self.rule.parsers_count += 1;
+        self.rule.parsers.push(parser_id);
         Ok(&self.rule)
     }
 }
@@ -53,8 +43,8 @@ impl super::Classifier for Classifier {
 impl Classifier {
     #[inline]
     pub fn classify(&self, pkt: &mut packet::Packet) {
-        if self.rule.parsers_count > 0 {
-            pkt.rules.push(self.rule)
+        if self.rule.parsers.len() > 0 {
+            pkt.rules.push(self.rule.clone())
         }
     }
 }
@@ -68,13 +58,13 @@ mod test {
     #[test]
     fn add_rule_with_same_parser_id() {
         let mut classifier = Classifier::default();
-        let mut rule = super::super::Rule::new(1);
+        let rule = super::super::Rule::new(1);
 
         assert!(matches!(classifier.add_rule(&rule), Ok(_)));
 
-        let mut rule = super::super::Rule::new(1);
+        let rule = super::super::Rule::new(1);
         assert!(matches!(classifier.add_rule(&rule), Ok(_)));
-        assert_eq!(classifier.rule.parsers_count, 1);
+        assert_eq!(classifier.rule.parsers.len(), 1);
     }
 
     #[test]
@@ -93,17 +83,13 @@ mod test {
             rule.id = i as RuleID;
             assert!(matches!(classifier.add_rule(&rule), Ok(_)));
         }
-        assert_eq!(classifier.rule.parsers_count, 8);
-
-        let mut rule = super::super::Rule::new(9);
-        rule.id = 9;
-        assert!(matches!(classifier.add_rule(&rule), Err(_)));
+        assert_eq!(classifier.rule.parsers.len(), 8);
     }
 
     #[test]
     fn classify() {
         let mut classifier = Classifier::default();
-        let mut rule = super::super::Rule::new(1);
+        let rule = super::super::Rule::new(1);
 
         assert!(matches!(classifier.add_rule(&rule), Ok(_)));
 

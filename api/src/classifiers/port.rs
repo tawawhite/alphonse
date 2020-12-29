@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Result};
 
-use super::{matched, packet, MAX_PARSER_NUM};
+use super::{matched, packet};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Rule {
@@ -23,8 +23,7 @@ impl Default for Classifier {
                     id: 0,
                     priority: 0,
                     rule_type: matched::RuleType::Port,
-                    parsers: [0; 8],
-                    parsers_count: 0
+                    parsers: Vec::new(),
                 };
                 std::u16::MAX as usize * 3
             ],
@@ -56,24 +55,8 @@ impl super::Classifier for Classifier {
             }
         };
         let index = base_index + port_rule.port as usize;
-        let last_parser_index = self.rules[index].parsers_count as usize;
-        match last_parser_index {
-            // this rule has already been registered, and registered rules count meets the upper bound
-            MAX_PARSER_NUM => {
-                return Err(anyhow!(
-                    "Rule {:?} associated with too many parsers, dropping parser",
-                    rule
-                ));
-            }
-            // first time this rule is registered
-            0 => None,
-            // this rule has already been registered
-            _ => Some(self.rules[index].id),
-        };
-
         self.rules[index].id = rule.id;
-        self.rules[index].parsers[last_parser_index] = rule.parsers[0];
-        self.rules[index].parsers_count += 1;
+        self.rules[index].parsers.push(rule.parsers[0]);
 
         Ok(&self.rules[index])
     }
@@ -90,13 +73,13 @@ impl Classifier {
         };
 
         let src_index = base_index + pkt.src_port() as usize;
-        if self.rules[src_index].parsers_count > 0 {
-            pkt.rules.push(self.rules[src_index]);
+        if self.rules[src_index].parsers.len() > 0 {
+            pkt.rules.push(self.rules[src_index].clone());
         }
 
         let dst_index = base_index + pkt.dst_port() as usize;
-        if self.rules[dst_index].parsers_count > 0 {
-            pkt.rules.push(self.rules[dst_index]);
+        if self.rules[dst_index].parsers.len() > 0 {
+            pkt.rules.push(self.rules[dst_index].clone());
         }
     }
 }
@@ -119,7 +102,7 @@ mod test {
         assert!(matches!(classifier.add_rule(&rule), Ok(_)));
 
         let rule = &classifier.rules[(port_rule.port) as usize];
-        assert_eq!(rule.parsers_count, 1);
+        assert_eq!(rule.parsers.len(), 1);
         assert_eq!(rule.parsers[0], 1);
 
         let port_rule = Rule {
@@ -131,7 +114,7 @@ mod test {
         assert!(matches!(classifier.add_rule(&rule), Ok(rule) if rule.id == 0));
 
         let rule = &classifier.rules[(port_rule.port) as usize];
-        assert_eq!(rule.parsers_count, 2);
+        assert_eq!(rule.parsers.len(), 2);
         assert_eq!(rule.parsers[1], 12);
     }
 
@@ -148,15 +131,6 @@ mod test {
             rule.id = i as RuleID;
             assert!(matches!(classifier.add_rule(&rule), Ok(_)));
         }
-
-        let port_rule = Rule {
-            port: 80,
-            protocol: packet::Protocol::UDP,
-        };
-        let mut rule = super::super::Rule::new(9);
-        rule.rule_type = super::super::RuleType::Port(port_rule);
-        rule.id = 9;
-        assert!(matches!(classifier.add_rule(&rule), Err(_)));
     }
 
     #[test]
@@ -227,7 +201,7 @@ mod test {
         assert_eq!(pkt.rules.len(), 1);
         assert_eq!(pkt.rules[0].rule_type, matched::RuleType::Port);
         assert_eq!(pkt.rules[0].parsers[0], 1);
-        assert_eq!(pkt.rules[0].parsers_count, 1);
+        assert_eq!(pkt.rules[0].parsers.len(), 1);
 
         let port_rule = Rule {
             port: 53,
@@ -256,7 +230,7 @@ mod test {
         assert_eq!(pkt.rules.len(), 1);
         assert_eq!(pkt.rules[0].rule_type, matched::RuleType::Port);
         assert_eq!(pkt.rules[0].parsers[0], 2);
-        assert_eq!(pkt.rules[0].parsers_count, 1);
+        assert_eq!(pkt.rules[0].parsers.len(), 1);
 
         let port_rule = Rule {
             port: 32836,
@@ -312,6 +286,6 @@ mod test {
         assert_eq!(pkt.rules.len(), 1);
         assert_eq!(pkt.rules[0].rule_type, matched::RuleType::Port);
         assert_eq!(pkt.rules[0].parsers[0], 3);
-        assert_eq!(pkt.rules[0].parsers_count, 1);
+        assert_eq!(pkt.rules[0].parsers.len(), 1);
     }
 }

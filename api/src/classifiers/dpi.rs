@@ -80,7 +80,7 @@ impl Classifier {
                 })?;
 
                 for id in ids {
-                    pkt.rules.push(self.rules[id]);
+                    pkt.rules.push(self.rules[id].clone());
                 }
 
                 Ok(())
@@ -131,15 +131,14 @@ mod test {
         let rule = super::super::Rule {
             id: 0,
             priority: 0,
-            parsers: [0; super::super::MAX_PARSER_NUM],
-            parsers_count: 0,
+            parsers: Vec::new(),
             rule_type: super::super::RuleType::DPI(dpi_rule),
         };
 
         assert!(matches!(classifier.add_rule(&rule), Ok(_)));
 
         let mut rule = rule.clone();
-        rule.parsers[0] = 1;
+        rule.parsers.push(1);
         assert!(matches!(classifier.add_rule(&rule), Ok(rule) if rule.id == 0));
     }
 
@@ -159,8 +158,7 @@ mod test {
         let rule = super::super::Rule {
             id: 10,
             priority: 100,
-            parsers: [0; super::super::MAX_PARSER_NUM],
-            parsers_count: 1,
+            parsers: vec![0],
             rule_type: super::super::RuleType::DPI(dpi_rule),
         };
 
@@ -177,8 +175,8 @@ mod test {
         assert_eq!(pkt.rules.len(), 1);
         assert_eq!(pkt.rules[0].id(), 10);
         assert_eq!(pkt.rules[0].priority, 100);
+        assert_eq!(pkt.rules[0].parsers.len(), 1);
         assert_eq!(pkt.rules[0].parsers[0], 0);
-        assert_eq!(pkt.rules[0].parsers_count, 1);
 
         // unmatched
         let mut pkt = packet::Packet::default();
