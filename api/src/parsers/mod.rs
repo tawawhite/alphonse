@@ -54,7 +54,7 @@ pub trait ProtocolParserTrait: Send + Sync {
     fn set_id(&mut self, id: ParserID);
 
     /// Get parser name
-    fn name(&self) -> String;
+    fn name(&self) -> &String;
 
     /// Initialize parser required global resources
     fn init(&mut self) -> Result<()> {
@@ -70,11 +70,16 @@ pub trait ProtocolParserTrait: Send + Sync {
     fn register_classify_rules(&mut self, manager: &mut ClassifierManager) -> Result<()>;
 
     /// Parse a single packet and maybe update session information
-    fn parse_pkt(&mut self, _pkt: &packet::Packet, ses: &mut session::Session) -> Result<()> {
+    fn parse_pkt(
+        &mut self,
+        _pkt: &packet::Packet,
+        _rule: &super::classifiers::matched::Rule,
+        ses: &mut session::Session,
+    ) -> Result<()> {
         if !self.is_classified() {
             // If this session is already classified as this protocol, skip
             self.classified_as_this_protocol()?;
-            ses.add_protocol(Box::new(self.name()));
+            ses.add_protocol(Box::new(self.name().clone()));
         }
 
         Ok(())
