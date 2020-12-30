@@ -15,20 +15,22 @@ use super::capture::{Capture, NetworkInterface, Offline};
 use super::config;
 use super::packet::{parser, Parser};
 
-/// 收包线程
+/// RX Thread
 pub struct RxThread {
-    /// 线程ID
+    /// Thread ID
     id: u8,
+    /// Exit flag
     exit: Arc<AtomicBool>,
-    /// 收包总数
+    /// Total received packet count
     pub rx_count: u64,
-    // 基本协议解析器
+    /// Basic protocol parser
     parser: Parser,
+    /// Packet channel sender
     senders: Vec<Sender<Box<Packet>>>,
 }
 
 impl RxThread {
-    /// 创建一个新的收包线程结构体
+    /// Create a new rx thread
     pub fn new(
         id: u8,
         link_type: u16,
