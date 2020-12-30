@@ -56,7 +56,6 @@ impl Parser {
     /// 解析单个数据包
     #[inline]
     pub fn parse_pkt(&self, pkt: &mut Packet) -> Result<(), Error> {
-        let mut layer;
         // 根据 link type 解析数据链路层协议, 获取下一层协议的协议类型和起始位置
         let mut result = match self.link_type {
             link::NULL => {
@@ -89,14 +88,12 @@ impl Parser {
             }
         };
 
-        layer = match result {
-            Ok(l) => l,
+        let mut layer = match result {
+            Ok(l) => match l {
+                Some(l) => l,
+                None => return Ok(()),
+            },
             Err(e) => return Err(e),
-        };
-
-        let mut layer = match layer {
-            None => return Ok(()),
-            Some(l) => l,
         };
 
         loop {
