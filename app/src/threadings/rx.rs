@@ -98,6 +98,8 @@ impl RxThread {
                 }
             };
 
+            self.rx_count += 1;
+
             match self.parser.parse_pkt(&mut pkt) {
                 Ok(_) => {}
                 Err(e) => match e {
