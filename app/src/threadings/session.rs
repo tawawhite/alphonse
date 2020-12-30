@@ -93,7 +93,6 @@ impl SessionThread {
     #[inline]
     fn timeout(
         ts: u64,
-        timeout: u64,
         session_table: &mut HashMap<Box<Packet>, Rc<SessionData>>,
         cfg: &Arc<config::Config>,
     ) {
@@ -171,12 +170,7 @@ impl SessionThread {
             }
 
             if last_packet_time >= last_timeout_check_time {
-                SessionThread::timeout(
-                    last_packet_time,
-                    last_timeout_check_time,
-                    &mut session_table,
-                    &cfg,
-                );
+                SessionThread::timeout(last_packet_time, &mut session_table, &cfg);
                 last_timeout_check_time = last_packet_time;
             }
         }

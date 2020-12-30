@@ -99,13 +99,17 @@ fn main() -> Result<()> {
         for parser in &protocol_parsers {
             parsers.push(parser.box_clone());
         }
-        handles.push(thread::spawn(move || thread.spawn(cfg, parsers)));
+        let builder = thread::Builder::new().name(format!("alphonse-pkt{}", thread.id()));
+        let handle = builder.spawn(move || thread.spawn(cfg, parsers))?;
+        handles.push(handle);
     }
 
     // start all rx threads
     for mut thread in rx_threads {
         let cfg = cfg.clone();
-        handles.push(thread::spawn(move || thread.spawn(cfg)));
+        let builder = thread::Builder::new().name(format!("alphonse-ses{}", thread.id()));
+        let handle = builder.spawn(move || thread.spawn(cfg))?;
+        handles.push(handle);
     }
 
     for handle in handles {
