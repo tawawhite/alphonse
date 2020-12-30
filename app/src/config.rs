@@ -27,7 +27,7 @@ pub struct Config {
     pub sctp_timeout: u16,
     pub tags: Vec<String>,
     pub tcp_timeout: u16,
-    pub timeout_pkt_epoch: u16,
+    pub timeout_interval: u64,
     pub udp_timeout: u16,
 }
 
@@ -106,22 +106,22 @@ fn parse_config_file(config_file: &str, config: &mut Config) -> Result<()> {
         }
     };
 
-    match &doc["timeout.pkt-epoch"] {
+    match &doc["timeout.interval"] {
         Yaml::Integer(i) => set_integer(
-            &mut config.timeout_pkt_epoch,
-            *i as u16,
-            8,
-            0xffff,
+            &mut config.timeout_interval,
+            *i as u64,
             1,
-            "timeout.pkt-epoch",
+            10,
+            1,
+            "timeout.interval",
         ),
         Yaml::BadValue => {
-            println!("Option timeout.pkt-epoch not found or bad integer value, set timeout.pkt-epoch to 60 secs");
-            config.timeout_pkt_epoch = 8;
+            println!("Option timeout.interval not found or bad integer value, set timeout.interval to 1 sec");
+            config.timeout_interval = 1;
         }
         _ => {
             return Err(anyhow!(
-                "Wrong value type for timeout.pkt-epoch, expecting integer",
+                "Wrong value type for timeout.interval, expecting integer",
             ))
         }
     };

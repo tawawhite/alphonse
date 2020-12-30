@@ -93,23 +93,18 @@ impl SessionThread {
     #[inline]
     fn timeout(
         ts: u64,
+        timeout: u64,
         session_table: &mut HashMap<Box<Packet>, Rc<SessionData>>,
-        timeout_epoch: &mut u16,
         cfg: &Arc<config::Config>,
     ) {
-        if *timeout_epoch == cfg.timeout_pkt_epoch {
-            &mut session_table.retain(|pkt, ses| match pkt.trans_layer.protocol {
-                Protocol::TCP => !ses.info.timeout(cfg.tcp_timeout as c_long, ts as c_long),
-                Protocol::UDP => !ses.info.timeout(cfg.udp_timeout as c_long, ts as c_long),
-                Protocol::SCTP => !ses.info.timeout(cfg.sctp_timeout as c_long, ts as c_long),
-                _ => !ses
-                    .info
-                    .timeout(cfg.default_timeout as c_long, ts as c_long),
-            });
-            *timeout_epoch = 0;
-        } else {
-            *timeout_epoch += 1;
-        }
+        &mut session_table.retain(|pkt, ses| match pkt.trans_layer.protocol {
+            Protocol::TCP => !ses.info.timeout(cfg.tcp_timeout as c_long, ts as c_long),
+            Protocol::UDP => !ses.info.timeout(cfg.udp_timeout as c_long, ts as c_long),
+            Protocol::SCTP => !ses.info.timeout(cfg.sctp_timeout as c_long, ts as c_long),
+            _ => !ses
+                .info
+                .timeout(cfg.default_timeout as c_long, ts as c_long),
+        });
     }
 
     pub fn spawn(
@@ -117,10 +112,11 @@ impl SessionThread {
         cfg: Arc<config::Config>,
         mut protocol_parsers: Box<Vec<Box<dyn ProtocolParserTrait>>>,
     ) -> Result<()> {
-        let mut _last_packet_time: u64 = SystemTime::now()
+        let mut last_packet_time: u64 = SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_secs();
+        let mut last_timeout_check_time: u64 = last_packet_time + cfg.timeout_interval;
         let mut session_table: HashMap<Box<Packet>, Rc<SessionData>> = Default::default();
 
         println!("session thread {} started", self.id);
@@ -130,14 +126,13 @@ impl SessionThread {
             Err(_) => todo!(),
         };
 
-        let mut timeout_epoch = 0;
         while !self.exit.load(Ordering::Relaxed) {
             let mut pkt = match self.receiver.recv() {
                 Err(_) => break,
                 Ok(p) => p,
             };
 
-            _last_packet_time = pkt.ts.tv_sec as u64;
+            last_packet_time = pkt.ts.tv_sec as u64;
 
             match session_table.get_mut(&pkt) {
                 Some(mut ses) => {
@@ -175,12 +170,15 @@ impl SessionThread {
                 }
             }
 
-            SessionThread::timeout(
-                _last_packet_time,
-                &mut session_table,
-                &mut timeout_epoch,
-                &cfg,
-            );
+            if last_packet_time >= last_timeout_check_time {
+                SessionThread::timeout(
+                    last_packet_time,
+                    last_timeout_check_time,
+                    &mut session_table,
+                    &cfg,
+                );
+                last_timeout_check_time = last_packet_time;
+            }
         }
 
         println!("session thread {} exit", self.id);
