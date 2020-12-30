@@ -21,12 +21,11 @@ pub type ParserExitFunc = fn() -> Result<()>;
 
 pub struct ProtocolParser {
     parser: Box<Box<dyn ProtocolParserTrait>>,
-    _lib: Arc<libloading::Library>,
 }
 
 impl ProtocolParser {
-    pub fn new(parser: Box<Box<dyn ProtocolParserTrait>>, lib: Arc<libloading::Library>) -> Self {
-        ProtocolParser { parser, _lib: lib }
+    pub fn new(parser: Box<Box<dyn ProtocolParserTrait>>) -> Self {
+        ProtocolParser { parser }
     }
 }
 

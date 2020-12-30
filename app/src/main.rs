@@ -11,6 +11,7 @@ extern crate signal_hook;
 extern crate twox_hash;
 extern crate yaml_rust;
 
+use std::collections::HashMap;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use std::thread;
@@ -38,17 +39,20 @@ fn main() -> Result<()> {
     let cfg = Arc::new(cfg);
     let mut handles = vec![];
 
+    // keep share library 'alive' so that the vtable of trait object pointer is not pointing to an invalid position
+    let mut parser_libraries = HashMap::new();
     let mut protocol_parsers = Vec::new();
 
     for p in &cfg.as_ref().parsers {
-        let lib = Arc::new(libloading::Library::new(p)?);
+        parser_libraries.insert(p.clone(), libloading::Library::new(p)?);
+        let lib = parser_libraries.get(p).unwrap();
 
         unsafe {
             match lib.get::<NewProtocolParserFunc>(b"al_new_protocol_parser\0") {
                 Ok(func) => {
                     let mut parser = func();
                     parser.set_id(protocol_parsers.len() as ParserID);
-                    let parser = api::parsers::ProtocolParser::new(parser, lib.clone());
+                    let parser = api::parsers::ProtocolParser::new(parser);
                     protocol_parsers.push(parser);
                 }
                 Err(e) => {
