@@ -57,6 +57,10 @@ impl SessionThread {
         }
     }
 
+    pub fn id(&self) -> u8 {
+        self.id
+    }
+
     #[inline]
     fn parse_pkt(
         &self,

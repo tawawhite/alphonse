@@ -43,9 +43,11 @@ impl RxThread {
             senders,
         }
     }
-}
 
-impl RxThread {
+    pub fn id(&self) -> u8 {
+        self.id
+    }
+
     /// get pcap files according to command line arguments/configuration file
     fn get_pcap_files(cfg: &config::Config) -> Vec<PathBuf> {
         let mut files = Vec::new();
