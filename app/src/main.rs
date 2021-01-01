@@ -103,7 +103,7 @@ fn main() -> Result<()> {
         for parser in &protocol_parsers {
             parsers.push(parser.box_clone());
         }
-        let builder = thread::Builder::new().name(format!("alphonse-pkt{}", thread.id()));
+        let builder = thread::Builder::new().name(format!("alphonse-ses{}", thread.id()));
         let handle = builder.spawn(move || thread.spawn(cfg, parsers))?;
         handles.push(handle);
     }
@@ -111,7 +111,7 @@ fn main() -> Result<()> {
     // start all rx threads
     for mut thread in rx_threads {
         let cfg = cfg.clone();
-        let builder = thread::Builder::new().name(format!("alphonse-ses{}", thread.id()));
+        let builder = thread::Builder::new().name(format!("alphonse-rx{}", thread.id()));
         let handle = builder.spawn(move || thread.spawn(cfg))?;
         handles.push(handle);
     }
