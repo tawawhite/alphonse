@@ -50,7 +50,7 @@ pub struct RxThread {
     /// Basic protocol parser
     parser: Parser,
     /// Packet channel sender
-    senders: Vec<Sender<Arc<Session>>>,
+    sender: Sender<Arc<Session>>,
     /// Packet Classifier
     classifier: Arc<ClassifierManager>,
 }
@@ -60,7 +60,7 @@ impl RxThread {
     pub fn new(
         id: u8,
         link_type: u16,
-        senders: Vec<Sender<Arc<Session>>>,
+        sender: Sender<Arc<Session>>,
         classifier: Arc<ClassifierManager>,
         exit: Arc<AtomicBool>,
     ) -> RxThread {
@@ -70,7 +70,7 @@ impl RxThread {
             rx_count: 0,
             parser: Parser::new(link_type),
             classifier,
-            senders,
+            sender,
         }
     }
 
@@ -257,18 +257,13 @@ impl RxThread {
             }
 
             if last_packet_time >= last_timeout_check_time {
-                Self::timeout(
-                    last_packet_time,
-                    &mut session_table,
-                    &mut self.senders[self.id as usize],
-                    &cfg,
-                )?;
+                Self::timeout(last_packet_time, &mut session_table, &mut self.sender, &cfg)?;
                 last_timeout_check_time = last_packet_time;
             }
         }
 
         for (_, ses) in session_table.iter() {
-            self.senders[self.id as usize].send(ses.info.clone())?;
+            self.sender.send(ses.info.clone())?;
         }
         Ok(())
     }

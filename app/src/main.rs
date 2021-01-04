@@ -73,32 +73,28 @@ fn main() -> Result<()> {
 
     // initialize session threads
     let mut ses_threads = Vec::new();
-    let mut pkt_senders = Vec::new();
+    let (sender, receiver) = bounded(cfg.pkt_channel_size as usize);
 
     for i in 0..cfg.ses_threads {
-        let (sender, receiver) = bounded(cfg.pkt_channel_size as usize);
-        pkt_senders.push(sender);
-        let thread = threadings::SessionThread::new(i, exit.clone(), receiver);
+        let thread = threadings::SessionThread::new(i, exit.clone(), receiver.clone());
         ses_threads.push(thread);
     }
 
     // initialize rx threads
     let mut rx_threads = Vec::new();
     for i in 0..cfg.rx_threads {
-        let mut senders = Vec::new();
-        for sender in &pkt_senders {
-            senders.push(sender.clone());
-        }
         let thread = threadings::RxThread::new(
             i,
             packet::link::ETHERNET,
-            senders,
+            sender.clone(),
             classifier_manager.clone(),
             exit.clone(),
         );
         rx_threads.push(thread);
-        pkt_senders.clear(); // release all original senders
     }
+
+    drop(sender);
+    drop(receiver);
 
     // start all session threads
     for mut thread in ses_threads {
