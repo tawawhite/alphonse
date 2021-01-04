@@ -34,7 +34,6 @@ pub struct SessionThread {
     id: u8,
     exit: Arc<AtomicBool>,
     receiver: Receiver<Box<dyn Packet>>,
-    classifier: Arc<ClassifierManager>,
 }
 
 impl SessionThread {
@@ -42,14 +41,8 @@ impl SessionThread {
         id: u8,
         exit: Arc<AtomicBool>,
         receiver: Receiver<Box<dyn Packet>>,
-        classifier: Arc<ClassifierManager>,
     ) -> SessionThread {
-        SessionThread {
-            id,
-            exit,
-            receiver,
-            classifier,
-        }
+        SessionThread { id, exit, receiver }
     }
 
     pub fn id(&self) -> u8 {

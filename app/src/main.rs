@@ -78,8 +78,7 @@ fn main() -> Result<()> {
     for i in 0..cfg.ses_threads {
         let (sender, receiver) = bounded(cfg.pkt_channel_size as usize);
         pkt_senders.push(sender);
-        let thread =
-            threadings::SessionThread::new(i, exit.clone(), receiver, classifier_manager.clone());
+        let thread = threadings::SessionThread::new(i, exit.clone(), receiver);
         ses_threads.push(thread);
     }
 
