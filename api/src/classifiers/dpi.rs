@@ -70,7 +70,11 @@ impl super::Classifier for Classifier {
 }
 
 impl Classifier {
-    pub fn classify(&self, pkt: &mut packet::Packet, scratch: &mut ClassifyScratch) -> Result<()> {
+    pub fn classify(
+        &self,
+        pkt: &mut Box<dyn packet::Packet>,
+        scratch: &mut ClassifyScratch,
+    ) -> Result<()> {
         match (&self.hs_db, &scratch.hs_scratch) {
             (Some(db), Some(s)) => {
                 let mut ids = Vec::new();
@@ -80,7 +84,7 @@ impl Classifier {
                 })?;
 
                 for id in ids {
-                    pkt.rules.push(self.rules[id].clone());
+                    pkt.rules_mut().push(self.rules[id].clone());
                 }
 
                 Ok(())

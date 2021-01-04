@@ -42,9 +42,9 @@ impl super::Classifier for Classifier {
 
 impl Classifier {
     #[inline]
-    pub fn classify(&self, pkt: &mut packet::Packet) {
+    pub fn classify(&self, pkt: &mut Box<dyn packet::Packet>) {
         if self.rule.parsers.len() > 0 {
-            pkt.rules.push(self.rule.clone())
+            pkt.rules_mut().push(self.rule.clone())
         }
     }
 }

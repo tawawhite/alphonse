@@ -224,7 +224,7 @@ impl ClassifierManager {
     #[inline]
     pub fn classify(
         &self,
-        pkt: &mut packet::Packet,
+        pkt: &mut Box<dyn packet::Packet>,
         scratch: &mut dpi::ClassifyScratch,
     ) -> Result<()> {
         self.all_pkt_classifier.classify(pkt);

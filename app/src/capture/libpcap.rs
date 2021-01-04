@@ -2,7 +2,9 @@ use std::path::Path;
 
 use anyhow::{anyhow, Result};
 
-use alphonse_api::packet::Packet;
+use alphonse_api::classifiers::matched::Rule;
+use alphonse_api::packet::Layer;
+use alphonse_api::packet::Packet as PacketTrait;
 
 use super::Capture;
 
@@ -43,12 +45,23 @@ impl Offline {
 impl Capture for Offline {
     #[inline]
     /// 获取下一个数据包
-    fn next(&mut self) -> Result<Box<Packet>> {
-        let raw_pkt = self.cap.as_mut().next()?;
-        let mut pkt: Box<Packet> = Box::default();
-        pkt.ts = raw_pkt.header.ts;
-        pkt.caplen = raw_pkt.header.caplen;
-        pkt.data = Box::new(Vec::from(raw_pkt.data));
+    fn next(&mut self) -> Result<Box<dyn PacketTrait>> {
+        let raw = self.cap.as_mut().next()?;
+        let pkt = unsafe {
+            Box::new(Packet {
+                raw: pcap::Packet {
+                    header: &*(raw.header as *const pcap::PacketHeader),
+                    data: std::slice::from_raw_parts(raw.data.as_ptr(), raw.data.len()),
+                },
+                data_link_layer: Layer::default(),
+                network_layer: Layer::default(),
+                trans_layer: Layer::default(),
+                app_layer: Layer::default(),
+                hash: 0,
+                rules: Box::new(Vec::new()),
+                drop: false,
+            })
+        };
         Ok(pkt)
     }
 }
@@ -60,12 +73,23 @@ pub struct NetworkInterface {
 impl Capture for NetworkInterface {
     #[inline]
     /// 获取下一个数据包
-    fn next(&mut self) -> Result<Box<Packet>> {
-        let raw_pkt = self.cap.as_mut().next()?;
-        let mut pkt: Box<Packet> = Box::default();
-        pkt.ts = raw_pkt.header.ts;
-        pkt.caplen = raw_pkt.header.caplen;
-        pkt.data = Box::new(Vec::from(raw_pkt.data));
+    fn next(&mut self) -> Result<Box<dyn PacketTrait>> {
+        let raw = self.cap.as_mut().next()?;
+        let pkt: Box<Packet> = unsafe {
+            Box::new(Packet {
+                raw: pcap::Packet {
+                    header: &*(raw.header as *const pcap::PacketHeader),
+                    data: std::slice::from_raw_parts(raw.data.as_ptr(), raw.data.len()),
+                },
+                data_link_layer: Layer::default(),
+                network_layer: Layer::default(),
+                trans_layer: Layer::default(),
+                app_layer: Layer::default(),
+                hash: 0,
+                rules: Box::new(Vec::new()),
+                drop: false,
+            })
+        };
         Ok(pkt)
     }
 }
@@ -90,6 +114,124 @@ impl NetworkInterface {
                 Ok(NetworkInterface { cap: Box::new(cap) })
             }
             Err(_) => todo!(),
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct Packet<'a> {
+    raw: pcap::Packet<'a>,
+    data_link_layer: Layer,
+    network_layer: Layer,
+    trans_layer: Layer,
+    app_layer: Layer,
+    hash: u64,
+    rules: Box<Vec<Rule>>,
+    drop: bool,
+}
+
+impl<'a> PacketTrait for Packet<'a> {
+    fn raw(&self) -> &[u8] {
+        self.raw.data
+    }
+
+    fn ts(&self) -> &libc::timeval {
+        &self.raw.header.ts
+    }
+
+    fn caplen(&self) -> u32 {
+        self.raw.header.caplen
+    }
+
+    fn data_link_layer(&self) -> Layer {
+        self.data_link_layer
+    }
+
+    fn data_link_layer_mut(&mut self) -> &mut Layer {
+        &mut self.data_link_layer
+    }
+
+    fn network_layer(&self) -> Layer {
+        self.network_layer
+    }
+
+    fn network_layer_mut(&mut self) -> &mut Layer {
+        &mut self.network_layer
+    }
+
+    fn trans_layer(&self) -> Layer {
+        self.trans_layer
+    }
+
+    fn trans_layer_mut(&mut self) -> &mut Layer {
+        &mut self.trans_layer
+    }
+
+    fn app_layer(&self) -> Layer {
+        self.app_layer
+    }
+
+    fn app_layer_mut(&mut self) -> &mut Layer {
+        &mut self.app_layer
+    }
+
+    fn hash(&self) -> u64 {
+        self.hash
+    }
+
+    fn hash_mut(&mut self) -> &mut u64 {
+        &mut self.hash
+    }
+
+    fn rules(&self) -> &[Rule] {
+        self.rules.as_slice()
+    }
+
+    fn rules_mut(&mut self) -> &mut Vec<Rule> {
+        &mut self.rules
+    }
+
+    fn clone_box(&self) -> Box<dyn PacketTrait + '_> {
+        Box::new(self.clone())
+    }
+
+    fn clone_box_deep(&self) -> Box<dyn PacketTrait> {
+        // copy header info
+        let hdr = Box::new(self.raw.header.clone());
+        let hdr = Box::into_raw(hdr);
+
+        // copy pcaket raw buffer
+        let mut raw_buf = Box::new(vec![0; self.raw.len()]);
+        raw_buf.copy_from_slice(self.raw.data);
+        let len = raw_buf.len();
+        let ptr = Box::into_raw(raw_buf.into_boxed_slice());
+
+        unsafe {
+            Box::new(Packet {
+                raw: pcap::Packet {
+                    header: &*hdr,
+                    data: std::slice::from_raw_parts((*ptr).as_ptr(), len),
+                },
+                data_link_layer: self.data_link_layer,
+                network_layer: self.network_layer,
+                trans_layer: self.trans_layer,
+                app_layer: self.app_layer,
+                hash: self.hash,
+                rules: self.rules.clone(),
+                drop: true,
+            })
+        }
+    }
+}
+
+impl<'a> Drop for Packet<'a> {
+    fn drop(&mut self) {
+        if self.drop == true {
+            let ptr = self.raw.header as *const pcap::PacketHeader as *mut pcap::PacketHeader;
+            let a = unsafe { Box::from_raw(ptr) };
+            drop(a);
+            let a = unsafe { Box::from_raw(self.raw.data.as_ptr() as *mut u8) };
+            drop(a);
         }
     }
 }

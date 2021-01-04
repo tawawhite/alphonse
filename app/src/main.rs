@@ -73,46 +73,47 @@ fn main() -> Result<()> {
 
     // initialize session threads
     let mut ses_threads = Vec::new();
-    let mut pkt_senders = Vec::new();
+    let (sender, receiver) = bounded(cfg.pkt_channel_size as usize);
 
     for i in 0..cfg.ses_threads {
-        let (sender, receiver) = bounded(cfg.pkt_channel_size as usize);
-        pkt_senders.push(sender);
-        let thread =
-            threadings::SessionThread::new(i, exit.clone(), receiver, classifier_manager.clone());
+        let thread = threadings::SessionThread::new(i, exit.clone(), receiver.clone());
         ses_threads.push(thread);
     }
 
     // initialize rx threads
     let mut rx_threads = Vec::new();
     for i in 0..cfg.rx_threads {
-        let mut senders = Vec::new();
-        for sender in &pkt_senders {
-            senders.push(sender.clone());
-        }
-        let thread = threadings::RxThread::new(i, packet::link::ETHERNET, senders, exit.clone());
+        let thread = threadings::RxThread::new(
+            i,
+            packet::link::ETHERNET,
+            sender.clone(),
+            classifier_manager.clone(),
+            exit.clone(),
+        );
         rx_threads.push(thread);
-        pkt_senders.clear(); // release all original senders
     }
+
+    drop(sender);
+    drop(receiver);
 
     // start all session threads
     for mut thread in ses_threads {
         let cfg = cfg.clone();
-        let mut parsers: Box<Vec<Box<dyn api::parsers::ProtocolParserTrait>>> =
-            Box::new(Vec::new());
-        for parser in &protocol_parsers {
-            parsers.push(parser.box_clone());
-        }
         let builder = thread::Builder::new().name(format!("alphonse-ses{}", thread.id()));
-        let handle = builder.spawn(move || thread.spawn(cfg, parsers))?;
+        let handle = builder.spawn(move || thread.spawn(cfg))?;
         handles.push(handle);
     }
 
     // start all rx threads
     for mut thread in rx_threads {
         let cfg = cfg.clone();
+        let mut parsers: Box<Vec<Box<dyn api::parsers::ProtocolParserTrait>>> =
+            Box::new(Vec::new());
+        for parser in &protocol_parsers {
+            parsers.push(parser.box_clone());
+        }
         let builder = thread::Builder::new().name(format!("alphonse-rx{}", thread.id()));
-        let handle = builder.spawn(move || thread.spawn(cfg))?;
+        let handle = builder.spawn(move || thread.spawn(cfg, parsers))?;
         handles.push(handle);
     }
 

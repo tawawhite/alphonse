@@ -64,8 +64,8 @@ impl super::Classifier for Classifier {
 
 impl Classifier {
     /// Classify packet by transport protocol and port
-    pub fn classify(&self, pkt: &mut packet::Packet) {
-        let base_index = match pkt.trans_layer.protocol {
+    pub fn classify(&self, pkt: &mut Box<dyn packet::Packet>) {
+        let base_index = match pkt.trans_layer().protocol {
             packet::Protocol::TCP => std::u16::MAX as usize * 0,
             packet::Protocol::UDP => std::u16::MAX as usize * 1,
             packet::Protocol::SCTP => std::u16::MAX as usize * 2,
@@ -74,12 +74,12 @@ impl Classifier {
 
         let src_index = base_index + pkt.src_port() as usize;
         if self.rules[src_index].parsers.len() > 0 {
-            pkt.rules.push(self.rules[src_index].clone());
+            pkt.rules_mut().push(self.rules[src_index].clone());
         }
 
         let dst_index = base_index + pkt.dst_port() as usize;
         if self.rules[dst_index].parsers.len() > 0 {
-            pkt.rules.push(self.rules[dst_index].clone());
+            pkt.rules_mut().push(self.rules[dst_index].clone());
         }
     }
 }
