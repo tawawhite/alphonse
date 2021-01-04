@@ -55,16 +55,16 @@ impl Parser {
 impl Parser {
     /// 解析单个数据包
     #[inline]
-    pub fn parse_pkt(&self, pkt: &mut Packet) -> Result<(), Error> {
+    pub fn parse_pkt(&self, pkt: &mut dyn Packet) -> Result<(), Error> {
         // 根据 link type 解析数据链路层协议, 获取下一层协议的协议类型和起始位置
         let mut result = match self.link_type {
             link::NULL => {
-                pkt.data_link_layer.protocol = Protocol::NULL;
-                link::null::Parser::parse(pkt.data.as_ref(), 0)
+                pkt.data_link_layer().protocol = Protocol::NULL;
+                link::null::Parser::parse(pkt.raw(), 0)
             }
             link::ETHERNET => {
-                pkt.data_link_layer.protocol = Protocol::ETHERNET;
-                link::ethernet::Parser::parse(pkt.data.as_ref(), 0)
+                pkt.data_link_layer().protocol = Protocol::ETHERNET;
+                link::ethernet::Parser::parse(pkt.raw(), 0)
             }
             link::RAW | link::IPV4 => {
                 let layer = Layer {
@@ -98,65 +98,76 @@ impl Parser {
 
         loop {
             let offset = layer.offset;
-            let buf = &pkt.data.as_slice()[layer.offset as usize..];
             result = match &layer.protocol {
                 Protocol::ETHERNET => {
-                    if pkt.data_link_layer.protocol == Protocol::UNKNOWN {
-                        pkt.data_link_layer = layer;
+                    if pkt.data_link_layer().protocol == Protocol::UNKNOWN {
+                        *pkt.data_link_layer_mut() = layer;
                     }
+                    let buf = &pkt.raw()[layer.offset as usize..];
                     link::ethernet::Parser::parse(buf, offset)
                 }
                 Protocol::NULL => {
-                    if pkt.data_link_layer.protocol == Protocol::UNKNOWN {
-                        pkt.data_link_layer = layer;
+                    if pkt.data_link_layer().protocol == Protocol::UNKNOWN {
+                        *pkt.data_link_layer_mut() = layer;
                     }
+                    let buf = &pkt.raw()[layer.offset as usize..];
                     link::null::Parser::parse(buf, offset)
                 }
-                Protocol::MPLS => tunnel::mpls::Parser::parse(buf, offset),
+                Protocol::MPLS => {
+                    let buf = &pkt.raw()[layer.offset as usize..];
+                    tunnel::mpls::Parser::parse(buf, offset)
+                }
                 Protocol::RAW | Protocol::IPV4 => {
-                    if pkt.network_layer.protocol == Protocol::UNKNOWN {
-                        pkt.network_layer = layer;
+                    if pkt.network_layer().protocol == Protocol::UNKNOWN {
+                        *pkt.network_layer_mut() = layer;
                     }
+                    let buf = &pkt.raw()[layer.offset as usize..];
                     network::ipv4::Parser::parse(buf, offset)
                 }
                 Protocol::IPV6 => {
-                    if pkt.network_layer.protocol == Protocol::UNKNOWN {
-                        pkt.network_layer = layer;
+                    if pkt.network_layer().protocol == Protocol::UNKNOWN {
+                        *pkt.network_layer_mut() = layer;
                     }
+                    let buf = &pkt.raw()[layer.offset as usize..];
                     network::ipv6::Parser::parse(buf, offset)
                 }
                 Protocol::VLAN => {
-                    if pkt.network_layer.protocol == Protocol::UNKNOWN {
-                        pkt.network_layer = layer;
+                    if pkt.network_layer().protocol == Protocol::UNKNOWN {
+                        *pkt.network_layer_mut() = layer;
                     }
+                    let buf = &pkt.raw()[layer.offset as usize..];
                     network::vlan::Parser::parse(buf, offset)
                 }
                 Protocol::ICMP => {
-                    if pkt.network_layer.protocol == Protocol::UNKNOWN {
-                        pkt.network_layer = layer;
+                    if pkt.network_layer().protocol == Protocol::UNKNOWN {
+                        *pkt.network_layer_mut() = layer;
                     }
+                    let buf = &pkt.raw()[layer.offset as usize..];
                     network::icmp::Parser::parse(buf, offset)
                 }
                 Protocol::TCP => {
-                    if pkt.trans_layer.protocol == Protocol::UNKNOWN {
-                        pkt.trans_layer = layer;
+                    if pkt.trans_layer_mut().protocol == Protocol::UNKNOWN {
+                        *pkt.trans_layer_mut() = layer;
                     }
+                    let buf = &pkt.raw()[layer.offset as usize..];
                     transport::tcp::Parser::parse(buf, offset)
                 }
                 Protocol::UDP => {
-                    if pkt.trans_layer.protocol == Protocol::UNKNOWN {
-                        pkt.trans_layer = layer;
+                    if pkt.trans_layer_mut().protocol == Protocol::UNKNOWN {
+                        *pkt.trans_layer_mut() = layer;
                     }
+                    let buf = &pkt.raw()[layer.offset as usize..];
                     transport::udp::Parser::parse(buf, offset)
                 }
                 Protocol::SCTP => {
-                    if pkt.trans_layer.protocol == Protocol::UNKNOWN {
-                        pkt.trans_layer = layer;
+                    if pkt.trans_layer_mut().protocol == Protocol::UNKNOWN {
+                        *pkt.trans_layer_mut() = layer;
                     }
+                    let buf = &pkt.raw()[layer.offset as usize..];
                     transport::sctp::Parser::parse(buf, offset)
                 }
                 Protocol::APPLICATION => {
-                    pkt.app_layer = layer;
+                    *pkt.app_layer_mut() = layer;
                     return Ok(());
                 }
                 Protocol::UNKNOWN => {

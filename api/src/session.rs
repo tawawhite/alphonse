@@ -65,20 +65,20 @@ impl Session {
 
     #[inline]
     /// update session information
-    pub fn update(&mut self, pkt: &Box<packet::Packet>) {
+    pub fn update(&mut self, pkt: &Box<dyn packet::Packet>) {
         match pkt.direction() {
             packet::Direction::LEFT => {
                 self.pkt_count[0] += 1;
-                self.bytes[0] += pkt.bytes() as u64;
-                self.data_bytes[0] += pkt.data_bytes() as u64;
+                self.bytes[0] += pkt.caplen() as u64;
+                self.data_bytes[0] += pkt.data_len() as u64;
             }
             packet::Direction::RIGHT => {
                 self.pkt_count[1] += 1;
-                self.bytes[1] += pkt.bytes() as u64;
-                self.data_bytes[1] += pkt.data_bytes() as u64;
+                self.bytes[1] += pkt.caplen() as u64;
+                self.data_bytes[1] += pkt.data_len() as u64;
             }
         }
-        self.end_time = TimeVal::new(pkt.ts);
+        self.end_time = TimeVal::new(*pkt.ts());
     }
 
     #[inline]

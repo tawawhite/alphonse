@@ -1,5 +1,4 @@
 use std::ops::{Deref, DerefMut};
-use std::sync::Arc;
 
 use anyhow::Result;
 
@@ -71,7 +70,7 @@ pub trait ProtocolParserTrait: Send + Sync {
     /// Parse a single packet and maybe update session information
     fn parse_pkt(
         &mut self,
-        _pkt: &packet::Packet,
+        _pkt: &Box<dyn packet::Packet>,
         _rule: &super::classifiers::matched::Rule,
         ses: &mut session::Session,
     ) -> Result<()> {

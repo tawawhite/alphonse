@@ -38,7 +38,7 @@ pub struct SessionThread {
     /// 线程ID
     id: u8,
     exit: Arc<AtomicBool>,
-    receiver: Receiver<Box<Packet>>,
+    receiver: Receiver<Box<dyn Packet>>,
     classifier: Arc<ClassifierManager>,
 }
 
@@ -46,7 +46,7 @@ impl SessionThread {
     pub fn new(
         id: u8,
         exit: Arc<AtomicBool>,
-        receiver: Receiver<Box<Packet>>,
+        receiver: Receiver<Box<dyn Packet>>,
         classifier: Arc<ClassifierManager>,
     ) -> SessionThread {
         SessionThread {
@@ -66,13 +66,13 @@ impl SessionThread {
         &self,
         scratch: &mut api::classifiers::ClassifyScratch,
         protocol_parsers: &mut Box<Vec<Box<dyn ProtocolParserTrait>>>,
-        pkt: &mut Packet,
+        pkt: &mut Box<dyn Packet>,
         ses: &mut Session,
         ses_parsers: &mut FnvHashMap<ParserID, Box<dyn ProtocolParserTrait>>,
     ) -> Result<()> {
         self.classifier.classify(pkt, scratch)?;
 
-        for rule in pkt.rules.iter() {
+        for rule in pkt.rules().iter() {
             for parser_id in rule.parsers.iter() {
                 match ses_parsers.get_mut(parser_id) {
                     Some(parser) => {
@@ -97,10 +97,10 @@ impl SessionThread {
     #[inline]
     fn timeout(
         ts: u64,
-        session_table: &mut HashMap<Box<Packet>, Rc<SessionData>>,
+        session_table: &mut HashMap<Box<dyn Packet>, Rc<SessionData>>,
         cfg: &Arc<config::Config>,
     ) {
-        &mut session_table.retain(|pkt, ses| match pkt.trans_layer.protocol {
+        &mut session_table.retain(|pkt, ses| match pkt.trans_layer().protocol {
             Protocol::TCP => !ses.info.timeout(cfg.tcp_timeout as c_long, ts as c_long),
             Protocol::UDP => !ses.info.timeout(cfg.udp_timeout as c_long, ts as c_long),
             Protocol::SCTP => !ses.info.timeout(cfg.sctp_timeout as c_long, ts as c_long),
@@ -120,7 +120,7 @@ impl SessionThread {
             .unwrap()
             .as_secs();
         let mut last_timeout_check_time: u64 = last_packet_time + cfg.timeout_interval;
-        let mut session_table: HashMap<Box<Packet>, Rc<SessionData>> = Default::default();
+        let mut session_table: HashMap<Box<dyn Packet>, Rc<SessionData>> = Default::default();
 
         println!("session thread {} started", self.id);
 
@@ -135,7 +135,7 @@ impl SessionThread {
                 Ok(p) => p,
             };
 
-            last_packet_time = pkt.ts.tv_sec as u64;
+            last_packet_time = pkt.ts().tv_sec as u64;
 
             match session_table.get_mut(&pkt) {
                 Some(mut ses) => {
@@ -155,10 +155,10 @@ impl SessionThread {
                     };
                 }
                 None => {
-                    let key = pkt.clone();
+                    let key = pkt.clone_box_deep();
                     let mut ses_rc = Rc::new(SessionData::new());
                     let data = Rc::get_mut(&mut ses_rc).unwrap();
-                    data.info.start_time = TimeVal::new(pkt.ts);
+                    data.info.start_time = TimeVal::new(*pkt.ts());
                     data.info.update(&pkt);
                     self.parse_pkt(
                         &mut classify_scratch,

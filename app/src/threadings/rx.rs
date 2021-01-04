@@ -26,7 +26,7 @@ pub struct RxThread {
     /// Basic protocol parser
     parser: Parser,
     /// Packet channel sender
-    senders: Vec<Sender<Box<Packet>>>,
+    senders: Vec<Sender<Box<dyn Packet>>>,
 }
 
 impl RxThread {
@@ -34,7 +34,7 @@ impl RxThread {
     pub fn new(
         id: u8,
         link_type: u16,
-        senders: Vec<Sender<Box<Packet>>>,
+        senders: Vec<Sender<Box<dyn Packet>>>,
         exit: Arc<AtomicBool>,
     ) -> RxThread {
         RxThread {
@@ -100,7 +100,7 @@ impl RxThread {
 
             self.rx_count += 1;
 
-            match self.parser.parse_pkt(&mut pkt) {
+            match self.parser.parse_pkt(pkt.as_mut()) {
                 Ok(_) => {}
                 Err(e) => match e {
                     parser::Error::UnsupportProtocol(_) => {}
@@ -111,9 +111,9 @@ impl RxThread {
             // TODO: inline with_seed function
             let mut hasher = twox_hash::Xxh3Hash64::with_seed(0);
             pkt.hash(&mut hasher);
-            pkt.hash = hasher.finish();
+            *pkt.hash_mut() = hasher.finish();
 
-            let thread = (pkt.hash % self.senders.len() as u64) as usize;
+            let thread = (Packet::hash(pkt.as_ref()) % self.senders.len() as u64) as usize;
             match self.senders[thread].try_send(pkt) {
                 Ok(_) => {}
                 Err(e) => {
