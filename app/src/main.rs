@@ -104,13 +104,8 @@ fn main() -> Result<()> {
     // start all session threads
     for mut thread in ses_threads {
         let cfg = cfg.clone();
-        let mut parsers: Box<Vec<Box<dyn api::parsers::ProtocolParserTrait>>> =
-            Box::new(Vec::new());
-        for parser in &protocol_parsers {
-            parsers.push(parser.box_clone());
-        }
         let builder = thread::Builder::new().name(format!("alphonse-ses{}", thread.id()));
-        let handle = builder.spawn(move || thread.spawn(cfg, parsers))?;
+        let handle = builder.spawn(move || thread.spawn(cfg))?;
         handles.push(handle);
     }
 
