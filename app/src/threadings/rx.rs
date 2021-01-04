@@ -4,7 +4,6 @@ use std::ffi::OsString;
 use std::hash::{Hash, Hasher};
 use std::os::raw::c_long;
 use std::path::PathBuf;
-use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::SystemTime;
@@ -27,14 +26,14 @@ use super::packet::{parser, Parser};
 
 /// Data structure to store session info and session's protocol parsers
 struct SessionData {
-    info: Box<Session>,
+    info: Arc<Session>,
     parsers: Box<FnvHashMap<ParserID, Box<dyn ProtocolParserTrait>>>,
 }
 
 impl SessionData {
     fn new() -> Self {
         SessionData {
-            info: Box::new(Session::new()),
+            info: Arc::new(Session::new()),
             parsers: Box::new(FnvHashMap::default()),
         }
     }
@@ -51,7 +50,7 @@ pub struct RxThread {
     /// Basic protocol parser
     parser: Parser,
     /// Packet channel sender
-    senders: Vec<Sender<Box<dyn Packet>>>,
+    senders: Vec<Sender<Arc<Session>>>,
     /// Packet Classifier
     classifier: Arc<ClassifierManager>,
 }
@@ -61,7 +60,7 @@ impl RxThread {
     pub fn new(
         id: u8,
         link_type: u16,
-        senders: Vec<Sender<Box<dyn Packet>>>,
+        senders: Vec<Sender<Arc<Session>>>,
         classifier: Arc<ClassifierManager>,
         exit: Arc<AtomicBool>,
     ) -> RxThread {
@@ -150,17 +149,35 @@ impl RxThread {
     #[inline]
     fn timeout(
         ts: u64,
-        session_table: &mut HashMap<Box<dyn Packet>, Rc<SessionData>>,
+        session_table: &mut HashMap<Box<dyn Packet>, Box<SessionData>>,
+        sender: &mut Sender<Arc<Session>>,
         cfg: &Arc<config::Config>,
-    ) {
-        &mut session_table.retain(|pkt, ses| match pkt.trans_layer().protocol {
-            Protocol::TCP => !ses.info.timeout(cfg.tcp_timeout as c_long, ts as c_long),
-            Protocol::UDP => !ses.info.timeout(cfg.udp_timeout as c_long, ts as c_long),
-            Protocol::SCTP => !ses.info.timeout(cfg.sctp_timeout as c_long, ts as c_long),
-            _ => !ses
-                .info
-                .timeout(cfg.default_timeout as c_long, ts as c_long),
+    ) -> Result<()> {
+        &mut session_table.retain(|pkt, ses| {
+            let timeout = match pkt.trans_layer().protocol {
+                Protocol::TCP => !ses.info.timeout(cfg.tcp_timeout as c_long, ts as c_long),
+                Protocol::UDP => !ses.info.timeout(cfg.udp_timeout as c_long, ts as c_long),
+                Protocol::SCTP => !ses.info.timeout(cfg.sctp_timeout as c_long, ts as c_long),
+                _ => !ses
+                    .info
+                    .timeout(cfg.default_timeout as c_long, ts as c_long),
+            };
+
+            if timeout {
+                println!("timeouted");
+                match sender.send(ses.info.clone()) {
+                    Ok(_) => {}
+                    Err(err) => {
+                        eprintln!("sender error: {}", err);
+                        return false;
+                    }
+                }
+            }
+
+            timeout
         });
+
+        Ok(())
     }
 
     #[inline]
@@ -175,7 +192,7 @@ impl RxThread {
             .unwrap()
             .as_secs();
         let mut last_timeout_check_time: u64 = last_packet_time + cfg.timeout_interval;
-        let mut session_table: HashMap<Box<dyn Packet>, Rc<SessionData>> = Default::default();
+        let mut session_table: HashMap<Box<dyn Packet>, Box<SessionData>> = Default::default();
         let mut classify_scratch = match self.classifier.alloc_scratch() {
             Ok(scratch) => scratch,
             Err(_) => todo!(),
@@ -186,7 +203,7 @@ impl RxThread {
                 Ok(pkt) => pkt,
                 Err(err) => {
                     if TypeId::of::<C>() == TypeId::of::<super::capture::Offline>() {
-                        return Ok(());
+                        break;
                     }
                     return Err(err);
                 }
@@ -209,45 +226,49 @@ impl RxThread {
             *pkt.hash_mut() = hasher.finish();
 
             match session_table.get_mut(&pkt) {
-                Some(mut ses) => {
-                    match Rc::get_mut(&mut ses) {
-                        Some(data) => {
-                            data.info.update(&pkt);
-                            self.parse_pkt(
-                                &mut classify_scratch,
-                                protocol_parsers,
-                                &mut pkt,
-                                data.info.as_mut(),
-                                data.parsers.as_mut(),
-                            )
-                            .unwrap();
-                        }
-                        None => todo!("handle session rc get_mut None"),
-                    };
-                }
-                None => {
-                    let key = pkt.clone_box_deep();
-                    let mut ses_rc = Rc::new(SessionData::new());
-                    let data = Rc::get_mut(&mut ses_rc).unwrap();
-                    data.info.start_time = TimeVal::new(*pkt.ts());
-                    data.info.update(&pkt);
+                Some(ses) => {
+                    Arc::get_mut(&mut ses.info).unwrap().update(&pkt);
                     self.parse_pkt(
                         &mut classify_scratch,
                         protocol_parsers,
                         &mut pkt,
-                        data.info.as_mut(),
-                        data.parsers.as_mut(),
+                        Arc::get_mut(&mut ses.info).unwrap(),
+                        ses.parsers.as_mut(),
+                    )
+                    .unwrap();
+                }
+                None => {
+                    let key = pkt.clone_box_deep();
+                    let mut ses = Box::new(SessionData::new());
+                    let info = Arc::get_mut(&mut ses.info).unwrap();
+                    info.start_time = TimeVal::new(*pkt.ts());
+                    info.update(&pkt);
+                    self.parse_pkt(
+                        &mut classify_scratch,
+                        protocol_parsers,
+                        &mut pkt,
+                        Arc::get_mut(&mut ses.info).unwrap(),
+                        ses.parsers.as_mut(),
                     )
                     .unwrap();
 
-                    &mut session_table.insert(key, ses_rc);
+                    &mut session_table.insert(key, ses);
                 }
             }
 
             if last_packet_time >= last_timeout_check_time {
-                Self::timeout(last_packet_time, &mut session_table, &cfg);
+                Self::timeout(
+                    last_packet_time,
+                    &mut session_table,
+                    &mut self.senders[self.id as usize],
+                    &cfg,
+                )?;
                 last_timeout_check_time = last_packet_time;
             }
+        }
+
+        for (_, ses) in session_table.iter() {
+            self.senders[self.id as usize].send(ses.info.clone())?;
         }
         Ok(())
     }

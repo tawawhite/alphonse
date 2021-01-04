@@ -33,15 +33,11 @@ pub struct SessionThread {
     /// 线程ID
     id: u8,
     exit: Arc<AtomicBool>,
-    receiver: Receiver<Box<dyn Packet>>,
+    receiver: Receiver<Arc<Session>>,
 }
 
 impl SessionThread {
-    pub fn new(
-        id: u8,
-        exit: Arc<AtomicBool>,
-        receiver: Receiver<Box<dyn Packet>>,
-    ) -> SessionThread {
+    pub fn new(id: u8, exit: Arc<AtomicBool>, receiver: Receiver<Arc<Session>>) -> SessionThread {
         SessionThread { id, exit, receiver }
     }
 
@@ -49,14 +45,15 @@ impl SessionThread {
         self.id
     }
 
-    pub fn spawn(&mut self, cfg: Arc<config::Config>) -> Result<()> {
+    pub fn spawn(&mut self, _cfg: Arc<config::Config>) -> Result<()> {
         println!("session thread {} started", self.id);
 
         while !self.exit.load(Ordering::Relaxed) {
-            let mut pkt = match self.receiver.recv() {
+            let ses = match self.receiver.recv() {
                 Err(_) => break,
-                Ok(p) => p,
+                Ok(s) => s,
             };
+            println!("{}", serde_json::to_string(ses.as_ref()).unwrap());
         }
 
         println!("session thread {} exit", self.id);
