@@ -90,7 +90,13 @@ fn main() -> Result<()> {
         for sender in &pkt_senders {
             senders.push(sender.clone());
         }
-        let thread = threadings::RxThread::new(i, packet::link::ETHERNET, senders, exit.clone());
+        let thread = threadings::RxThread::new(
+            i,
+            packet::link::ETHERNET,
+            senders,
+            classifier_manager.clone(),
+            exit.clone(),
+        );
         rx_threads.push(thread);
         pkt_senders.clear(); // release all original senders
     }
@@ -111,8 +117,13 @@ fn main() -> Result<()> {
     // start all rx threads
     for mut thread in rx_threads {
         let cfg = cfg.clone();
+        let mut parsers: Box<Vec<Box<dyn api::parsers::ProtocolParserTrait>>> =
+            Box::new(Vec::new());
+        for parser in &protocol_parsers {
+            parsers.push(parser.box_clone());
+        }
         let builder = thread::Builder::new().name(format!("alphonse-rx{}", thread.id()));
-        let handle = builder.spawn(move || thread.spawn(cfg))?;
+        let handle = builder.spawn(move || thread.spawn(cfg, parsers))?;
         handles.push(handle);
     }
 
