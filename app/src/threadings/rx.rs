@@ -227,12 +227,13 @@ impl RxThread {
 
             match session_table.get_mut(&pkt) {
                 Some(ses) => {
-                    Arc::get_mut(&mut ses.info).unwrap().update(&pkt);
+                    let info = Arc::get_mut(&mut ses.info).unwrap();
+                    info.update(&pkt);
                     self.parse_pkt(
                         &mut classify_scratch,
                         protocol_parsers,
                         &mut pkt,
-                        Arc::get_mut(&mut ses.info).unwrap(),
+                        info,
                         ses.parsers.as_mut(),
                     )
                     .unwrap();
