@@ -26,6 +26,7 @@ mod capture;
 mod commands;
 mod config;
 mod packet;
+mod stats;
 mod threadings;
 
 fn main() -> Result<()> {

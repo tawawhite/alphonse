@@ -6,6 +6,8 @@ use alphonse_api::classifiers::matched::Rule;
 use alphonse_api::packet::Layer;
 use alphonse_api::packet::Packet as PacketTrait;
 
+use crate::stats::CaptureStat;
+
 use super::Capture;
 
 pub struct Offline {
@@ -64,6 +66,15 @@ impl Capture for Offline {
         };
         Ok(pkt)
     }
+
+    fn stats(&mut self) -> Result<CaptureStat> {
+        let stats = self.cap.as_mut().stats()?;
+        Ok(CaptureStat {
+            received: stats.received as u64,
+            dropped: stats.dropped as u64,
+            if_dropped: stats.if_dropped as u64,
+        })
+    }
 }
 
 pub struct NetworkInterface {
@@ -91,6 +102,15 @@ impl Capture for NetworkInterface {
             })
         };
         Ok(pkt)
+    }
+
+    fn stats(&mut self) -> Result<CaptureStat> {
+        let stats = self.cap.as_mut().stats()?;
+        Ok(CaptureStat {
+            received: stats.received as u64,
+            dropped: stats.dropped as u64,
+            if_dropped: stats.if_dropped as u64,
+        })
     }
 }
 
