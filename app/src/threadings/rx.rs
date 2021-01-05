@@ -256,7 +256,7 @@ impl RxThread {
                 }
             }
 
-            if last_packet_time >= last_timeout_check_time {
+            if last_packet_time > last_timeout_check_time {
                 Self::timeout(last_packet_time, &mut session_table, &mut self.sender, &cfg)?;
                 last_timeout_check_time = last_packet_time;
             }
