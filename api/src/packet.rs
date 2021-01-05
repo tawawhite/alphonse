@@ -395,12 +395,13 @@ impl Default for Protocol {
 }
 
 #[cfg(test)]
-mod test {
+pub mod test {
     use super::Packet as PacketTrait;
     use super::*;
 
+    /// Packet structure only for test use
     #[derive(Clone)]
-    struct Packet {
+    pub struct Packet {
         /// timestamp
         pub ts: libc::timeval,
         /// capture length
@@ -496,11 +497,15 @@ mod test {
             self.rules.as_slice()
         }
 
-        fn rules_mut(&mut self) -> &mut [Rule] {
-            self.rules.as_mut_slice()
+        fn rules_mut(&mut self) -> &mut Vec<Rule> {
+            &mut self.rules
         }
 
         fn clone_box(&self) -> Box<dyn PacketTrait + '_> {
+            Box::new(self.clone())
+        }
+
+        fn clone_box_deep(&self) -> Box<dyn PacketTrait> {
             Box::new(self.clone())
         }
     }
@@ -527,7 +532,7 @@ mod test {
     #[test]
     fn test_src_ipv4() {
         let mut pkt = Packet::default();
-        pkt.data = Box::new(vec![
+        pkt.raw = Box::new(vec![
             0x45, 0x00, 0x02, 0x2d, 0x00, 0x00, 0x40, 0x00, 0x40, 0x06, 0x79, 0x1d, 0xc0, 0xa8,
             0x02, 0xde, 0xda, 0x62, 0x21, 0xc5, 0xe2, 0xb2, 0x01, 0xbb, 0x2b, 0xd5, 0x16, 0xf7,
             0x66, 0x96, 0xcf, 0xb8, 0x50, 0x18, 0x10, 0x00, 0x8a, 0xcf, 0x00, 0x00,

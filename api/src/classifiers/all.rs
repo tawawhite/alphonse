@@ -54,6 +54,7 @@ mod test {
     use super::super::RuleID;
     use super::*;
     use crate::classifiers::Classifier as ClassifierTrait;
+    use crate::packet::Packet as PacketTrait;
 
     #[test]
     fn add_rule_with_same_parser_id() {
@@ -93,16 +94,16 @@ mod test {
 
         assert!(matches!(classifier.add_rule(&rule), Ok(_)));
 
-        let mut pkt = packet::Packet::default();
+        let mut pkt: Box<dyn PacketTrait> = Box::new(packet::test::Packet::default());
         classifier.classify(&mut pkt);
-        assert_eq!(pkt.rules.len(), 1);
+        assert_eq!(pkt.rules().len(), 1);
     }
 
     #[test]
     fn classify_without_any_parser() {
         let classifier = Classifier::default();
-        let mut pkt = packet::Packet::default();
+        let mut pkt: Box<dyn PacketTrait> = Box::new(packet::test::Packet::default());
         classifier.classify(&mut pkt);
-        assert_eq!(pkt.rules.len(), 0);
+        assert_eq!(pkt.rules().len(), 0);
     }
 }

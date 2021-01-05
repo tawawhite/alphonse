@@ -89,6 +89,7 @@ mod test {
     use super::super::RuleID;
     use super::*;
     use crate::classifiers::Classifier as ClassifierTrait;
+    use crate::packet::Packet as PacketTrait;
 
     #[test]
     fn add_same_port_rule() {
@@ -164,8 +165,8 @@ mod test {
 
         classifier.add_rule(&rule).unwrap();
 
-        let mut pkt = packet::Packet::default();
-        pkt.data = Box::new(vec![
+        let mut pkt = Box::new(packet::test::Packet::default());
+        pkt.raw = Box::new(vec![
             0x8c, 0xab, 0x8e, 0xfc, 0x30, 0xc1, 0x8c, 0x85, 0x90, 0x1b, 0x17, 0x95, 0x08, 0x00,
             0x45, 0x00, 0x01, 0x5e, 0x00, 0x00, 0x40, 0x00, 0x40, 0x06, 0x1c, 0x4e, 0xc0, 0xa8,
             0x02, 0xde, 0x11, 0xfd, 0x47, 0xc9, 0xe3, 0x0a, 0x00, 0x50, 0x73, 0xd0, 0x6a, 0x40,
@@ -197,11 +198,12 @@ mod test {
             offset: 34,
             protocol: packet::Protocol::TCP,
         };
+        let mut pkt: Box<dyn PacketTrait> = pkt;
         classifier.classify(&mut pkt);
-        assert_eq!(pkt.rules.len(), 1);
-        assert_eq!(pkt.rules[0].rule_type, matched::RuleType::Port);
-        assert_eq!(pkt.rules[0].parsers[0], 1);
-        assert_eq!(pkt.rules[0].parsers.len(), 1);
+        assert_eq!(pkt.rules().len(), 1);
+        assert_eq!(pkt.rules()[0].rule_type, matched::RuleType::Port);
+        assert_eq!(pkt.rules()[0].parsers[0], 1);
+        assert_eq!(pkt.rules()[0].parsers.len(), 1);
 
         let port_rule = Rule {
             port: 53,
@@ -212,8 +214,8 @@ mod test {
 
         classifier.add_rule(&rule).unwrap();
 
-        let mut pkt = packet::Packet::default();
-        pkt.data = Box::new(vec![
+        let mut pkt = Box::new(packet::test::Packet::default());
+        pkt.raw = Box::new(vec![
             0x8c, 0xab, 0x8e, 0xfc, 0x30, 0xc1, 0x8c, 0x85, 0x90, 0x1b, 0x17, 0x95, 0x08, 0x00,
             0x45, 0x00, 0x00, 0x49, 0x94, 0x8f, 0x00, 0x00, 0xff, 0x11, 0xa0, 0xe4, 0xc0, 0xa8,
             0x02, 0xde, 0xc0, 0xa8, 0x02, 0x01, 0xd2, 0x28, 0x00, 0x35, 0x00, 0x35, 0xf8, 0x70,
@@ -222,15 +224,16 @@ mod test {
             0x6f, 0x67, 0x6c, 0x65, 0x61, 0x70, 0x69, 0x73, 0x03, 0x63, 0x6f, 0x6d, 0x00, 0x00,
             0x01, 0x00, 0x01,
         ]);
-        pkt.trans_layer = packet::Layer {
+        *pkt.trans_layer_mut() = packet::Layer {
             offset: 34,
             protocol: packet::Protocol::UDP,
         };
+        let mut pkt: Box<dyn PacketTrait> = pkt;
         classifier.classify(&mut pkt);
-        assert_eq!(pkt.rules.len(), 1);
-        assert_eq!(pkt.rules[0].rule_type, matched::RuleType::Port);
-        assert_eq!(pkt.rules[0].parsers[0], 2);
-        assert_eq!(pkt.rules[0].parsers.len(), 1);
+        assert_eq!(pkt.rules().len(), 1);
+        assert_eq!(pkt.rules()[0].rule_type, matched::RuleType::Port);
+        assert_eq!(pkt.rules()[0].parsers[0], 2);
+        assert_eq!(pkt.rules()[0].parsers.len(), 1);
 
         let port_rule = Rule {
             port: 32836,
@@ -241,8 +244,8 @@ mod test {
 
         classifier.add_rule(&rule).unwrap();
 
-        let mut pkt = packet::Packet::default();
-        pkt.data = Box::new(vec![
+        let mut pkt = Box::new(packet::test::Packet::default());
+        pkt.raw = Box::new(vec![
             0x00, 0x04, 0x96, 0x08, 0xe0, 0x40, 0x00, 0x0e, 0x2e, 0x24, 0x37, 0x5f, 0x08, 0x00,
             0x45, 0x02, 0x01, 0xc4, 0x00, 0x01, 0x40, 0x00, 0x40, 0x84, 0xbb, 0x6f, 0x9b, 0xe6,
             0x18, 0x9b, 0xcb, 0xff, 0xfc, 0xc2, 0x80, 0x44, 0x00, 0x50, 0xd2, 0x6a, 0xc1, 0xe5,
@@ -278,14 +281,15 @@ mod test {
             0x6e, 0x3a, 0x20, 0x6b, 0x65, 0x65, 0x70, 0x2d, 0x61, 0x6c, 0x69, 0x76, 0x65, 0x0d,
             0x0a, 0x0d, 0x0a, 0x00,
         ]);
-        pkt.trans_layer = packet::Layer {
+        *pkt.trans_layer_mut() = packet::Layer {
             offset: 34,
             protocol: packet::Protocol::SCTP,
         };
+        let mut pkt: Box<dyn PacketTrait> = pkt;
         classifier.classify(&mut pkt);
-        assert_eq!(pkt.rules.len(), 1);
-        assert_eq!(pkt.rules[0].rule_type, matched::RuleType::Port);
-        assert_eq!(pkt.rules[0].parsers[0], 3);
-        assert_eq!(pkt.rules[0].parsers.len(), 1);
+        assert_eq!(pkt.rules().len(), 1);
+        assert_eq!(pkt.rules()[0].rule_type, matched::RuleType::Port);
+        assert_eq!(pkt.rules()[0].parsers[0], 3);
+        assert_eq!(pkt.rules()[0].parsers.len(), 1);
     }
 }
