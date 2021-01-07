@@ -298,7 +298,6 @@ fn parse_config_file(config_file: &str, config: &mut Config) -> Result<()> {
                         .ok_or(anyhow!("Failed to convert Yaml into &str"))?;
                     config.dpdk_eal_args.push(String::from(s));
                 }
-                Ok(())
             }
             _ => return Err(anyhow!("Invalid/Empty dpdk args in {}", config_file)),
         };
