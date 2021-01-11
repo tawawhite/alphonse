@@ -8,13 +8,18 @@ use serde::{Serialize, Serializer};
 pub mod precision {
     /// TimeVal serialize precision
     pub trait Precision {}
+
+    #[derive(Clone)]
     pub struct Second {}
     impl Precision for Second {}
+
+    #[derive(Clone)]
     pub struct Millisecond {}
     impl Precision for Millisecond {}
 }
 
 /// Wrapper type for libc::timeval
+#[derive(Clone)]
 pub struct TimeVal<P: 'static + precision::Precision> {
     tv: timeval,
     percision: PhantomData<&'static P>,
@@ -24,6 +29,18 @@ impl<P: precision::Precision> TimeVal<P> {
     pub fn new(tv: timeval) -> Self {
         TimeVal {
             tv,
+            percision: PhantomData,
+        }
+    }
+}
+
+impl<P: precision::Precision> Default for TimeVal<P> {
+    fn default() -> Self {
+        TimeVal {
+            tv: timeval {
+                tv_sec: 0,
+                tv_usec: 0,
+            },
             percision: PhantomData,
         }
     }
