@@ -3,7 +3,7 @@ use std::path::Path;
 use anyhow::{anyhow, Result};
 
 use alphonse_api::classifiers::matched::Rule;
-use alphonse_api::packet::Layer;
+use alphonse_api::packet::Layers;
 use alphonse_api::packet::Packet as PacketTrait;
 
 use crate::stats::CaptureStat;
@@ -55,10 +55,7 @@ impl Capture for Offline {
                     header: &*(raw.header as *const pcap::PacketHeader),
                     data: std::slice::from_raw_parts(raw.data.as_ptr(), raw.data.len()),
                 },
-                data_link_layer: Layer::default(),
-                network_layer: Layer::default(),
-                trans_layer: Layer::default(),
-                app_layer: Layer::default(),
+                layers: Layers::default(),
                 hash: 0,
                 rules: Box::new(Vec::new()),
                 drop: false,
@@ -68,12 +65,12 @@ impl Capture for Offline {
     }
 
     fn stats(&mut self) -> Result<CaptureStat> {
-        let stats = self.cap.as_mut().stats()?;
-        Ok(CaptureStat {
-            received: stats.received as u64,
-            dropped: stats.dropped as u64,
-            if_dropped: stats.if_dropped as u64,
-        })
+        let mut stats = CaptureStat::default();
+        let cap_stats = self.cap.as_mut().stats()?;
+        stats.rx_pkts = cap_stats.received as u64;
+        stats.dropped = cap_stats.dropped as u64;
+        stats.if_dropped = cap_stats.if_dropped as u64;
+        Ok(stats)
     }
 }
 
@@ -92,10 +89,7 @@ impl Capture for NetworkInterface {
                     header: &*(raw.header as *const pcap::PacketHeader),
                     data: std::slice::from_raw_parts(raw.data.as_ptr(), raw.data.len()),
                 },
-                data_link_layer: Layer::default(),
-                network_layer: Layer::default(),
-                trans_layer: Layer::default(),
-                app_layer: Layer::default(),
+                layers: Layers::default(),
                 hash: 0,
                 rules: Box::new(Vec::new()),
                 drop: false,
@@ -105,12 +99,12 @@ impl Capture for NetworkInterface {
     }
 
     fn stats(&mut self) -> Result<CaptureStat> {
-        let stats = self.cap.as_mut().stats()?;
-        Ok(CaptureStat {
-            received: stats.received as u64,
-            dropped: stats.dropped as u64,
-            if_dropped: stats.if_dropped as u64,
-        })
+        let mut stats = CaptureStat::default();
+        let cap_stats = self.cap.as_mut().stats()?;
+        stats.rx_pkts = cap_stats.received as u64;
+        stats.dropped = cap_stats.dropped as u64;
+        stats.if_dropped = cap_stats.if_dropped as u64;
+        Ok(stats)
     }
 }
 
@@ -141,10 +135,7 @@ impl NetworkInterface {
 #[derive(Clone)]
 pub struct Packet<'a> {
     raw: pcap::Packet<'a>,
-    data_link_layer: Layer,
-    network_layer: Layer,
-    trans_layer: Layer,
-    app_layer: Layer,
+    layers: Layers,
     hash: u64,
     rules: Box<Vec<Rule>>,
     drop: bool,
@@ -163,36 +154,12 @@ impl<'a> PacketTrait for Packet<'a> {
         self.raw.header.caplen
     }
 
-    fn data_link_layer(&self) -> Layer {
-        self.data_link_layer
+    fn layers(&self) -> &Layers {
+        &self.layers
     }
 
-    fn data_link_layer_mut(&mut self) -> &mut Layer {
-        &mut self.data_link_layer
-    }
-
-    fn network_layer(&self) -> Layer {
-        self.network_layer
-    }
-
-    fn network_layer_mut(&mut self) -> &mut Layer {
-        &mut self.network_layer
-    }
-
-    fn trans_layer(&self) -> Layer {
-        self.trans_layer
-    }
-
-    fn trans_layer_mut(&mut self) -> &mut Layer {
-        &mut self.trans_layer
-    }
-
-    fn app_layer(&self) -> Layer {
-        self.app_layer
-    }
-
-    fn app_layer_mut(&mut self) -> &mut Layer {
-        &mut self.app_layer
+    fn layers_mut(&mut self) -> &mut Layers {
+        &mut self.layers
     }
 
     fn hash(&self) -> u64 {
@@ -232,10 +199,7 @@ impl<'a> PacketTrait for Packet<'a> {
                     header: &*hdr,
                     data: std::slice::from_raw_parts((*ptr).as_ptr(), len),
                 },
-                data_link_layer: self.data_link_layer,
-                network_layer: self.network_layer,
-                trans_layer: self.trans_layer,
-                app_layer: self.app_layer,
+                layers: self.layers,
                 hash: self.hash,
                 rules: self.rules.clone(),
                 drop: true,

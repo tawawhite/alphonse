@@ -154,7 +154,7 @@ impl RxThread {
         cfg: &Arc<config::Config>,
     ) -> Result<()> {
         &mut session_table.retain(|pkt, ses| {
-            let timeout = match pkt.trans_layer().protocol {
+            let timeout = match pkt.layers().trans.protocol {
                 Protocol::TCP => ses.info.timeout(cfg.tcp_timeout as c_long, ts as c_long),
                 Protocol::UDP => ses.info.timeout(cfg.udp_timeout as c_long, ts as c_long),
                 Protocol::SCTP => ses.info.timeout(cfg.sctp_timeout as c_long, ts as c_long),

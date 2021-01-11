@@ -65,7 +65,7 @@ impl super::Classifier for Classifier {
 impl Classifier {
     /// Classify packet by transport protocol and port
     pub fn classify(&self, pkt: &mut Box<dyn packet::Packet>) {
-        let base_index = match pkt.trans_layer().protocol {
+        let base_index = match pkt.layers().trans.protocol {
             packet::Protocol::TCP => std::u16::MAX as usize * 0,
             packet::Protocol::UDP => std::u16::MAX as usize * 1,
             packet::Protocol::SCTP => std::u16::MAX as usize * 2,
@@ -194,7 +194,7 @@ mod test {
             0x6e, 0x74, 0x3a, 0x20, 0x63, 0x6f, 0x6d, 0x2e, 0x61, 0x70, 0x70, 0x6c, 0x65, 0x2e,
             0x74, 0x72, 0x75, 0x73, 0x74, 0x64, 0x2f, 0x32, 0x2e, 0x30, 0x0d, 0x0a, 0x0d, 0x0a,
         ]);
-        pkt.trans_layer = packet::Layer {
+        pkt.layers_mut().trans = packet::Layer {
             offset: 34,
             protocol: packet::Protocol::TCP,
         };
@@ -224,7 +224,7 @@ mod test {
             0x6f, 0x67, 0x6c, 0x65, 0x61, 0x70, 0x69, 0x73, 0x03, 0x63, 0x6f, 0x6d, 0x00, 0x00,
             0x01, 0x00, 0x01,
         ]);
-        *pkt.trans_layer_mut() = packet::Layer {
+        pkt.layers_mut().trans = packet::Layer {
             offset: 34,
             protocol: packet::Protocol::UDP,
         };
@@ -281,7 +281,7 @@ mod test {
             0x6e, 0x3a, 0x20, 0x6b, 0x65, 0x65, 0x70, 0x2d, 0x61, 0x6c, 0x69, 0x76, 0x65, 0x0d,
             0x0a, 0x0d, 0x0a, 0x00,
         ]);
-        *pkt.trans_layer_mut() = packet::Layer {
+        pkt.layers_mut().trans = packet::Layer {
             offset: 34,
             protocol: packet::Protocol::SCTP,
         };
