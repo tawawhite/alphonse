@@ -29,6 +29,7 @@ pub struct Config {
     pub tcp_timeout: u16,
     pub timeout_interval: u64,
     pub udp_timeout: u16,
+    pub docs: Vec<Yaml>,
 }
 
 /// Parse command line arguments and set configuration
@@ -83,6 +84,7 @@ fn parse_config_file(config_file: &str, config: &mut Config) -> Result<()> {
 
     let docs = YamlLoader::load_from_str(&s)?;
     let doc = &docs[0];
+    config.docs = docs.clone();
 
     match &doc["channel.pkt.size"] {
         Yaml::Integer(i) => set_integer(
