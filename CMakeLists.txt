@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.10.0)
 project(alphonse VERSION 0.1.0)
 
+cmake_policy(SET CMP0109 NEW)
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 include(macros)
 include(projects)
@@ -25,6 +26,11 @@ endif()
 option(BUILD_DPDK "build dpdk" OFF)
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND BUILD_DPDK)
     add_dependencies(alphonse dpdk)
+endif()
+
+option(BUILD_DPDK_KMODS "build DPDK igb_uio kmods" OFF)
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND BUILD_DPDK)
+    add_dependencies(alphonse dpdk-kmods)
 endif()
 
 add_dependencies(alphonse llhttp hyperscan)

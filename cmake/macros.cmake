@@ -33,6 +33,7 @@ macro(print_configuration)
     message(STATUS "  OFFLINE_ENVIRONMENT ..............: ${OFFLINE_ENVIRONMENT}")
     message(STATUS "  BUILD_LIBPCAP ....................: ${BUILD_LIBPCAP}")
     message(STATUS "  BUILD_DPDK .......................: ${BUILD_DPDK}")
+    message(STATUS "  BUILD_DPDK_KMODS .................: ${BUILD_DPDK_KMODS}")
     message(STATUS "")
 endmacro(print_configuration)
 
