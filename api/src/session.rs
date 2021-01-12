@@ -85,9 +85,9 @@ impl Session {
     /// whether this session is too long
     pub fn timeout(&self, timeout: c_long, timestamp: c_long) -> bool {
         if self.end_time.tv_sec + timeout < timestamp {
-            false
-        } else {
             true
+        } else {
+            false
         }
     }
 
