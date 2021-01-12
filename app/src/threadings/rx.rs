@@ -1,7 +1,6 @@
 use std::any::TypeId;
 use std::collections::HashMap;
 use std::ffi::OsString;
-use std::hash::{Hash, Hasher};
 use std::os::raw::c_long;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -10,12 +9,12 @@ use std::time::SystemTime;
 
 use anyhow::Result;
 use crossbeam_channel::Sender;
-use fnv::{FnvHashMap, FnvHasher};
+use fnv::FnvHashMap;
 use path_absolutize::Absolutize;
 
 use alphonse_api as api;
 use api::classifiers::ClassifierManager;
-use api::packet::{Packet, Protocol};
+use api::packet::{Packet, PacketHashKey, Protocol};
 use api::parsers::{ParserID, ProtocolParserTrait};
 use api::session::Session;
 use api::utils::timeval::TimeVal;
@@ -149,12 +148,12 @@ impl RxThread {
     #[inline]
     fn timeout(
         ts: u64,
-        session_table: &mut HashMap<Box<dyn Packet>, Box<SessionData>>,
+        session_table: &mut HashMap<PacketHashKey, Box<SessionData>>,
         sender: &mut Sender<Arc<Session>>,
         cfg: &Arc<config::Config>,
     ) -> Result<()> {
-        &mut session_table.retain(|pkt, ses| {
-            let timeout = match pkt.layers().trans.protocol {
+        &mut session_table.retain(|key, ses| {
+            let timeout = match key.trans_proto {
                 Protocol::TCP => ses.info.timeout(cfg.tcp_timeout as c_long, ts as c_long),
                 Protocol::UDP => ses.info.timeout(cfg.udp_timeout as c_long, ts as c_long),
                 Protocol::SCTP => ses.info.timeout(cfg.sctp_timeout as c_long, ts as c_long),
@@ -192,7 +191,7 @@ impl RxThread {
             .unwrap()
             .as_secs();
         let mut last_timeout_check_time: u64 = last_packet_time + cfg.timeout_interval;
-        let mut session_table: HashMap<Box<dyn Packet>, Box<SessionData>> = Default::default();
+        let mut session_table: HashMap<PacketHashKey, Box<SessionData>> = Default::default();
         let mut classify_scratch = match self.classifier.alloc_scratch() {
             Ok(scratch) => scratch,
             Err(_) => todo!(),
@@ -220,12 +219,8 @@ impl RxThread {
                 },
             };
 
-            // TODO: inline with_seed function
-            let mut hasher = FnvHasher::default();
-            pkt.hash(&mut hasher);
-            *pkt.hash_mut() = hasher.finish();
-
-            match session_table.get_mut(&pkt) {
+            let key = PacketHashKey::from(pkt.as_ref());
+            match session_table.get_mut(&key) {
                 Some(ses) => {
                     let info = Arc::get_mut(&mut ses.info).unwrap();
                     info.update(&pkt);
@@ -239,7 +234,6 @@ impl RxThread {
                     .unwrap();
                 }
                 None => {
-                    let key = pkt.clone_box_deep();
                     let mut ses = Box::new(SessionData::new());
                     let info = Arc::get_mut(&mut ses.info).unwrap();
                     info.start_time = TimeVal::new(*pkt.ts());

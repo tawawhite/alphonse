@@ -19,4 +19,6 @@ serde_json = "1.0"
 rustc_version = "0.3"
 
 [features]
+default = [ "pkt-hash-mac" ]
 arkime = []
+pkt-hash-mac = []

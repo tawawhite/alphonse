@@ -6,6 +6,7 @@
 
 use std::convert::TryFrom;
 use std::hash::{Hash, Hasher};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 extern crate libc;
 
@@ -46,6 +47,190 @@ pub struct Layers {
     pub app: Layer,
 }
 
+#[repr(u8)]
+#[derive(Debug, PartialEq, Eq)]
+pub enum PacketHashMethod {
+    /// Normal 5 tuple hash
+    FiveTuple,
+    /// Hash use only mac address
+    #[cfg(feature = "pkt-hash-mac")]
+    MacOnly,
+}
+
+#[derive(Debug, Eq)]
+pub struct PacketHashKey {
+    pub hash_method: PacketHashMethod,
+    pub network_proto: Protocol,
+    pub trans_proto: Protocol,
+    pub src_port: u16,
+    pub dst_port: u16,
+    pub src_ip: IpAddr,
+    pub dst_ip: IpAddr,
+    #[cfg(feature = "pkt-hash-mac")]
+    pub src_mac: [u8; 6],
+    #[cfg(feature = "pkt-hash-mac")]
+    pub dst_mac: [u8; 6],
+}
+
+impl Default for PacketHashKey {
+    fn default() -> PacketHashKey {
+        PacketHashKey {
+            hash_method: PacketHashMethod::FiveTuple,
+            network_proto: Protocol::default(),
+            trans_proto: Protocol::default(),
+            src_port: 0,
+            dst_port: 0,
+            src_ip: IpAddr::V4(Ipv4Addr::from(0)),
+            dst_ip: IpAddr::V4(Ipv4Addr::from(0)),
+            #[cfg(feature = "pkt-hash-mac")]
+            src_mac: [0; 6],
+            #[cfg(feature = "pkt-hash-mac")]
+            dst_mac: [0; 6],
+        }
+    }
+}
+
+impl From<&dyn Packet> for PacketHashKey {
+    fn from(pkt: &dyn Packet) -> Self {
+        let mut key = Self::default();
+        key.network_proto = pkt.layers().network.protocol;
+        key.trans_proto = pkt.layers().trans.protocol;
+
+        match key.trans_proto {
+            Protocol::TCP | Protocol::UDP | Protocol::SCTP => {
+                if pkt.src_port() > pkt.dst_port() {
+                    key.src_port = pkt.src_port();
+                    key.dst_port = pkt.dst_port();
+                } else {
+                    key.src_port = pkt.dst_port();
+                    key.dst_port = pkt.src_port();
+                }
+            }
+            _ => {}
+        };
+
+        match key.network_proto {
+            Protocol::IPV4 => {
+                let src_ip = pkt.src_ipv4();
+                let dst_ip = pkt.dst_ipv4();
+                if src_ip > dst_ip {
+                    key.src_ip = IpAddr::V4(Ipv4Addr::from(src_ip));
+                    key.dst_ip = IpAddr::V4(Ipv4Addr::from(dst_ip));
+                } else {
+                    key.src_ip = IpAddr::V4(Ipv4Addr::from(dst_ip));
+                    key.dst_ip = IpAddr::V4(Ipv4Addr::from(src_ip));
+                }
+            }
+            Protocol::IPV6 => {
+                let src_ip = *pkt.src_ipv6();
+                let dst_ip = *pkt.dst_ipv6();
+                if src_ip > dst_ip {
+                    key.src_ip = IpAddr::V6(Ipv6Addr::from(src_ip));
+                    key.dst_ip = IpAddr::V6(Ipv6Addr::from(dst_ip));
+                } else {
+                    key.src_ip = IpAddr::V6(Ipv6Addr::from(dst_ip));
+                    key.dst_ip = IpAddr::V6(Ipv6Addr::from(src_ip));
+                }
+            }
+            _ => {}
+        };
+
+        #[cfg(feature = "pkt-hash-mac")]
+        {
+            match key.hash_method {
+                PacketHashMethod::MacOnly => {
+                    let src_mac = pkt.src_mac();
+                    let dst_mac = pkt.dst_mac();
+                    if src_mac > dst_mac {
+                        key.src_mac.copy_from_slice(src_mac);
+                        key.dst_mac.copy_from_slice(dst_mac);
+                    } else {
+                        key.src_mac.copy_from_slice(dst_mac);
+                        key.dst_mac.copy_from_slice(src_mac);
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        key
+    }
+}
+
+impl Hash for PacketHashKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        match self.hash_method {
+            PacketHashMethod::FiveTuple => {
+                self.trans_proto.hash(state);
+                self.src_port.hash(state);
+                self.dst_port.hash(state);
+                self.src_ip.hash(state);
+                self.dst_ip.hash(state);
+            }
+            #[cfg(feature = "pkt-hash-mac")]
+            PacketHashMethod::MacOnly => {
+                self.src_mac.hash(state);
+                self.dst_mac.hash(state);
+            }
+        }
+    }
+}
+
+impl PartialEq for PacketHashKey {
+    fn eq(&self, other: &PacketHashKey) -> bool {
+        if self.trans_proto != other.trans_proto {
+            return false;
+        }
+
+        match self.trans_proto {
+            Protocol::TCP | Protocol::UDP | Protocol::SCTP => {
+                let self_src_port = self.src_port;
+                let self_dst_port = self.dst_port;
+                let other_src_port = self.src_port;
+                let other_dst_port = self.dst_port;
+
+                let self_cmp = self_src_port > self_dst_port;
+                let other_cmp = other_src_port > other_dst_port;
+
+                if self_cmp == other_cmp {
+                    if (self_src_port != other_src_port) || (self_dst_port != other_dst_port) {
+                        return false;
+                    }
+                } else {
+                    if (self_src_port != other_dst_port) || (self_dst_port != other_src_port) {
+                        return false;
+                    }
+                }
+            }
+            _ => {}
+        };
+
+        match self.network_proto {
+            Protocol::IPV4 | Protocol::IPV6 => {
+                let self_src_ip = self.src_ip;
+                let self_dst_ip = self.dst_ip;
+                let other_src_ip = other.src_ip;
+                let other_dst_ip = other.dst_ip;
+
+                let self_cmp = self_src_ip > self_dst_ip;
+                let other_cmp = other_src_ip > other_dst_ip;
+                if self_cmp == other_cmp {
+                    if (self_src_ip != other_src_ip) || (self_dst_ip != other_dst_ip) {
+                        return false;
+                    }
+                } else {
+                    if (self_src_ip != other_dst_ip) || (self_dst_ip != other_src_ip) {
+                        return false;
+                    }
+                }
+            }
+            _ => {}
+        };
+
+        true
+    }
+}
+
 pub trait Packet: Send {
     /// Get raw packet data
     fn raw(&self) -> &[u8];
@@ -58,9 +243,6 @@ pub trait Packet: Send {
 
     fn layers(&self) -> &Layers;
     fn layers_mut(&mut self) -> &mut Layers;
-
-    fn hash(&self) -> u64;
-    fn hash_mut(&mut self) -> &mut u64;
 
     fn rules(&self) -> &[Rule];
     fn rules_mut(&mut self) -> &mut Vec<Rule>;
@@ -209,136 +391,6 @@ impl std::fmt::Debug for dyn Packet {
     }
 }
 
-impl Hash for dyn Packet {
-    #[inline]
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        if self.hash() != 0 {
-            return self.hash().hash(state);
-        }
-
-        match self.layers().trans.protocol {
-            Protocol::TCP | Protocol::UDP | Protocol::SCTP => {
-                let src_port = self.src_port();
-                let dst_port = self.dst_port();
-                if src_port > dst_port {
-                    src_port.hash(state);
-                    dst_port.hash(state);
-                } else {
-                    dst_port.hash(state);
-                    src_port.hash(state);
-                }
-            }
-            _ => {}
-        };
-
-        match self.layers().network.protocol {
-            Protocol::IPV4 => {
-                let src_ip = self.src_ipv4();
-                let dst_ip = self.dst_ipv4();
-                if src_ip > dst_ip {
-                    src_ip.hash(state);
-                    dst_ip.hash(state);
-                } else {
-                    dst_ip.hash(state);
-                    src_ip.hash(state);
-                }
-            }
-            Protocol::IPV6 => {
-                let src_ip = *self.src_ipv6();
-                let dst_ip = *self.dst_ipv6();
-                if src_ip > dst_ip {
-                    src_ip.hash(state);
-                    dst_ip.hash(state);
-                } else {
-                    dst_ip.hash(state);
-                    src_ip.hash(state);
-                }
-            }
-            _ => {}
-        };
-    }
-}
-
-impl PartialEq for dyn Packet {
-    #[inline]
-    fn eq(&self, other: &dyn Packet) -> bool {
-        if self.layers().trans.protocol != other.layers().trans.protocol {
-            return false;
-        }
-
-        if self.layers().network.protocol != other.layers().network.protocol {
-            return false;
-        }
-
-        match self.layers().trans.protocol {
-            Protocol::TCP | Protocol::UDP | Protocol::SCTP => {
-                let self_src_port = self.src_port();
-                let self_dst_port = self.dst_port();
-                let other_src_port = self.src_port();
-                let other_dst_port = self.dst_port();
-
-                let self_cmp = self_src_port > self_dst_port;
-                let other_cmp = other_src_port > other_dst_port;
-
-                if self_cmp == other_cmp {
-                    if (self_src_port != other_src_port) || (self_dst_port != other_dst_port) {
-                        return false;
-                    }
-                } else {
-                    if (self_src_port != other_dst_port) || (self_dst_port != other_src_port) {
-                        return false;
-                    }
-                }
-            }
-            _ => {}
-        };
-
-        match self.layers().network.protocol {
-            Protocol::IPV4 => {
-                let self_src_ip = self.src_ipv4();
-                let self_dst_ip = self.dst_ipv4();
-                let other_src_ip = other.src_ipv4();
-                let other_dst_ip = other.dst_ipv4();
-
-                let self_cmp = self_src_ip > self_dst_ip;
-                let other_cmp = other_src_ip > other_dst_ip;
-                if self_cmp == other_cmp {
-                    if (self_src_ip != other_src_ip) || (self_dst_ip != other_dst_ip) {
-                        return false;
-                    }
-                } else {
-                    if (self_src_ip != other_dst_ip) || (self_dst_ip != other_src_ip) {
-                        return false;
-                    }
-                }
-            }
-            Protocol::IPV6 => {
-                let self_src_ip = self.src_ipv6();
-                let self_dst_ip = self.dst_ipv6();
-                let other_src_ip = other.src_ipv6();
-                let other_dst_ip = other.dst_ipv6();
-
-                let self_cmp = self_src_ip > self_dst_ip;
-                let other_cmp = other_src_ip > other_dst_ip;
-                if self_cmp == other_cmp {
-                    if (self_src_ip != other_src_ip) || (self_dst_ip != other_dst_ip) {
-                        return false;
-                    }
-                } else {
-                    if (self_src_ip != other_dst_ip) || (self_dst_ip != other_src_ip) {
-                        return false;
-                    }
-                }
-            }
-            _ => {}
-        };
-
-        true
-    }
-}
-
-impl Eq for dyn Packet {}
-
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 /// Protocol collection, 1 byte
@@ -448,14 +500,6 @@ pub mod test {
 
         fn layers_mut(&mut self) -> &mut Layers {
             &mut self.layers
-        }
-
-        fn hash(&self) -> u64 {
-            self.hash
-        }
-
-        fn hash_mut(&mut self) -> &mut u64 {
-            &mut self.hash
         }
 
         fn rules(&self) -> &[Rule] {

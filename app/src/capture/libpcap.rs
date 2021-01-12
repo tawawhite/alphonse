@@ -56,7 +56,6 @@ impl Capture for Offline {
                     data: std::slice::from_raw_parts(raw.data.as_ptr(), raw.data.len()),
                 },
                 layers: Layers::default(),
-                hash: 0,
                 rules: Box::new(Vec::new()),
                 drop: false,
             })
@@ -90,7 +89,6 @@ impl Capture for NetworkInterface {
                     data: std::slice::from_raw_parts(raw.data.as_ptr(), raw.data.len()),
                 },
                 layers: Layers::default(),
-                hash: 0,
                 rules: Box::new(Vec::new()),
                 drop: false,
             })
@@ -136,7 +134,6 @@ impl NetworkInterface {
 pub struct Packet<'a> {
     raw: pcap::Packet<'a>,
     layers: Layers,
-    hash: u64,
     rules: Box<Vec<Rule>>,
     drop: bool,
 }
@@ -160,14 +157,6 @@ impl<'a> PacketTrait for Packet<'a> {
 
     fn layers_mut(&mut self) -> &mut Layers {
         &mut self.layers
-    }
-
-    fn hash(&self) -> u64 {
-        self.hash
-    }
-
-    fn hash_mut(&mut self) -> &mut u64 {
-        &mut self.hash
     }
 
     fn rules(&self) -> &[Rule] {
@@ -200,7 +189,6 @@ impl<'a> PacketTrait for Packet<'a> {
                     data: std::slice::from_raw_parts((*ptr).as_ptr(), len),
                 },
                 layers: self.layers,
-                hash: self.hash,
                 rules: self.rules.clone(),
                 drop: true,
             })

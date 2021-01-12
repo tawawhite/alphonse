@@ -63,7 +63,6 @@ impl Device {
 pub struct Packet {
     mbuf: Box<rte::mbuf::MBuf>,
     ts: TimeVal<precision::Millisecond>,
-    hash: u64,
     layers: Layers,
     rules: Box<Vec<Rule>>,
     drop: bool,
@@ -87,7 +86,6 @@ impl Clone for Packet {
         Self {
             mbuf: self.mbuf.clone(),
             ts: self.ts.clone(),
-            hash: self.hash,
             layers: self.layers.clone(),
             rules: self.rules.clone(),
             drop: self.drop,
@@ -114,14 +112,6 @@ impl PacketTrait for Packet {
 
     fn layers_mut(&mut self) -> &mut Layers {
         &mut self.layers
-    }
-
-    fn hash(&self) -> u64 {
-        self.hash
-    }
-
-    fn hash_mut(&mut self) -> &mut u64 {
-        &mut self.hash
     }
 
     fn rules(&self) -> &[Rule] {
