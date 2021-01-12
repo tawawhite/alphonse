@@ -10,7 +10,7 @@ use std::time::SystemTime;
 
 use anyhow::Result;
 use crossbeam_channel::Sender;
-use fnv::FnvHashMap;
+use fnv::{FnvHashMap, FnvHasher};
 use path_absolutize::Absolutize;
 
 use alphonse_api as api;
@@ -221,7 +221,7 @@ impl RxThread {
             };
 
             // TODO: inline with_seed function
-            let mut hasher = twox_hash::Xxh3Hash64::with_seed(0);
+            let mut hasher = FnvHasher::default();
             pkt.hash(&mut hasher);
             *pkt.hash_mut() = hasher.finish();
 
