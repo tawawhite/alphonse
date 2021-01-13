@@ -222,7 +222,9 @@ impl RxThread {
             let key = PacketHashKey::from(pkt.as_ref());
             match session_table.get_mut(&key) {
                 Some(ses) => {
-                    let info = Arc::get_mut(&mut ses.info).unwrap();
+                    // let info = Arc::get_mut(&mut ses.info).unwrap();
+                    let info =
+                        unsafe { &mut *(&mut ses.info.as_ref() as *const _ as *mut Session) };
                     info.update(&pkt);
                     self.parse_pkt(
                         &mut classify_scratch,
@@ -235,7 +237,8 @@ impl RxThread {
                 }
                 None => {
                     let mut ses = Box::new(SessionData::new());
-                    let info = Arc::get_mut(&mut ses.info).unwrap();
+                    let info =
+                        unsafe { &mut *(&mut ses.info.as_ref() as *const _ as *mut Session) };
                     info.start_time = TimeVal::new(*pkt.ts());
                     info.update(&pkt);
                     self.parse_pkt(
