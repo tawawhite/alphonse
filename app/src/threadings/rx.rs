@@ -211,6 +211,24 @@ impl RxThread {
             last_packet_time = pkt.ts().tv_sec as u64;
             self.rx_count += 1;
 
+            if self.rx_count % 100000 == 0 {
+                match cap.stats() {
+                    Err(_) => {
+                        todo!("handle get capture stat error")
+                    }
+                    Ok(stats) => {
+                        println!(
+                            "received: {} dropped: {}({:.3}) if_dropped: {}({:.3})",
+                            stats.rx_pkts,
+                            stats.dropped,
+                            stats.dropped as f64 / stats.rx_pkts as f64,
+                            stats.if_dropped,
+                            stats.if_dropped as f64 / stats.rx_pkts as f64
+                        );
+                    }
+                }
+            }
+
             match self.parser.parse_pkt(pkt.as_mut()) {
                 Ok(_) => {}
                 Err(e) => match e {

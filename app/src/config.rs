@@ -22,6 +22,7 @@ pub struct Config {
     pub pcap_dir: String,
     pub quiet: bool,
     pub recursive: bool,
+    pub rx_stat_log_interval: u32,
     pub rx_threads: u8,
     pub ses_threads: u8,
     pub sctp_timeout: u16,
@@ -288,6 +289,26 @@ fn parse_config_file(config_file: &str, config: &mut Config) -> Result<()> {
         Yaml::BadValue => return Err(anyhow!("Option interfaces not found or bad array value",)),
         _ => return Err(anyhow!("Wrong value type for interfaces, expecting array",)),
     }
+
+    match &doc["rx.stats.log.interval"] {
+        Yaml::Integer(i) => set_integer(
+            &mut config.rx_stat_log_interval,
+            *i as u32,
+            1,
+            10,
+            1,
+            "rx.stats.log.interval",
+        ),
+        Yaml::BadValue => {
+            println!("Option rx.stats.log.interval not found or bad integer value, set rx.stats.log.interval to 1 sec");
+            config.timeout_interval = 1;
+        }
+        _ => {
+            return Err(anyhow!(
+                "Wrong value type for rx.stats.log.interval, expecting integer",
+            ))
+        }
+    };
 
     #[cfg(all(target_os = "linux", feature = "dpdk"))]
     {
