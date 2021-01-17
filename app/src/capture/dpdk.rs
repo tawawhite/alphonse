@@ -1,7 +1,10 @@
+use std::collections::HashMap;
+use std::ffi::CStr;
 use std::ops::Deref;
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use rte::ethdev::EthDevice;
+use yaml_rust::Yaml;
 
 use alphonse_api as api;
 use api::classifiers::matched::Rule;
@@ -14,12 +17,55 @@ use crate::stats::CaptureStat;
 
 pub struct Device {
     port: rte::PortId,
-    pub thread: u8,
 }
 
 impl Device {
-    pub fn new(port: rte::PortId, thread: u8) -> Self {
-        Self { port, thread }
+    pub fn new(port: rte::PortId) -> Self {
+        Self { port }
+    }
+
+    fn configure(port: rte::PortId, nb_rx_queue: u16) -> Result<()> {
+        let rss_key = [
+            0x6D, 0x5A, 0x6D, 0x5A, 0x6D, 0x5A, 0x6D, 0x5A, 0x6D, 0x5A, 0x6D, 0x5A, 0x6D, 0x5A,
+            0x6D, 0x5A, 0x6D, 0x5A, 0x6D, 0x5A, 0x6D, 0x5A, 0x6D, 0x5A, 0x6D, 0x5A, 0x6D, 0x5A,
+            0x6D, 0x5A, 0x6D, 0x5A, 0x6D, 0x5A, 0x6D, 0x5A, 0x6D, 0x5A, 0x6D, 0x5A,
+        ];
+
+        let rss_conf = rte::ethdev::EthRssConf {
+            key: Some(rss_key),
+            hash: rte::ethdev::RssHashFunc::ETH_RSS_PROTO_MASK,
+        };
+        let mut rx_adv_conf = rte::ethdev::RxAdvConf::default();
+        rx_adv_conf.rss_conf = Some(rss_conf);
+
+        let mut rx_mode = rte::ethdev::EthRxMode::default();
+        rx_mode.mq_mode = rte::ffi::rte_eth_rx_mq_mode::ETH_MQ_RX_RSS;
+
+        let mut conf = rte::ethdev::EthConf::default();
+        conf.rx_adv_conf = Some(rx_adv_conf);
+        conf.rxmode = Some(rx_mode);
+
+        port.configure(nb_rx_queue, 0, &conf)?;
+
+        Ok(())
+    }
+
+    fn rx_queue_setup(
+        port: rte::PortId,
+        nb_rx_queue: u16,
+        mb_pool: &mut rte::mempool::MemoryPool,
+    ) -> Result<()> {
+        for i in 0..nb_rx_queue {
+            let mut rx_conf = rte::ffi::rte_eth_rxconf::default();
+            rx_conf.rx_thresh.pthresh = 8;
+            rx_conf.rx_thresh.hthresh = 0;
+            rx_conf.rx_thresh.wthresh = 4;
+            rx_conf.rx_free_thresh = 0;
+            rx_conf.rx_drop_en = 0;
+            rx_conf.rx_deferred_start = 0;
+            port.rx_queue_setup(i, 4096, Some(rx_conf), mb_pool)?;
+        }
+        Ok(())
     }
 }
 
@@ -27,11 +73,55 @@ impl super::Capture for Device {
     fn init(cfg: &Config) -> Result<()> {
         rte::eal::init(cfg.dpdk_eal_args.as_slice()).expect("fail to initial EAL");
 
+        if rte::ethdev::count() == 0 {
+            return Err(anyhow!("no avaiable port found"));
+        }
+
         println!("available port count: {}", rte::ethdev::count());
 
-        for port in rte::ethdev::devices() {
-            let info = port.info();
-            println!("found port: {:?}", info);
+        let ports: HashMap<String, rte::PortId> = rte::ethdev::devices()
+            .map(|port| {
+                let info = port.info();
+                let name = unsafe { CStr::from_ptr((*info.device).name).to_str().unwrap() };
+                (name.to_string(), port)
+            })
+            .collect();
+
+        let doc = &cfg.docs[0];
+        let rx_ports = &doc["dpdk.rx.ports"].as_vec().ok_or(anyhow!(""))?;
+        for port in rx_ports.iter() {
+            let port = port.as_hash().ok_or(anyhow!("port is not a hash"))?;
+            for (k, v) in port.iter() {
+                let pci = k.as_str().ok_or(anyhow!("key is not a string"))?;
+                let port = match ports.get(pci) {
+                    Some(port) => *port,
+                    None => {
+                        eprintln!("specific port {} doesn't exist or is not available", pci);
+                        eprintln!("available ports: {:?}", ports.keys());
+                        continue;
+                    }
+                };
+
+                let cores = v.as_vec().ok_or(anyhow!("cores is not an array"))?;
+                let mut nb_rx_queue = 0;
+                for core in cores {
+                    let core = core.as_hash().ok_or(anyhow!("core is not a hash"))?;
+                    let queues = core
+                        .get(&Yaml::String("queue".to_string()))
+                        .ok_or(anyhow!("no queue found"))?
+                        .as_i64()
+                        .ok_or(anyhow!("queue is not i64"))?;
+                    nb_rx_queue += queues;
+                }
+
+                println!("configuring port {}", port);
+                Self::configure(port, nb_rx_queue as u16)?;
+                // Self::rx_queue_setup(port, nb_rx_queue, mb_pool);
+
+                // TODO: set mtu by alphonse config
+                port.set_mtu(1514)?;
+                // port.start()?;
+            }
         }
 
         Ok(())
