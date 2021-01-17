@@ -1,7 +1,7 @@
 if(OFFLINE_ENVIRONMENT)
-    set(hyperscan_url ${CMAKE_CURRENT_SOURCE_DIR}/third_party/hyperscan-5.3.0.tar.gz)
+    set(hyperscan_url ${CMAKE_CURRENT_SOURCE_DIR}/third_party/hyperscan-5.4.0.tar.gz)
 else()
-    set(hyperscan_url https://github.com/intel/hyperscan/archive/v5.3.0.tar.gz)
+    set(hyperscan_url https://github.com/intel/hyperscan/archive/v5.4.0.tar.gz)
 endif()
 
 set(FLAGS "-I${CMAKE_CURRENT_BINARY_DIR}/install/include -L${CMAKE_CURRENT_BINARY_DIR}/install/${CMAKE_INSTALL_LIBDIR}")
