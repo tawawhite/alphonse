@@ -29,7 +29,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND BUILD_DPDK)
 endif()
 
 option(BUILD_DPDK_KMODS "build DPDK igb_uio kmods" OFF)
-if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND BUILD_DPDK)
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND BUILD_DPDK_KMODS)
     add_dependencies(alphonse dpdk-kmods)
 endif()
 
