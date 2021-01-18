@@ -312,18 +312,17 @@ fn parse_config_file(config_file: &str, config: &mut Config) -> Result<()> {
 
     #[cfg(all(target_os = "linux", feature = "dpdk"))]
     {
-        // 处理 DPDK EAL 启动参数
-        match *&doc["dpdk"] {
-            Yaml::Array(ref array) => {
-                for v in array {
-                    let s = v
-                        .as_str()
-                        .ok_or(anyhow!("Failed to convert Yaml into &str"))?;
-                    config.dpdk_eal_args.push(String::from(s));
-                }
-            }
-            _ => return Err(anyhow!("Invalid/Empty dpdk args in {}", config_file)),
-        };
+        // parse DPDK EAL intialize arguments
+        let args = doc["dpdk.eal.args"]
+            .as_vec()
+            .ok_or(anyhow!("Invalid type/bad value for dpdk.eal.args"))?;
+        for arg in args {
+            let arg = arg
+                .as_str()
+                .ok_or(anyhow!("Failed to convert Yaml into &str"))?
+                .to_string();
+            config.dpdk_eal_args.push(arg);
+        }
     }
     Ok(())
 }
