@@ -6,9 +6,9 @@ use alphonse_api::classifiers::matched::Rule;
 use alphonse_api::packet::Layers;
 use alphonse_api::packet::Packet as PacketTrait;
 
+use crate::capture::{Capture, CaptureUtility};
+use crate::config::Config;
 use crate::stats::CaptureStat;
-
-use super::Capture;
 
 pub struct Offline {
     cap: Box<pcap::Capture<pcap::Offline>>,
@@ -129,6 +129,11 @@ impl NetworkInterface {
         }
     }
 }
+
+pub const UTILITY: CaptureUtility = CaptureUtility {
+    init: |_: &mut Config| Ok(()),
+    cleanup: |_: &Config| Ok(()),
+};
 
 #[derive(Clone)]
 pub struct Packet<'a> {

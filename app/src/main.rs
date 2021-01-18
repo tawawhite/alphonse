@@ -1,6 +1,7 @@
+extern crate alphonse_api;
+extern crate anyhow;
 #[macro_use]
 extern crate clap;
-extern crate alphonse_api;
 extern crate crossbeam_channel;
 extern crate hyperscan;
 extern crate libc;
@@ -30,22 +31,26 @@ mod packet;
 mod stats;
 mod threadings;
 
-use capture::Capture;
-
 fn main() -> Result<()> {
     let root_cmd = commands::new_root_command();
-    let cfg = config::parse_args(root_cmd)?;
+    let mut cfg = config::parse_args(root_cmd)?;
     let exit = Arc::new(AtomicBool::new(false));
+
+    match cfg.backend.as_str() {
+        "libpcap" => {
+            (capture::libpcap::UTILITY.init)(&mut cfg)?;
+        }
+        "dpdk" => {
+            #[cfg(all(target_os = "linux", feature = "dpdk"))]
+            (capture::dpdk::UTILITY.init)(&mut cfg)?;
+        }
+        _ => unreachable!(),
+    };
 
     signal_hook::flag::register(signal_hook::consts::SIGTERM, Arc::clone(&exit))?;
     signal_hook::flag::register(signal_hook::consts::SIGINT, Arc::clone(&exit))?;
 
     let cfg = Arc::new(cfg);
-
-    #[cfg(all(target_os = "linux", feature = "dpdk"))]
-    {
-        capture::dpdk::Device::init(&cfg)?;
-    }
 
     let mut handles = vec![];
 
@@ -134,10 +139,16 @@ fn main() -> Result<()> {
         };
     }
 
-    #[cfg(all(target_os = "linux", feature = "dpdk"))]
-    {
-        capture::dpdk::Device::cleanup()?;
-    }
+    match cfg.backend.as_str() {
+        "libpcap" => {
+            (capture::libpcap::UTILITY.cleanup)(&cfg)?;
+        }
+        "dpdk" => {
+            #[cfg(all(target_os = "linux", feature = "dpdk"))]
+            (capture::dpdk::UTILITY.cleanup)(&cfg)?;
+        }
+        _ => unreachable!(),
+    };
 
     Ok(())
 }

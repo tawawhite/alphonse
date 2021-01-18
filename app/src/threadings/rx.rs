@@ -302,13 +302,24 @@ impl RxThread {
         cfg: &Arc<config::Config>,
         protocol_parsers: &mut Box<Vec<Box<dyn ProtocolParserTrait>>>,
     ) -> Result<()> {
-        let interface = match cfg.interfaces.get(self.id as usize) {
-            Some(i) => i,
-            None => todo!(),
-        };
+        match cfg.backend.as_str() {
+            "libpcap" => {
+                let interface = match cfg.interfaces.get(self.id as usize) {
+                    Some(i) => i,
+                    None => todo!(),
+                };
 
-        let mut cap = NetworkInterface::try_from_str(interface)?;
-        self.rx(&mut cap, cfg, protocol_parsers)?;
+                let mut cap = NetworkInterface::try_from_str(interface)?;
+                self.rx(&mut cap, cfg, protocol_parsers)?;
+            }
+            #[cfg(all(target_os = "linux", feature = "dpdk"))]
+            "dpdk" => {
+                let mut devices = crate::capture::dpdk::devices(cfg)?;
+                let device = &mut devices.get_mut(self.id as usize).unwrap().1.clone();
+                self.rx(device, cfg, protocol_parsers)?;
+            }
+            _ => unreachable!(),
+        };
 
         Ok(())
     }
