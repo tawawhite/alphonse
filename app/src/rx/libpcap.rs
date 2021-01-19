@@ -1,5 +1,6 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::thread::JoinHandle;
 
 use anyhow::Result;
 use crossbeam_channel::Sender;
@@ -24,12 +25,11 @@ pub fn start(
     exit: Arc<AtomicBool>,
     cfg: Arc<Config>,
     sender: Sender<Box<dyn PacketTrait>>,
-) -> Result<()> {
+) -> Result<Option<Vec<JoinHandle<Result<()>>>>> {
     let mut handles = vec![];
-    for (id, interface) in cfg.interfaces.iter().enumerate() {
+    for interface in cfg.interfaces.iter() {
         let cfg = cfg.clone();
         let mut thread = RxThread {
-            id: id as u8,
             exit: exit.clone(),
             sender: sender.clone(),
             interface: interface.clone(),
@@ -39,18 +39,10 @@ pub fn start(
         handles.push(handle);
     }
 
-    for handle in handles {
-        match handle.join() {
-            Ok(_) => {}
-            Err(e) => eprintln!("{:?}", e),
-        };
-    }
-
-    Ok(())
+    Ok(Some(handles))
 }
 
 struct RxThread {
-    id: u8,
     exit: Arc<AtomicBool>,
     sender: Sender<Box<dyn PacketTrait>>,
     interface: String,
@@ -59,6 +51,8 @@ struct RxThread {
 impl RxThread {
     pub fn spawn(&mut self, _cfg: Arc<Config>) -> Result<()> {
         let mut cap = NetworkInterface::try_from_str(self.interface.as_str())?;
+
+        println!("{} started", self.name());
 
         while !self.exit.load(Ordering::Relaxed) {
             let pkt = cap.next()?;
@@ -69,6 +63,8 @@ impl RxThread {
                 }
             };
         }
+
+        println!("{} exit", self.name());
         Ok(())
     }
 

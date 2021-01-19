@@ -16,10 +16,10 @@ extern crate yaml_rust;
 use std::collections::HashMap;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
-use std::thread;
+use std::thread::JoinHandle;
 
 use anyhow::Result;
-use crossbeam_channel::bounded;
+use crossbeam_channel::{bounded, Sender};
 
 use alphonse_api as api;
 use api::{classifiers, parsers::NewProtocolParserFunc, parsers::ParserID, session};
@@ -31,6 +31,30 @@ mod packet;
 mod rx;
 mod stats;
 mod threadings;
+
+fn start_rx(
+    exit: Arc<AtomicBool>,
+    cfg: Arc<config::Config>,
+    sender: Sender<Box<dyn api::packet::Packet>>,
+) -> Result<Vec<JoinHandle<Result<()>>>> {
+    if !cfg.pcap_file.is_empty() {
+        let handles = match (rx::files::UTILITY.start)(exit, cfg, sender)? {
+            Some(handles) => handles,
+            None => vec![],
+        };
+        return Ok(handles);
+    }
+
+    let handles = match cfg.backend.as_str() {
+        "libpcap" => match (rx::libpcap::UTILITY.start)(exit, cfg, sender)? {
+            Some(handles) => handles,
+            None => vec![],
+        },
+        _ => unreachable!(),
+    };
+
+    Ok(handles)
+}
 
 fn main() -> Result<()> {
     let root_cmd = commands::new_root_command();
@@ -92,8 +116,18 @@ fn main() -> Result<()> {
     let (sender, receiver) = bounded(cfg.pkt_channel_size as usize);
 
     for i in 0..cfg.ses_threads {
-        let thread = threadings::SessionThread::new(i, exit.clone(), receiver.clone());
+        let thread = threadings::SessionThread::new(
+            i,
+            exit.clone(),
+            receiver.clone(),
+            classifier_manager.clone(),
+        );
         ses_threads.push(thread);
+    }
+
+    let rx_handles = start_rx(exit.clone(), cfg.clone(), sender.clone())?;
+    for h in rx_handles {
+        handles.push(h);
     }
 
     drop(sender);
@@ -102,8 +136,9 @@ fn main() -> Result<()> {
     // start all session threads
     for mut thread in ses_threads {
         let cfg = cfg.clone();
-        let builder = thread::Builder::new().name(format!("alphonse-ses{}", thread.id()));
-        let handle = builder.spawn(move || thread.spawn(cfg))?;
+        let parsers = Box::new(protocol_parsers.iter().map(|p| p.box_clone()).collect());
+        let builder = std::thread::Builder::new().name(thread.name());
+        let handle = builder.spawn(move || thread.spawn(cfg, parsers))?;
         handles.push(handle);
     }
 

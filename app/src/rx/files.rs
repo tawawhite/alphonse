@@ -2,6 +2,7 @@ use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::thread::JoinHandle;
 
 use anyhow::{anyhow, Result};
 use crossbeam_channel::Sender;
@@ -22,17 +23,21 @@ pub const UTILITY: RxUtility = RxUtility {
     cleanup: |_| Ok(()),
 };
 
-pub fn start(
+fn start(
     exit: Arc<AtomicBool>,
     cfg: Arc<Config>,
     sender: Sender<Box<dyn PacketTrait>>,
-) -> Result<()> {
+) -> Result<Option<Vec<JoinHandle<Result<()>>>>> {
+    let mut handles = vec![];
     let mut thread = RxThread {
         exit: exit.clone(),
         sender: sender.clone(),
         files: get_pcap_files(cfg.as_ref()),
     };
-    Ok(())
+    let builder = std::thread::Builder::new().name(thread.name());
+    let handle = builder.spawn(move || thread.spawn(cfg))?;
+    handles.push(handle);
+    Ok(Some(handles))
 }
 
 /// get pcap files according to command line arguments/configuration file
@@ -82,6 +87,8 @@ impl RxThread {
             return Ok(());
         }
 
+        println!("{} started", self.name());
+
         for file in &self.files {
             if !file.exists() {
                 return Err(anyhow!("File does not exist"));
@@ -100,6 +107,8 @@ impl RxThread {
             }
         }
 
+        println!("{} exit", self.name());
+
         Ok(())
     }
 
@@ -108,16 +117,8 @@ impl RxThread {
     }
 }
 
-pub struct Offline {
+struct Offline {
     cap: Box<pcap::Capture<pcap::Offline>>,
-}
-
-impl Offline {
-    #[inline]
-    /// Get pcap file's link type
-    pub fn link_type(&self) -> u16 {
-        self.cap.get_datalink().0 as u16
-    }
 }
 
 impl Offline {

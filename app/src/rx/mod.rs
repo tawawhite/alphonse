@@ -1,4 +1,5 @@
 use std::sync::{atomic::AtomicBool, Arc};
+use std::thread::JoinHandle;
 
 use alphonse_api as api;
 use anyhow::Result;
@@ -14,7 +15,10 @@ pub mod libpcap;
 
 pub struct RxUtility {
     pub init: fn(cfg: &mut Config) -> Result<()>,
-    pub start:
-        fn(exit: Arc<AtomicBool>, cfg: Arc<Config>, sender: Sender<Box<dyn Packet>>) -> Result<()>,
+    pub start: fn(
+        exit: Arc<AtomicBool>,
+        cfg: Arc<Config>,
+        sender: Sender<Box<dyn Packet>>,
+    ) -> Result<Option<Vec<JoinHandle<Result<()>>>>>,
     pub cleanup: fn(cfg: &Config) -> Result<()>,
 }
