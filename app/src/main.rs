@@ -96,19 +96,6 @@ fn main() -> Result<()> {
         ses_threads.push(thread);
     }
 
-    // initialize rx threads
-    let mut rx_threads = Vec::new();
-    for i in 0..cfg.rx_threads {
-        let thread = threadings::RxThread::new(
-            i,
-            packet::link::ETHERNET,
-            sender.clone(),
-            classifier_manager.clone(),
-            exit.clone(),
-        );
-        rx_threads.push(thread);
-    }
-
     drop(sender);
     drop(receiver);
 
@@ -117,19 +104,6 @@ fn main() -> Result<()> {
         let cfg = cfg.clone();
         let builder = thread::Builder::new().name(format!("alphonse-ses{}", thread.id()));
         let handle = builder.spawn(move || thread.spawn(cfg))?;
-        handles.push(handle);
-    }
-
-    // start all rx threads
-    for mut thread in rx_threads {
-        let cfg = cfg.clone();
-        let mut parsers: Box<Vec<Box<dyn api::parsers::ProtocolParserTrait>>> =
-            Box::new(Vec::new());
-        for parser in &protocol_parsers {
-            parsers.push(parser.box_clone());
-        }
-        let builder = thread::Builder::new().name(format!("alphonse-rx{}", thread.id()));
-        let handle = builder.spawn(move || thread.spawn(cfg, parsers))?;
         handles.push(handle);
     }
 

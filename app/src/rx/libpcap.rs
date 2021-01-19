@@ -21,9 +21,9 @@ pub const UTILITY: RxUtility = RxUtility {
 };
 
 pub fn start(
+    exit: Arc<AtomicBool>,
     cfg: Arc<Config>,
     sender: Sender<Box<dyn PacketTrait>>,
-    exit: Arc<AtomicBool>,
 ) -> Result<()> {
     let mut handles = vec![];
     for (id, interface) in cfg.interfaces.iter().enumerate() {
@@ -61,13 +61,7 @@ impl RxThread {
         let mut cap = NetworkInterface::try_from_str(self.interface.as_str())?;
 
         while !self.exit.load(Ordering::Relaxed) {
-            let pkt = match cap.next() {
-                Ok(pkt) => pkt,
-                Err(err) => {
-                    return Err(err);
-                }
-            };
-
+            let pkt = cap.next()?;
             match self.sender.send(pkt) {
                 Ok(_) => {}
                 Err(err) => {
@@ -89,20 +83,9 @@ struct NetworkInterface {
 
 impl Capture for NetworkInterface {
     #[inline]
-    /// 获取下一个数据包
     fn next(&mut self) -> Result<Box<dyn PacketTrait>> {
         let raw = self.cap.as_mut().next()?;
-        let pkt: Box<Packet> = unsafe {
-            Box::new(Packet {
-                raw: pcap::Packet {
-                    header: &*(raw.header as *const pcap::PacketHeader),
-                    data: std::slice::from_raw_parts(raw.data.as_ptr(), raw.data.len()),
-                },
-                layers: Layers::default(),
-                rules: Box::new(Vec::new()),
-                drop: false,
-            })
-        };
+        let pkt: Box<Packet> = Box::new(Packet::from(&raw));
         Ok(pkt)
     }
 
@@ -142,24 +125,25 @@ impl NetworkInterface {
 }
 
 #[derive(Clone)]
-pub struct Packet<'a> {
-    raw: pcap::Packet<'a>,
+pub struct Packet {
+    raw: Vec<u8>,
+    ts: libc::timeval,
+    caplen: u32,
     layers: Layers,
     rules: Box<Vec<Rule>>,
-    drop: bool,
 }
 
-impl<'a> PacketTrait for Packet<'a> {
+impl PacketTrait for Packet {
     fn raw(&self) -> &[u8] {
-        self.raw.data
+        self.raw.as_slice()
     }
 
     fn ts(&self) -> &libc::timeval {
-        &self.raw.header.ts
+        &self.ts
     }
 
     fn caplen(&self) -> u32 {
-        self.raw.header.caplen
+        self.caplen
     }
 
     fn layers(&self) -> &Layers {
@@ -181,40 +165,16 @@ impl<'a> PacketTrait for Packet<'a> {
     fn clone_box(&self) -> Box<dyn PacketTrait + '_> {
         Box::new(self.clone())
     }
-
-    fn clone_box_deep(&self) -> Box<dyn PacketTrait> {
-        // copy header info
-        let hdr = Box::new(self.raw.header.clone());
-        let hdr = Box::into_raw(hdr);
-
-        // copy pcaket raw buffer
-        let mut raw_buf = Box::new(vec![0; self.raw.len()]);
-        raw_buf.copy_from_slice(self.raw.data);
-        let len = raw_buf.len();
-        let ptr = Box::into_raw(raw_buf.into_boxed_slice());
-
-        unsafe {
-            Box::new(Packet {
-                raw: pcap::Packet {
-                    header: &*hdr,
-                    data: std::slice::from_raw_parts((*ptr).as_ptr(), len),
-                },
-                layers: self.layers,
-                rules: self.rules.clone(),
-                drop: true,
-            })
-        }
-    }
 }
 
-impl<'a> Drop for Packet<'a> {
-    fn drop(&mut self) {
-        if self.drop == true {
-            let ptr = self.raw.header as *const pcap::PacketHeader as *mut pcap::PacketHeader;
-            let a = unsafe { Box::from_raw(ptr) };
-            drop(a);
-            let a = unsafe { Box::from_raw(self.raw.data.as_ptr() as *mut u8) };
-            drop(a);
+impl From<&pcap::Packet<'_>> for Packet {
+    fn from(pkt: &pcap::Packet) -> Self {
+        Packet {
+            raw: Vec::from(pkt.data),
+            ts: pkt.header.ts,
+            caplen: pkt.header.caplen,
+            layers: Layers::default(),
+            rules: Box::new(Vec::new()),
         }
     }
 }

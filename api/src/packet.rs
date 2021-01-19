@@ -249,8 +249,6 @@ pub trait Packet: Send {
 
     fn clone_box(&self) -> Box<dyn Packet + '_>;
 
-    fn clone_box_deep(&self) -> Box<dyn Packet>;
-
     #[inline]
     fn data_len(&self) -> u16 {
         match self.layers().trans.protocol {

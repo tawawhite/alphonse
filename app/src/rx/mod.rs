@@ -15,6 +15,6 @@ pub mod libpcap;
 pub struct RxUtility {
     pub init: fn(cfg: &mut Config) -> Result<()>,
     pub start:
-        fn(cfg: Arc<Config>, sender: Sender<Box<dyn Packet>>, exit: Arc<AtomicBool>) -> Result<()>,
+        fn(exit: Arc<AtomicBool>, cfg: Arc<Config>, sender: Sender<Box<dyn Packet>>) -> Result<()>,
     pub cleanup: fn(cfg: &Config) -> Result<()>,
 }

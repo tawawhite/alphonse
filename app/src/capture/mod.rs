@@ -7,9 +7,6 @@ use crate::stats::CaptureStat;
 
 #[cfg(all(target_os = "linux", feature = "dpdk"))]
 pub mod dpdk;
-pub mod libpcap;
-
-pub use libpcap::{NetworkInterface, Offline};
 
 pub trait Capture {
     fn configure(&mut self, _: &Config) -> Result<()> {
