@@ -28,6 +28,7 @@ mod capture;
 mod commands;
 mod config;
 mod packet;
+mod rx;
 mod stats;
 mod threadings;
 
@@ -38,10 +39,10 @@ fn main() -> Result<()> {
 
     match cfg.backend.as_str() {
         "libpcap" => {
-            (capture::libpcap::UTILITY.init)(&mut cfg)?;
+            (rx::libpcap::UTILITY.init)(&mut cfg)?;
         }
+        #[cfg(all(target_os = "linux", feature = "dpdk"))]
         "dpdk" => {
-            #[cfg(all(target_os = "linux", feature = "dpdk"))]
             (capture::dpdk::UTILITY.init)(&mut cfg)?;
         }
         _ => unreachable!(),
@@ -141,10 +142,10 @@ fn main() -> Result<()> {
 
     match cfg.backend.as_str() {
         "libpcap" => {
-            (capture::libpcap::UTILITY.cleanup)(&cfg)?;
+            (rx::libpcap::UTILITY.cleanup)(&cfg)?;
         }
+        #[cfg(all(target_os = "linux", feature = "dpdk"))]
         "dpdk" => {
-            #[cfg(all(target_os = "linux", feature = "dpdk"))]
             (capture::dpdk::UTILITY.cleanup)(&cfg)?;
         }
         _ => unreachable!(),
