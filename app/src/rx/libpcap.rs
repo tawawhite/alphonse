@@ -10,7 +10,6 @@ use api::classifiers::matched::Rule;
 use api::packet::Layers;
 use api::packet::Packet as PacketTrait;
 
-use crate::capture::Capture;
 use crate::config::Config;
 use crate::rx::RxUtility;
 use crate::stats::CaptureStat;
@@ -77,7 +76,7 @@ struct NetworkInterface {
     cap: Box<pcap::Capture<pcap::Active>>,
 }
 
-impl Capture for NetworkInterface {
+impl NetworkInterface {
     #[inline]
     fn next(&mut self) -> Result<Box<dyn PacketTrait>> {
         let raw = self.cap.as_mut().next()?;

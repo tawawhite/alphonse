@@ -11,7 +11,6 @@ use path_absolutize::Absolutize;
 use alphonse_api as api;
 use api::packet::Packet as PacketTrait;
 
-use crate::capture::Capture;
 use crate::config::Config;
 use crate::rx::libpcap::Packet;
 use crate::rx::RxUtility;
@@ -143,7 +142,7 @@ impl Offline {
     }
 }
 
-impl Capture for Offline {
+impl Offline {
     #[inline]
     fn next(&mut self) -> Result<Box<dyn PacketTrait>> {
         let raw = self.cap.as_mut().next()?;

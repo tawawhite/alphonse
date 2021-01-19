@@ -24,7 +24,6 @@ use crossbeam_channel::{bounded, Sender};
 use alphonse_api as api;
 use api::{classifiers, parsers::NewProtocolParserFunc, parsers::ParserID, session};
 
-mod capture;
 mod commands;
 mod config;
 mod packet;
@@ -67,7 +66,7 @@ fn main() -> Result<()> {
         }
         #[cfg(all(target_os = "linux", feature = "dpdk"))]
         "dpdk" => {
-            (capture::dpdk::UTILITY.init)(&mut cfg)?;
+            (rx::dpdk::UTILITY.init)(&mut cfg)?;
         }
         _ => unreachable!(),
     };
@@ -155,7 +154,7 @@ fn main() -> Result<()> {
         }
         #[cfg(all(target_os = "linux", feature = "dpdk"))]
         "dpdk" => {
-            (capture::dpdk::UTILITY.cleanup)(&cfg)?;
+            (rx::dpdk::UTILITY.cleanup)(&cfg)?;
         }
         _ => unreachable!(),
     };
