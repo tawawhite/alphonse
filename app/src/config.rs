@@ -20,6 +20,7 @@ pub struct Config {
     pub parsers: Vec<String>,
     pub pcap_file: String,
     pub pcap_dir: String,
+    pub pkt_threads: u8,
     pub quiet: bool,
     pub recursive: bool,
     pub rx_stat_log_interval: u32,
@@ -211,6 +212,18 @@ fn parse_config_file(config_file: &str, config: &mut Config) -> Result<()> {
         _ => {
             return Err(anyhow!(
                 "Wrong value type for timeout.sctp, expecting integer",
+            ))
+        }
+    };
+
+    match &doc["threads.pkt"] {
+        Yaml::Integer(i) => config.pkt_threads = *i as u8,
+        Yaml::BadValue => {
+            return Err(anyhow!("Option threads.pkt not found or bad integer value",))
+        }
+        _ => {
+            return Err(anyhow!(
+                "Wrong value type for threads.pkt, expecting integer",
             ))
         }
     };

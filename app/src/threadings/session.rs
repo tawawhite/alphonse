@@ -119,8 +119,6 @@ impl SessionThread {
         cfg: Arc<config::Config>,
         mut protocol_parsers: Box<Vec<Box<dyn ProtocolParserTrait>>>,
     ) -> Result<()> {
-        let parser = crate::packet::Parser::new(crate::packet::link::ETHERNET);
-
         let mut session_table: FnvHashMap<PacketHashKey, Box<SessionData>> = Default::default();
 
         let mut classify_scratch = match self.classifier.alloc_scratch() {
@@ -143,20 +141,10 @@ impl SessionThread {
 
             last_packet_time = pkt.ts().tv_sec as u64;
 
-            match parser.parse_pkt(pkt.as_mut()) {
-                Ok(_) => {}
-                Err(e) => match e {
-                    crate::packet::parser::Error::UnsupportProtocol(_) => {}
-                    _ => todo!(),
-                },
-            };
-
             let key = PacketHashKey::from(pkt.as_ref());
             match session_table.get_mut(&key) {
                 Some(ses) => {
-                    // let info = Arc::get_mut(&mut ses.info).unwrap();
-                    let info =
-                        unsafe { &mut *(&mut ses.info.as_ref() as *const _ as *mut Session) };
+                    let info = unsafe { &mut *(ses.info.as_ref() as *const _ as *mut Session) };
                     info.update(&pkt);
                     self.parse_pkt(
                         &mut classify_scratch,
@@ -169,15 +157,14 @@ impl SessionThread {
                 }
                 None => {
                     let mut ses = Box::new(SessionData::new());
-                    let info =
-                        unsafe { &mut *(&mut ses.info.as_ref() as *const _ as *mut Session) };
+                    let info = unsafe { &mut *(ses.info.as_ref() as *const _ as *mut Session) };
                     info.start_time = TimeVal::new(*pkt.ts());
                     info.update(&pkt);
                     self.parse_pkt(
                         &mut classify_scratch,
                         &mut protocol_parsers,
                         &mut pkt,
-                        Arc::get_mut(&mut ses.info).unwrap(),
+                        info,
                         ses.parsers.as_mut(),
                     )
                     .unwrap();
@@ -190,7 +177,6 @@ impl SessionThread {
                 Self::timeout(last_packet_time, &mut session_table, &cfg)?;
                 last_timeout_check_time = last_packet_time;
             }
-            // println!("{}", serde_json::to_string(ses.as_ref()).unwrap());
         }
 
         println!("session thread {} exit", self.id);

@@ -112,25 +112,30 @@ fn main() -> Result<()> {
 
     // initialize session threads
     let mut ses_threads = Vec::new();
-    let (sender, receiver) = bounded(cfg.pkt_channel_size as usize);
-
+    let mut dispatch_senders = vec![];
+    let mut dispatch_receivers = vec![];
     for i in 0..cfg.ses_threads {
+        let (dispatch_sender, dispatch_receiver) = bounded(cfg.pkt_channel_size as usize);
         let thread = threadings::SessionThread::new(
             i,
             exit.clone(),
-            receiver.clone(),
+            dispatch_receiver.clone(),
             classifier_manager.clone(),
         );
         ses_threads.push(thread);
+        dispatch_senders.push(dispatch_sender);
+        dispatch_receivers.push(dispatch_receiver);
     }
 
-    let rx_handles = start_rx(exit.clone(), cfg.clone(), sender.clone())?;
-    for h in rx_handles {
-        handles.push(h);
-    }
+    // initialize pkt threads
+    let (pkt_sender, pkt_receiver) = bounded(cfg.pkt_channel_size as usize);
+    let mut pkt_threads = Vec::new();
 
-    drop(sender);
-    drop(receiver);
+    for i in 0..cfg.pkt_threads {
+        let thread =
+            threadings::PktThread::new(i, exit.clone(), pkt_receiver.clone(), &dispatch_senders);
+        pkt_threads.push(thread);
+    }
 
     // start all session threads
     for mut thread in ses_threads {
@@ -140,6 +145,23 @@ fn main() -> Result<()> {
         let handle = builder.spawn(move || thread.spawn(cfg, parsers))?;
         handles.push(handle);
     }
+
+    // start all pkt threads
+    for thread in pkt_threads {
+        let builder = std::thread::Builder::new().name(thread.name());
+        let handle = builder.spawn(move || thread.spawn())?;
+        handles.push(handle);
+    }
+
+    let rx_handles = start_rx(exit.clone(), cfg.clone(), pkt_sender.clone())?;
+    for h in rx_handles {
+        handles.push(h);
+    }
+
+    drop(pkt_sender);
+    drop(pkt_receiver);
+    drop(dispatch_senders);
+    drop(dispatch_receivers);
 
     for handle in handles {
         match handle.join() {
