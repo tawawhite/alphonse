@@ -511,10 +511,6 @@ pub mod test {
         fn clone_box(&self) -> Box<dyn PacketTrait + '_> {
             Box::new(self.clone())
         }
-
-        fn clone_box_deep(&self) -> Box<dyn PacketTrait> {
-            Box::new(self.clone())
-        }
     }
 
     #[test]
