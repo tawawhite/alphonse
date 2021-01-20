@@ -94,14 +94,38 @@ impl RxThread {
             }
 
             let mut cap = Offline::try_from_path(file)?;
+            let mut overflow_cnt = 0;
 
             while !self.exit.load(Ordering::Relaxed) {
-                let pkt = cap.next()?;
-                match self.sender.send(pkt) {
-                    Ok(_) => {}
+                let pkt = match cap.next() {
+                    Ok(pkt) => pkt,
                     Err(err) => {
-                        eprintln!("{} sender error: {}", self.name(), err)
+                        if err.to_string().as_str() == "no more packets to read from the file" {
+                        } else {
+                            eprintln!("{}", err);
+                        }
+                        break;
                     }
+                };
+
+                match self.sender.try_send(pkt) {
+                    Ok(_) => {}
+                    Err(err) => match err {
+                        crossbeam_channel::TrySendError::Full(_) => {
+                            overflow_cnt += 1;
+                            if overflow_cnt % 10000 == 0 {
+                                println!(
+                                    "{} overflowing, total overflow {}",
+                                    self.name(),
+                                    overflow_cnt
+                                );
+                            }
+                        }
+                        crossbeam_channel::TrySendError::Disconnected(_) => {
+                            println!("{} channel is closed, exit", self.name());
+                            break;
+                        }
+                    },
                 };
             }
         }

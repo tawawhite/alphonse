@@ -50,16 +50,30 @@ struct RxThread {
 impl RxThread {
     pub fn spawn(&mut self, _cfg: Arc<Config>) -> Result<()> {
         let mut cap = NetworkInterface::try_from_str(self.interface.as_str())?;
+        let mut overflow_cnt = 0;
 
         println!("{} started", self.name());
 
         while !self.exit.load(Ordering::Relaxed) {
             let pkt = cap.next()?;
-            match self.sender.send(pkt) {
+            match self.sender.try_send(pkt) {
                 Ok(_) => {}
-                Err(err) => {
-                    eprintln!("{} sender error: {}", self.name(), err)
-                }
+                Err(err) => match err {
+                    crossbeam_channel::TrySendError::Full(_) => {
+                        overflow_cnt += 1;
+                        if overflow_cnt % 10000 == 0 {
+                            println!(
+                                "{} overflowing, total overflow {}",
+                                self.name(),
+                                overflow_cnt
+                            );
+                        }
+                    }
+                    crossbeam_channel::TrySendError::Disconnected(_) => {
+                        println!("{} channel is closed, exit", self.name());
+                        break;
+                    }
+                },
             };
         }
 
