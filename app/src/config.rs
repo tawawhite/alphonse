@@ -9,7 +9,7 @@ use super::commands::CliArg;
 
 #[derive(Default, Clone)]
 pub struct Config {
-    pub backend: String,
+    pub rx_backend: String,
     pub verbose_mode: bool,
     pub pkt_channel_size: u32,
     pub default_timeout: u16,
@@ -252,15 +252,15 @@ fn parse_config_file(config_file: &str, config: &mut Config) -> Result<()> {
         }
     };
 
-    match &doc["backend"] {
+    match &doc["rx.backend"] {
         Yaml::String(s) => match s.as_str() {
             "dpdk" | "libpcap" => {
-                config.backend = String::from(s);
+                config.rx_backend = String::from(s);
             }
-            _ => return Err(anyhow!("Invalid backend option: {}", s)),
+            _ => return Err(anyhow!("Invalid rx.backend option: {}", s)),
         },
-        Yaml::BadValue => return Err(anyhow!("Option backend not found or bad string value",)),
-        _ => return Err(anyhow!("Wrong value type for backend, expecting string",)),
+        Yaml::BadValue => return Err(anyhow!("Option rr.backend not found or bad string value",)),
+        _ => return Err(anyhow!("Wrong value type for rx.backend, expecting string",)),
     };
 
     match &doc["parsers"] {

@@ -44,7 +44,7 @@ fn start_rx(
         return Ok(handles);
     }
 
-    let handles = match cfg.backend.as_str() {
+    let handles = match cfg.rx_backend.as_str() {
         "libpcap" => match (rx::libpcap::UTILITY.start)(exit, cfg, sender)? {
             Some(handles) => handles,
             None => vec![],
@@ -60,7 +60,7 @@ fn main() -> Result<()> {
     let mut cfg = config::parse_args(root_cmd)?;
     let exit = Arc::new(AtomicBool::new(false));
 
-    match cfg.backend.as_str() {
+    match cfg.rx_backend.as_str() {
         "libpcap" => {
             (rx::libpcap::UTILITY.init)(&mut cfg)?;
         }
@@ -170,7 +170,7 @@ fn main() -> Result<()> {
         };
     }
 
-    match cfg.backend.as_str() {
+    match cfg.rx_backend.as_str() {
         "libpcap" => {
             (rx::libpcap::UTILITY.cleanup)(&cfg)?;
         }
