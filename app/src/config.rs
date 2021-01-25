@@ -34,6 +34,94 @@ pub struct Config {
     pub docs: Vec<Yaml>,
 }
 
+fn get_str(doc: &Yaml, key: &str, default: &str) -> String {
+    match &doc[key] {
+        Yaml::String(s) => s.clone(),
+        Yaml::BadValue => {
+            println!(
+                "Option {} not found or bad string value, set {} to {}",
+                key, key, default
+            );
+            default.to_string()
+        }
+        _ => {
+            println!(
+                "Wrong value type for {}, expecting string, set {} to {}",
+                key, key, default
+            );
+            default.to_string()
+        }
+    }
+}
+
+fn get_integer(doc: &Yaml, key: &str, default: i64, min: i64, max: i64) -> i64 {
+    match doc[key] {
+        Yaml::Integer(i) => {
+            if i < min || i > max {
+                println!(
+                    "Option {} is less/greater than min/max value {}/{}, set {} to {}",
+                    key, min, max, key, default
+                );
+                default
+            } else {
+                i
+            }
+        }
+        Yaml::BadValue => {
+            println!(
+                "Option {} not found or bad integer value, set {} to {}",
+                key, key, default
+            );
+            default
+        }
+        _ => {
+            println!(
+                "Wrong value type for {}, expecting string, set {} to {}",
+                key, key, default
+            );
+            default
+        }
+    }
+}
+
+fn get_str_arr(doc: &Yaml, key: &str) -> Vec<String> {
+    let mut result = vec![];
+    match &doc[key] {
+        Yaml::Array(a) => {
+            for parser in a {
+                match parser {
+                    Yaml::String(s) => result.push(String::from(s)),
+                    Yaml::BadValue => println!("Bad string value for {}'s element", key),
+                    _ => println!("Wrong value type for {}' element, expecting string", key),
+                }
+            }
+        }
+        Yaml::BadValue => println!(
+            "Option {} not found or bad array value, set {} to empty array",
+            key, key
+        ),
+        _ => println!(
+            "Wrong value type for {}, expecting array, set {} to empty array",
+            key, key
+        ),
+    }
+    result
+}
+
+impl Config {
+    pub fn get_integer(&self, key: &str, default: i64, min: i64, max: i64) -> i64 {
+        get_integer(&self.docs[0], key, default, min, max)
+    }
+
+    pub fn get_str(&self, key: &str, default: &str) -> String {
+        get_str(&self.docs[0], key, default)
+    }
+
+    pub fn get_str_arr(&self, key: &str) -> Vec<String> {
+        get_str_arr(&self.docs[0], key)
+    }
+}
+
 /// Parse command line arguments and set configuration
 pub fn parse_args(root_cmd: clap::App) -> Result<Config> {
     let mut config: Config = Default::default();
@@ -54,24 +142,6 @@ pub fn parse_args(root_cmd: clap::App) -> Result<Config> {
     Ok(config)
 }
 
-fn set_integer<T: std::cmp::PartialOrd + std::fmt::Display + Copy>(
-    dst: &mut T,
-    src: T,
-    default: T,
-    max: T,
-    min: T,
-    name: &str,
-) {
-    if src > max || src < min {
-        *dst = default;
-        println!(
-            "{} is out of range: [{}, {}], set to default value: {}",
-            name, min, max, default
-        );
-    }
-    *dst = src;
-}
-
 fn parse_config_file(config_file: &str, config: &mut Config) -> Result<()> {
     let cfg_path = Path::new(config_file);
     if !cfg_path.exists() {
@@ -88,240 +158,35 @@ fn parse_config_file(config_file: &str, config: &mut Config) -> Result<()> {
     let doc = &docs[0];
     config.docs = docs.clone();
 
-    match &doc["channel.pkt.size"] {
-        Yaml::Integer(i) => set_integer(
-            &mut config.pkt_channel_size,
-            *i as u32,
-            1000000,
-            0xffffffff,
-            100000,
-            "channel.pkt.size",
-        ),
-        Yaml::BadValue => {
+    config.pkt_channel_size =
+        get_integer(doc, "channel.pkt.size", 1000000, 100000, 10000000) as u32;
+    config.timeout_interval = get_integer(doc, "timeout.interval", 1, 1, 10) as u64;
+    config.default_timeout = get_integer(doc, "timeout.default", 60, 10, 180) as u16;
+    config.tcp_timeout = get_integer(doc, "timeout.tcp", 60, 10, 180) as u16;
+    config.udp_timeout = get_integer(doc, "timeout.udp", 60, 10, 180) as u16;
+    config.sctp_timeout = get_integer(doc, "timeout.sctp", 60, 10, 180) as u16;
+
+    config.pkt_threads = get_integer(doc, "threads.pkt", 1, 1, 24) as u8;
+    config.rx_threads = get_integer(doc, "threads.rx", 1, 1, 24) as u8;
+    config.ses_threads = get_integer(doc, "threads.session", 1, 1, 24) as u8;
+
+    let backend = get_str(doc, "rx.backend", "libpcap");
+    match backend.as_str() {
+        "dpdk" | "libpcap" => {
+            config.rx_backend = backend;
+        }
+        _ => {
             println!(
-                "Option channel.pkt.size not found or bad integer value, set channel.pkt.size to 1000000"
+                "Invalid rx.backend option: {}, set rx.backend to {}",
+                s, "libpcap"
             );
-            config.pkt_channel_size = 1000000;
-        }
-        _ => {
-            return Err(anyhow!(
-                "Wrong value type for channel.pkt.size, expecting integer",
-            ))
         }
     };
 
-    match &doc["timeout.interval"] {
-        Yaml::Integer(i) => set_integer(
-            &mut config.timeout_interval,
-            *i as u64,
-            1,
-            10,
-            1,
-            "timeout.interval",
-        ),
-        Yaml::BadValue => {
-            println!("Option timeout.interval not found or bad integer value, set timeout.interval to 1 sec");
-            config.timeout_interval = 1;
-        }
-        _ => {
-            return Err(anyhow!(
-                "Wrong value type for timeout.interval, expecting integer",
-            ))
-        }
-    };
+    config.parsers = get_str_arr(doc, "parsers");
+    config.interfaces = get_str_arr(doc, "interfaces");
 
-    match &doc["timeout.default"] {
-        Yaml::Integer(i) => set_integer(
-            &mut config.default_timeout,
-            *i as u16,
-            60,
-            0xffff,
-            10,
-            "timeout.default",
-        ),
-        Yaml::BadValue => {
-            println!("Option timeout.default not found or bad integer value, set timeout.default to 60 secs");
-            config.default_timeout = 60;
-        }
-        _ => {
-            return Err(anyhow!(
-                "Wrong value type for timeout.default, expecting integer",
-            ))
-        }
-    };
-
-    match &doc["timeout.tcp"] {
-        Yaml::Integer(i) => set_integer(
-            &mut config.tcp_timeout,
-            *i as u16,
-            60,
-            0xffff,
-            10,
-            "timeout.tcp",
-        ),
-        Yaml::BadValue => {
-            println!(
-                "Option timeout.tcp not found or bad integer value, set timeout.tcp to 60 secs"
-            );
-            config.tcp_timeout = 480;
-        }
-        _ => {
-            return Err(anyhow!(
-                "Wrong value type for timeout.tcp, expecting integer",
-            ))
-        }
-    };
-
-    match &doc["timeout.udp"] {
-        Yaml::Integer(i) => set_integer(
-            &mut config.udp_timeout,
-            *i as u16,
-            60,
-            0xffff,
-            10,
-            "timeout.udp",
-        ),
-        Yaml::BadValue => {
-            println!(
-                "Option timeout.udp not found or bad integer value, set timeout.udp to 60 secs"
-            );
-            config.udp_timeout = 480;
-        }
-        _ => {
-            return Err(anyhow!(
-                "Wrong value type for timeout.udp, expecting integer",
-            ))
-        }
-    };
-
-    match &doc["timeout.sctp"] {
-        Yaml::Integer(i) => set_integer(
-            &mut config.sctp_timeout,
-            *i as u16,
-            60,
-            0xffff,
-            10,
-            "timeout.sctp",
-        ),
-        Yaml::BadValue => {
-            println!(
-                "Option timeout.sctp not found or bad integer value, set timeout.udp to 60 secs"
-            );
-            config.udp_timeout = 480;
-        }
-        _ => {
-            return Err(anyhow!(
-                "Wrong value type for timeout.sctp, expecting integer",
-            ))
-        }
-    };
-
-    match &doc["threads.pkt"] {
-        Yaml::Integer(i) => config.pkt_threads = *i as u8,
-        Yaml::BadValue => {
-            return Err(anyhow!("Option threads.pkt not found or bad integer value",))
-        }
-        _ => {
-            return Err(anyhow!(
-                "Wrong value type for threads.pkt, expecting integer",
-            ))
-        }
-    };
-
-    match &doc["threads.rx"] {
-        Yaml::Integer(i) => config.rx_threads = *i as u8,
-        Yaml::BadValue => return Err(anyhow!("Option threads.rx not found or bad integer value",)),
-        _ => {
-            return Err(anyhow!(
-                "Wrong value type for threads.rx, expecting integer",
-            ))
-        }
-    };
-
-    match &doc["threads.session"] {
-        Yaml::Integer(i) => config.ses_threads = *i as u8,
-        Yaml::BadValue => {
-            return Err(anyhow!(
-                "Option threads.session not found or bad integer value",
-            ))
-        }
-        _ => {
-            return Err(anyhow!(
-                "Wrong value type for threads.session, expecting integer",
-            ))
-        }
-    };
-
-    match &doc["rx.backend"] {
-        Yaml::String(s) => match s.as_str() {
-            "dpdk" | "libpcap" => {
-                config.rx_backend = String::from(s);
-            }
-            _ => return Err(anyhow!("Invalid rx.backend option: {}", s)),
-        },
-        Yaml::BadValue => return Err(anyhow!("Option rr.backend not found or bad string value",)),
-        _ => return Err(anyhow!("Wrong value type for rx.backend, expecting string",)),
-    };
-
-    match &doc["parsers"] {
-        Yaml::Array(a) => {
-            for parser in a {
-                match parser {
-                    Yaml::String(s) => config.parsers.push(String::from(s)),
-                    Yaml::BadValue => {
-                        return Err(anyhow!("Option parsers not found or bad array value",))
-                    }
-                    _ => {
-                        return Err(anyhow!(
-                            "Wrong value type for interfaces' element, expecting string",
-                        ))
-                    }
-                }
-            }
-        }
-        Yaml::BadValue => return Err(anyhow!("Option parsers not found or bad array value",)),
-        _ => return Err(anyhow!("Wrong value type for parsers, expecting array",)),
-    }
-
-    match &doc["interfaces"] {
-        Yaml::Array(a) => {
-            for element in a {
-                match element {
-                    Yaml::String(s) => config.interfaces.push(s.clone()),
-                    Yaml::BadValue => {
-                        return Err(anyhow!("Bad string value for an network interface",))
-                    }
-                    _ => {
-                        return Err(anyhow!(
-                            "Wrong value type for interfaces' element, expecting string",
-                        ))
-                    }
-                }
-            }
-        }
-        Yaml::BadValue => return Err(anyhow!("Option interfaces not found or bad array value",)),
-        _ => return Err(anyhow!("Wrong value type for interfaces, expecting array",)),
-    }
-
-    match &doc["rx.stats.log.interval"] {
-        Yaml::Integer(i) => set_integer(
-            &mut config.rx_stat_log_interval,
-            *i as u32,
-            1,
-            10,
-            1,
-            "rx.stats.log.interval",
-        ),
-        Yaml::BadValue => {
-            println!("Option rx.stats.log.interval not found or bad integer value, set rx.stats.log.interval to 1 sec");
-            config.timeout_interval = 1;
-        }
-        _ => {
-            return Err(anyhow!(
-                "Wrong value type for rx.stats.log.interval, expecting integer",
-            ))
-        }
-    };
+    config.rx_stat_log_interval = get_integer(doc, "rx.stats.log.interval", 1, 1, 10) as u32;
 
     #[cfg(all(target_os = "linux", feature = "dpdk"))]
     {
