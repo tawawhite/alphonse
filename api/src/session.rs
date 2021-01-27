@@ -10,6 +10,7 @@ use super::utils::timeval::{precision, TimeVal};
 #[derive(Serialize)]
 #[cfg_attr(feature = "arkime", serde(rename_all = "camelCase"))]
 pub struct Session {
+    #[serde(skip_serializing_if = "String::is_empty")]
     pub id: String,
     /// Some session only contains one direction's packets
     /// Some protocols may work in that way
