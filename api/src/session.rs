@@ -42,7 +42,7 @@ where
 #[cfg_attr(feature = "arkime", serde(rename_all = "camelCase"))]
 pub struct Session {
     #[serde(skip_serializing_if = "String::is_empty")]
-    pub id: String,
+    pub id: Box<String>,
     /// Some session only contains one direction's packets
     /// Some protocols may work in that way
     /// but network problems could cause single direction
@@ -70,18 +70,18 @@ pub struct Session {
     pub parse_finished: bool,
     /// custom fields
     #[serde(flatten)]
-    pub fields: serde_json::Value,
+    pub fields: Box<serde_json::Value>,
     /// Tags
-    tags: HashSet<Box<String>>,
+    tags: Box<HashSet<String>>,
     /// Protocols
-    protocols: HashSet<Box<String>>,
+    protocols: Box<HashSet<String>>,
 }
 
 impl Session {
     /// Create a new session
     pub fn new() -> Session {
         Session {
-            id: String::new(),
+            id: Box::new(String::new()),
             single_direction: false,
             pkt_count: [0; 2],
             bytes: [0; 2],
@@ -95,9 +95,9 @@ impl Session {
                 tv_usec: 0,
             }),
             parse_finished: false,
-            fields: serde_json::Value::default(),
-            tags: HashSet::new(),
-            protocols: HashSet::new(),
+            fields: Box::new(serde_json::Value::default()),
+            tags: Box::new(HashSet::new()),
+            protocols: Box::new(HashSet::new()),
         }
     }
 
@@ -131,13 +131,13 @@ impl Session {
 
     /// Add session protocol information
     #[inline]
-    pub fn add_protocol(&mut self, protocol: Box<String>) {
+    pub fn add_protocol(&mut self, protocol: &String) {
         self.protocols.insert(protocol.clone());
     }
 
     /// Add tag
     #[inline]
-    pub fn add_tag(&mut self, tag: Box<String>) {
+    pub fn add_tag(&mut self, tag: &String) {
         self.tags.insert(tag.clone());
     }
 }

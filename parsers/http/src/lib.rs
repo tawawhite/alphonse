@@ -148,7 +148,7 @@ impl api::parsers::ProtocolParserTrait for ProtocolParser {
         if !self.is_classified() {
             // If this session is already classified as this protocol, skip
             self.classified_as_this_protocol()?;
-            ses.add_protocol(Box::new(self.name().clone()));
+            ses.add_protocol(self.name());
         }
 
         Ok(())
