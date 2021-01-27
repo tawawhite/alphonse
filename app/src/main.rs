@@ -11,6 +11,7 @@ extern crate path_absolutize;
 extern crate rte;
 extern crate serde_json;
 extern crate signal_hook;
+extern crate tokio;
 extern crate yaml_rust;
 
 use std::collections::HashMap;
@@ -55,7 +56,8 @@ fn start_rx(
     Ok(handles)
 }
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     let root_cmd = commands::new_root_command();
     let mut cfg = config::parse_args(root_cmd)?;
     let exit = Arc::new(AtomicBool::new(false));
@@ -110,6 +112,9 @@ fn main() -> Result<()> {
     classifier_manager.prepare()?;
     let classifier_manager = Arc::new(classifier_manager);
 
+    let (ses_sender, ses_receiver) = bounded(cfg.pkt_channel_size as usize);
+    let mut output_thread = threadings::output::Thread::new(exit.clone(), ses_receiver.clone());
+
     // initialize session threads
     let mut ses_threads = Vec::new();
     let mut dispatch_senders = vec![];
@@ -120,6 +125,7 @@ fn main() -> Result<()> {
             i,
             exit.clone(),
             dispatch_receiver.clone(),
+            ses_sender.clone(),
             classifier_manager.clone(),
         );
         ses_threads.push(thread);
@@ -135,6 +141,14 @@ fn main() -> Result<()> {
         let thread =
             threadings::PktThread::new(i, exit.clone(), pkt_receiver.clone(), &dispatch_senders);
         pkt_threads.push(thread);
+    }
+
+    // start all output threads
+    {
+        let cfg = cfg.clone();
+        let builder = std::thread::Builder::new().name(output_thread.name());
+        let handle = builder.spawn(move || output_thread.spawn(cfg)).unwrap();
+        handles.push(handle);
     }
 
     // start all session threads
@@ -162,6 +176,8 @@ fn main() -> Result<()> {
     drop(pkt_receiver);
     drop(dispatch_senders);
     drop(dispatch_receivers);
+    drop(ses_sender);
+    drop(ses_receiver);
 
     for handle in handles {
         match handle.join() {

@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::time::SystemTime;
 
 use anyhow::Result;
-use crossbeam_channel::Receiver;
+use crossbeam_channel::{Receiver, Sender};
 use fnv::FnvHashMap;
 
 use alphonse_api as api;
@@ -37,6 +37,7 @@ pub struct SessionThread {
     id: u8,
     exit: Arc<AtomicBool>,
     receiver: Receiver<Box<dyn Packet>>,
+    sender: Sender<Arc<Session>>,
     classifier: Arc<ClassifierManager>,
 }
 
@@ -45,12 +46,14 @@ impl SessionThread {
         id: u8,
         exit: Arc<AtomicBool>,
         receiver: Receiver<Box<dyn Packet>>,
+        sender: Sender<Arc<Session>>,
         classifier: Arc<ClassifierManager>,
     ) -> SessionThread {
         SessionThread {
             id,
             exit,
             receiver,
+            sender,
             classifier,
         }
     }
@@ -97,6 +100,7 @@ impl SessionThread {
         ts: u64,
         session_table: &mut FnvHashMap<PacketHashKey, Box<SessionData>>,
         cfg: &Arc<config::Config>,
+        sender: &Sender<Arc<Session>>,
     ) -> Result<()> {
         &mut session_table.retain(|key, ses| {
             let timeout = match key.trans_proto {
@@ -107,6 +111,8 @@ impl SessionThread {
                     .info
                     .timeout(cfg.default_timeout as c_long, ts as c_long),
             };
+
+            sender.try_send(ses.info.clone()).unwrap();
 
             !timeout
         });
@@ -174,9 +180,14 @@ impl SessionThread {
             }
 
             if last_packet_time > last_timeout_check_time {
-                Self::timeout(last_packet_time, &mut session_table, &cfg)?;
+                Self::timeout(last_packet_time, &mut session_table, &cfg, &self.sender)?;
                 last_timeout_check_time = last_packet_time;
             }
+        }
+
+        for (_, ses) in &session_table {
+            let ses = &ses.info;
+            self.sender.try_send(ses.clone())?;
         }
 
         println!("session thread {} exit", self.id);

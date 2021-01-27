@@ -17,6 +17,7 @@ pub struct Config {
     pub dpdk_eal_args: Vec<String>,
     pub dry_run: bool,
     pub interfaces: Vec<String>,
+    pub output_threads: u8,
     pub parsers: Vec<String>,
     pub pcap_file: String,
     pub pcap_dir: String,
@@ -169,6 +170,7 @@ fn parse_config_file(config_file: &str, config: &mut Config) -> Result<()> {
     config.pkt_threads = get_integer(doc, "threads.pkt", 1, 1, 24) as u8;
     config.rx_threads = get_integer(doc, "threads.rx", 1, 1, 24) as u8;
     config.ses_threads = get_integer(doc, "threads.session", 1, 1, 24) as u8;
+    config.output_threads = get_integer(doc, "threads.output", 1, 1, 24) as u8;
 
     let backend = get_str(doc, "rx.backend", "libpcap");
     match backend.as_str() {
