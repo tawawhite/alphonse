@@ -6,7 +6,6 @@ use anyhow::{anyhow, Result};
 use chrono::{Datelike, Timelike};
 use crossbeam_channel::Receiver;
 use elasticsearch::{http::transport::Transport, Elasticsearch};
-use tokio::runtime::Runtime;
 
 use alphonse_api as api;
 use api::session::Session;
@@ -90,6 +89,9 @@ impl Thread {
             .enable_all()
             .build()
             .unwrap();
+        let host = cfg.get_str("elasticsearch", "http://localhost:9200");
+        let es = Arc::new(Elasticsearch::new(Transport::single_node(host.as_str())?));
+
         println!("{} started", self.name());
 
         let mut sessions = vec![];
@@ -104,13 +106,17 @@ impl Thread {
                     },
                 };
                 sessions.push(ses);
-                if sessions.len() == 100 {
+                if sessions.len() == 5 {
                     let sessions_cloned = sessions.clone();
                     let cfg = cfg.clone();
-                    let a = tokio::spawn(async {
-                        Thread::save_sessions(cfg, sessions_cloned).await.unwrap();
-                    });
-                    a.await.unwrap();
+                    let es = es.clone();
+                    tokio::spawn(async {
+                        Thread::save_sessions(cfg, es, sessions_cloned)
+                            .await
+                            .unwrap();
+                    })
+                    .await
+                    .unwrap();
                     sessions.clear();
                 }
             }
@@ -121,15 +127,45 @@ impl Thread {
         Ok(())
     }
 
-    async fn save_sessions(cfg: Arc<Config>, sessions: Vec<Arc<Session>>) -> Result<()> {
-        let host = cfg.get_str("elasticsearch", "http://localhost:9200");
-        let es = Elasticsearch::new(Transport::single_node(host.as_str())?);
-        let c = es.cat();
-        let resp = c.health().send().await?;
-        let resp = resp.text().await.unwrap();
-        println!("resp: {}", resp);
-        println!("sessions count: {}", sessions.len());
-        for ses in &sessions {}
+    async fn save_sessions(
+        _cfg: Arc<Config>,
+        es: Arc<Elasticsearch>,
+        sessions: Vec<Arc<Session>>,
+    ) -> Result<()> {
+        let mut body = vec![];
+        for ses in &sessions {
+            let index = format!(
+                "sessions2-{}",
+                to_index_suffix(Rotate::Daily, &ses.start_time)
+            );
+            let bulk_op = elasticsearch::BulkOperation::index(ses.as_ref()).index(index);
+            body.push(bulk_op);
+        }
+        let body = sessions
+            .iter()
+            .map(|ses| {
+                let index = format!(
+                    "sessions2-{}",
+                    to_index_suffix(Rotate::Daily, &ses.start_time)
+                );
+                elasticsearch::BulkOperation::from(
+                    elasticsearch::BulkOperation::index(ses.as_ref()).index(index),
+                )
+            })
+            .collect();
+        let resp = es
+            .bulk(elasticsearch::BulkParts::None)
+            .body(body)
+            .send()
+            .await?;
+        let code = resp.status_code();
+        match code.as_u16() {
+            200 => {}
+            c => {
+                println!("status code: {}", c);
+                println!("response message: {}", resp.text().await.unwrap());
+            }
+        };
 
         Ok(())
     }
