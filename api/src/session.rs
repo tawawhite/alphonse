@@ -1,10 +1,41 @@
 use std::collections::HashSet;
 use std::os::raw::c_long;
 
-use serde::Serialize;
+use serde::ser::SerializeStruct;
+use serde::{Serialize, Serializer};
 
 use super::packet;
 use super::utils::timeval::{precision, TimeVal};
+
+fn packets_serialize<S>(packets: &[u32; 2], s: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let mut state = s.serialize_struct("", 2)?;
+    state.serialize_field("srcPackets", &packets[0])?;
+    state.serialize_field("dstPackets", &packets[0])?;
+    state.end()
+}
+
+fn bytes_serialize<S>(bytes: &[u64; 2], s: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let mut state = s.serialize_struct("", 2)?;
+    state.serialize_field("srcBytes", &bytes[0])?;
+    state.serialize_field("dstBytes", &bytes[0])?;
+    state.end()
+}
+
+fn data_bytes_serialize<S>(data_bytes: &[u64; 2], s: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let mut state = s.serialize_struct("", 2)?;
+    state.serialize_field("srcDataBytes", &data_bytes[0])?;
+    state.serialize_field("dstDataBytes", &data_bytes[0])?;
+    state.end()
+}
 
 /// Network session
 #[derive(Serialize)]
@@ -17,10 +48,16 @@ pub struct Session {
     /// but network problems could cause single direction
     pub single_direction: bool,
     /// session total packets
+    #[cfg_attr(feature = "arkime", serde(flatten))]
+    #[cfg_attr(feature = "arkime", serde(serialize_with = "packets_serialize"))]
     pub pkt_count: [u32; 2],
     /// session total bytes
+    #[cfg_attr(feature = "arkime", serde(flatten))]
+    #[cfg_attr(feature = "arkime", serde(serialize_with = "bytes_serialize"))]
     pub bytes: [u64; 2],
     /// session total data bytes
+    #[cfg_attr(feature = "arkime", serde(flatten))]
+    #[cfg_attr(feature = "arkime", serde(serialize_with = "data_bytes_serialize"))]
     pub data_bytes: [u64; 2],
     /// session start time
     #[cfg_attr(feature = "arkime", serde(rename = "firstPacket"))]
