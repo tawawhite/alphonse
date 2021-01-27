@@ -1,18 +1,7 @@
-extern crate alphonse_api;
-extern crate anyhow;
 #[macro_use]
 extern crate clap;
-extern crate crossbeam_channel;
-extern crate hyperscan;
-extern crate libc;
-extern crate libloading;
-extern crate path_absolutize;
 #[cfg(all(target_os = "linux", feature = "dpdk"))]
 extern crate rte;
-extern crate serde_json;
-extern crate signal_hook;
-extern crate tokio;
-extern crate yaml_rust;
 
 use std::collections::HashMap;
 use std::sync::atomic::AtomicBool;
