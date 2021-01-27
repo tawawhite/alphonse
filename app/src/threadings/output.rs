@@ -84,10 +84,9 @@ impl Thread {
     }
 
     pub fn spawn(&mut self, cfg: Arc<Config>) -> Result<()> {
-        let mut rt = tokio::runtime::Builder::new()
-            .core_threads(4)
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(4)
             .thread_name("alphonse-output-tokio")
-            .threaded_scheduler()
             .enable_all()
             .build()
             .unwrap();
