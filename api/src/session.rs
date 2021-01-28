@@ -75,6 +75,8 @@ pub struct Session {
     tags: Box<HashSet<String>>,
     /// Protocols
     protocols: Box<HashSet<String>>,
+    /// Tunnel Protocols
+    tunnels: packet::Tunnel,
 }
 
 impl Session {
@@ -98,6 +100,7 @@ impl Session {
             fields: Box::new(serde_json::Value::default()),
             tags: Box::new(HashSet::new()),
             protocols: Box::new(HashSet::new()),
+            tunnels: packet::Tunnel::default(),
         }
     }
 

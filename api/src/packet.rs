@@ -8,7 +8,8 @@ use std::convert::TryFrom;
 use std::hash::{Hash, Hasher};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
-extern crate libc;
+use serde::ser::SerializeSeq;
+use serde::{Serialize, Serializer};
 
 use super::classifiers::matched::Rule;
 
@@ -247,6 +248,9 @@ pub trait Packet: Send {
     fn rules(&self) -> &[Rule];
     fn rules_mut(&mut self) -> &mut Vec<Rule>;
 
+    fn tunnel(&self) -> Tunnel;
+    fn tunnel_mut(&mut self) -> &mut Tunnel;
+
     fn clone_box(&self) -> Box<dyn Packet + '_>;
 
     #[inline]
@@ -442,6 +446,56 @@ impl Default for Protocol {
     }
 }
 
+bitflags! {
+    pub struct Tunnel: u8 {
+        const NONE = 0;
+        const GRE = 0b00000001;
+        const PPPOE = 0b00000010;
+        const MPLS = 0b00000100;
+        const PPP = 0b00001000;
+        const GTP = 0b00010000;
+        const VXLAN = 0b00100000;
+        const L2TP = 0b01000000;
+    }
+}
+
+impl Default for Tunnel {
+    fn default() -> Self {
+        Tunnel::NONE
+    }
+}
+
+impl Serialize for Tunnel {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut s = serializer.serialize_seq(None)?;
+        if self.contains(Tunnel::GRE) {
+            s.serialize_element("gre")?;
+        }
+        if self.contains(Tunnel::GTP) {
+            s.serialize_element("gtp")?;
+        }
+        if self.contains(Tunnel::L2TP) {
+            s.serialize_element("l2tp")?;
+        }
+        if self.contains(Tunnel::MPLS) {
+            s.serialize_element("mpls")?;
+        }
+        if self.contains(Tunnel::PPP) {
+            s.serialize_element("ppp")?;
+        }
+        if self.contains(Tunnel::PPPOE) {
+            s.serialize_element("pppoe")?;
+        }
+        if self.contains(Tunnel::VXLAN) {
+            s.serialize_element("vxlan")?;
+        }
+        s.end()
+    }
+}
+
 #[cfg(test)]
 pub mod test {
     use super::Packet as PacketTrait;
@@ -461,6 +515,7 @@ pub mod test {
         /// Packet hash, improve hash performance
         pub hash: u64,
         pub rules: Box<Vec<Rule>>,
+        pub tunnel: Tunnel,
     }
 
     impl Default for Packet {
@@ -475,6 +530,7 @@ pub mod test {
                 layers: Layers::default(),
                 hash: 0,
                 rules: Box::new(Vec::new()),
+                tunnel: Tunnel::default(),
             }
         }
     }
@@ -506,6 +562,14 @@ pub mod test {
 
         fn rules_mut(&mut self) -> &mut Vec<Rule> {
             &mut self.rules
+        }
+
+        fn tunnel(&self) -> Tunnel {
+            self.tunnel
+        }
+
+        fn tunnel_mut(&mut self) -> &mut Tunnel {
+            &mut self.tunnel
         }
 
         fn clone_box(&self) -> Box<dyn PacketTrait + '_> {
@@ -578,5 +642,17 @@ pub mod test {
         ]);
         pkt.layers_mut().network.offset = 0;
         assert_eq!(pkt.dst_ipv6().to_be(), 0xff0200000000000000000000000000fb);
+    }
+
+    #[test]
+    fn serialize_tunnel() {
+        let tunnel = Tunnel::GRE;
+        assert_eq!("[\"gre\"]", serde_json::to_string(&tunnel).unwrap());
+
+        let tunnel = Tunnel::GRE | Tunnel::L2TP;
+        assert_eq!(
+            "[\"gre\",\"l2tp\"]",
+            serde_json::to_string(&tunnel).unwrap()
+        );
     }
 }

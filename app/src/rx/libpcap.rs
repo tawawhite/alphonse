@@ -7,8 +7,8 @@ use crossbeam_channel::Sender;
 
 use alphonse_api as api;
 use api::classifiers::matched::Rule;
-use api::packet::Layers;
 use api::packet::Packet as PacketTrait;
+use api::packet::{Layers, Tunnel};
 
 use crate::config::Config;
 use crate::rx::RxUtility;
@@ -140,6 +140,7 @@ pub struct Packet {
     caplen: u32,
     layers: Layers,
     rules: Box<Vec<Rule>>,
+    tunnel: Tunnel,
 }
 
 impl PacketTrait for Packet {
@@ -171,6 +172,14 @@ impl PacketTrait for Packet {
         &mut self.rules
     }
 
+    fn tunnel(&self) -> Tunnel {
+        self.tunnel
+    }
+
+    fn tunnel_mut(&mut self) -> &mut Tunnel {
+        &mut self.tunnel
+    }
+
     fn clone_box(&self) -> Box<dyn PacketTrait + '_> {
         Box::new(self.clone())
     }
@@ -184,6 +193,7 @@ impl From<&pcap::Packet<'_>> for Packet {
             caplen: pkt.header.caplen,
             layers: Layers::default(),
             rules: Box::new(Vec::new()),
+            tunnel: Tunnel::default(),
         }
     }
 }
