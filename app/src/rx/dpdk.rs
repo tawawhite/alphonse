@@ -12,7 +12,7 @@ use yaml_rust::Yaml;
 
 use alphonse_api as api;
 use api::classifiers::matched::Rule;
-use api::packet::{Layers, Packet as PacketTrait};
+use api::packet::{Layers, Packet as PacketTrait, Tunnel};
 use api::utils::timeval::{precision, TimeVal};
 
 use crate::config::Config;
@@ -224,6 +224,7 @@ pub struct Packet {
     ts: TimeVal<precision::Millisecond>,
     layers: Layers,
     rules: Box<Vec<Rule>>,
+    tunnel: Tunnel,
     drop: bool,
 }
 
@@ -247,6 +248,7 @@ impl Clone for Packet {
             ts: self.ts.clone(),
             layers: self.layers.clone(),
             rules: self.rules.clone(),
+            tunnel: self.tunnel,
             drop: self.drop,
         }
     }
@@ -279,6 +281,14 @@ impl PacketTrait for Packet {
 
     fn rules_mut(&mut self) -> &mut Vec<Rule> {
         &mut self.rules
+    }
+
+    fn tunnel(&self) -> Tunnel {
+        self.tunnel
+    }
+
+    fn tunnel_mut(&mut self) -> &mut Tunnel {
+        &mut self.tunnel
     }
 
     fn clone_box(&self) -> Box<dyn PacketTrait + '_> {
