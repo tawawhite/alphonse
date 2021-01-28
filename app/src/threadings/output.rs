@@ -105,6 +105,11 @@ impl Thread {
                         crossbeam_channel::TryRecvError::Disconnected => break,
                     },
                 };
+
+                if cfg.dry_run {
+                    continue;
+                }
+
                 sessions.push(ses);
                 if sessions.len() == 5 {
                     let sessions_cloned = sessions.clone();
