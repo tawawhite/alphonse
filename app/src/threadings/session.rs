@@ -112,7 +112,9 @@ impl SessionThread {
                     .timeout(cfg.default_timeout as c_long, ts as c_long),
             };
 
-            sender.try_send(ses.info.clone()).unwrap();
+            if timeout {
+                sender.try_send(ses.info.clone()).unwrap();
+            }
 
             !timeout
         });
