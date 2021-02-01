@@ -4,8 +4,8 @@ use std::os::raw::c_long;
 use serde::ser::SerializeStruct;
 use serde::{Serialize, Serializer};
 
-use super::packet;
-use super::utils::timeval::{precision, TimeVal};
+use crate::packet;
+use crate::utils::timeval::{precision, TimeVal};
 
 fn packets_serialize<S>(packets: &[u32; 2], s: S) -> Result<S::Ok, S::Error>
 where
@@ -65,6 +65,9 @@ pub struct Session {
     /// session end time
     #[cfg_attr(feature = "arkime", serde(rename = "lastPacket"))]
     pub end_time: TimeVal<precision::Millisecond>,
+    /// Session next save time, used for long connection with few packets
+    #[serde(skip_serializing)]
+    pub save_time: u64,
     /// indicate nothing to parse here
     #[serde(skip_serializing)]
     pub parse_finished: bool,
@@ -80,30 +83,6 @@ pub struct Session {
 }
 
 impl Session {
-    /// Create a new session
-    pub fn new() -> Session {
-        Session {
-            id: Box::new(String::new()),
-            single_direction: false,
-            pkt_count: [0; 2],
-            bytes: [0; 2],
-            data_bytes: [0; 2],
-            start_time: TimeVal::new(libc::timeval {
-                tv_sec: 0,
-                tv_usec: 0,
-            }),
-            end_time: TimeVal::new(libc::timeval {
-                tv_sec: 0,
-                tv_usec: 0,
-            }),
-            parse_finished: false,
-            fields: Box::new(serde_json::Value::default()),
-            tags: Box::new(HashSet::new()),
-            protocols: Box::new(HashSet::new()),
-            tunnels: packet::Tunnel::default(),
-        }
-    }
-
     #[inline]
     /// update session information
     pub fn update(&mut self, pkt: &Box<dyn packet::Packet>) {
@@ -142,5 +121,39 @@ impl Session {
     #[inline]
     pub fn add_tag(&mut self, tag: &String) {
         self.tags.insert(tag.clone());
+    }
+
+    /// Whether this session needs to do a middle save operation
+    #[inline]
+    pub fn need_mid_save(&mut self, max_packets: u32, tv_sec: u64) -> bool {
+        if self.truncate(max_packets as u32) {
+            return true;
+        }
+
+        if self.save_time < tv_sec {
+            // If session connection active too long, need to save a middle result
+            return true;
+        }
+
+        false
+    }
+
+    /// Whether should truncate this session into a smaller session
+    #[inline]
+    pub fn truncate(&self, max_packets: u32) -> bool {
+        if self.pkt_count[0] + self.pkt_count[1] >= max_packets {
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Reset mid saved session
+    #[inline]
+    pub fn mid_save_reset(&mut self, save_time: u64) {
+        self.pkt_count = [0, 0];
+        self.bytes = [0, 0];
+        self.data_bytes = [0, 0];
+        self.save_time = save_time;
     }
 }

@@ -106,7 +106,10 @@ impl SessionThread {
                     .timeout(cfg.default_timeout as c_long, ts as c_long),
             };
 
-            if timeout {
+            if ses.info.need_mid_save(cfg.ses_max_packets as u32, ts) {
+                sender.try_send(ses.info.clone()).unwrap();
+                ses.info.mid_save_reset(ts + cfg.ses_save_timeout as u64);
+            } else if timeout {
                 sender.try_send(ses.info.clone()).unwrap();
             }
 
@@ -161,6 +164,7 @@ impl SessionThread {
                     let mut ses = Box::new(SessionData::default());
                     let info = ses.info.as_mut();
                     info.start_time = TimeVal::new(*pkt.ts());
+                    info.save_time = pkt.ts().tv_sec as u64;
                     info.update(&pkt);
                     self.parse_pkt(
                         &mut classify_scratch,

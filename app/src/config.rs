@@ -26,6 +26,10 @@ pub struct Config {
     pub recursive: bool,
     pub rx_stat_log_interval: u32,
     pub rx_threads: u8,
+    /// Max single session packets
+    pub ses_max_packets: u16,
+    /// Max session connection duration
+    pub ses_save_timeout: u16,
     pub ses_threads: u8,
     pub sctp_timeout: u16,
     pub tags: Vec<String>,
@@ -166,6 +170,10 @@ fn parse_config_file(config_file: &str, config: &mut Config) -> Result<()> {
     config.tcp_timeout = get_integer(doc, "timeout.tcp", 60, 10, 180) as u16;
     config.udp_timeout = get_integer(doc, "timeout.udp", 60, 10, 180) as u16;
     config.sctp_timeout = get_integer(doc, "timeout.sctp", 60, 10, 180) as u16;
+    config.ses_save_timeout = get_integer(doc, "timeout.ses.save", 180, 60, 360) as u16;
+
+    config.ses_max_packets =
+        get_integer(doc, "ses.max.packets", 10000, 1000, u16::MAX as i64) as u16;
 
     config.pkt_threads = get_integer(doc, "threads.pkt", 1, 1, 24) as u8;
     config.rx_threads = get_integer(doc, "threads.rx", 1, 1, 24) as u8;
