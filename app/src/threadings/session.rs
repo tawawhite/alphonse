@@ -17,18 +17,10 @@ use super::config;
 use super::sessions::Session;
 
 /// Data structure to store session info and session's protocol parsers
+#[derive(Default)]
 struct SessionData {
-    info: Arc<Session>,
+    info: Box<Session>,
     parsers: Box<FnvHashMap<ParserID, Box<dyn ProtocolParserTrait>>>,
-}
-
-impl SessionData {
-    fn new() -> Self {
-        SessionData {
-            info: Arc::new(Session::new()),
-            parsers: Box::new(FnvHashMap::default()),
-        }
-    }
 }
 
 /// 数据包处理线程
@@ -37,7 +29,7 @@ pub struct SessionThread {
     id: u8,
     exit: Arc<AtomicBool>,
     receiver: Receiver<Box<dyn Packet>>,
-    sender: Sender<Arc<Session>>,
+    sender: Sender<Box<Session>>,
     classifier: Arc<ClassifierManager>,
 }
 
@@ -46,7 +38,7 @@ impl SessionThread {
         id: u8,
         exit: Arc<AtomicBool>,
         receiver: Receiver<Box<dyn Packet>>,
-        sender: Sender<Arc<Session>>,
+        sender: Sender<Box<Session>>,
         classifier: Arc<ClassifierManager>,
     ) -> SessionThread {
         SessionThread {
@@ -100,7 +92,7 @@ impl SessionThread {
         ts: u64,
         session_table: &mut FnvHashMap<PacketHashKey, Box<SessionData>>,
         cfg: &Arc<config::Config>,
-        sender: &Sender<Arc<Session>>,
+        sender: &Sender<Box<Session>>,
     ) -> Result<()> {
         &mut session_table.retain(|key, ses| {
             let timeout = match key.trans_proto {
@@ -152,7 +144,7 @@ impl SessionThread {
             let key = PacketHashKey::from(pkt.as_ref());
             match session_table.get_mut(&key) {
                 Some(ses) => {
-                    let info = unsafe { &mut *(ses.info.as_ref() as *const _ as *mut Session) };
+                    let info = ses.info.as_mut();
                     info.update(&pkt);
                     self.parse_pkt(
                         &mut classify_scratch,
@@ -164,8 +156,8 @@ impl SessionThread {
                     .unwrap();
                 }
                 None => {
-                    let mut ses = Box::new(SessionData::new());
-                    let info = unsafe { &mut *(ses.info.as_ref() as *const _ as *mut Session) };
+                    let mut ses = Box::new(SessionData::default());
+                    let info = ses.info.as_mut();
                     info.start_time = TimeVal::new(*pkt.ts());
                     info.update(&pkt);
                     self.parse_pkt(

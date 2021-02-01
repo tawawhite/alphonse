@@ -70,11 +70,11 @@ fn to_index_suffix(rotate: Rotate, ts: &TimeVal<Millisecond>) -> String {
 
 pub struct Thread {
     exit: Arc<AtomicBool>,
-    receiver: Receiver<Arc<Session>>,
+    receiver: Receiver<Box<Session>>,
 }
 
 impl Thread {
-    pub fn new(exit: Arc<AtomicBool>, receiver: Receiver<Arc<Session>>) -> Self {
+    pub fn new(exit: Arc<AtomicBool>, receiver: Receiver<Box<Session>>) -> Self {
         Thread { exit, receiver }
     }
 
@@ -109,10 +109,9 @@ impl Thread {
                 if cfg.dry_run {
                     continue;
                 }
-
-                sessions.push(ses);
+                sessions.push(Arc::from(ses));
                 if sessions.len() == 5 {
-                    let sessions_cloned = sessions.clone();
+                    let sessions_cloned = Box::new(sessions.clone());
                     let cfg = cfg.clone();
                     let es = es.clone();
                     tokio::spawn(async {
@@ -135,15 +134,15 @@ impl Thread {
     async fn save_sessions(
         _cfg: Arc<Config>,
         es: Arc<Elasticsearch>,
-        sessions: Vec<Arc<Session>>,
+        sessions: Box<Vec<Arc<Session>>>,
     ) -> Result<()> {
         let mut body = vec![];
-        for ses in &sessions {
+        for ses in sessions.iter() {
             let index = format!(
                 "sessions2-{}",
                 to_index_suffix(Rotate::Daily, &ses.start_time)
             );
-            let bulk_op = elasticsearch::BulkOperation::index(ses.as_ref()).index(index);
+            let bulk_op = elasticsearch::BulkOperation::index(ses.clone()).index(index);
             body.push(bulk_op);
         }
         let body = sessions

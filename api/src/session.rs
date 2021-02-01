@@ -38,7 +38,7 @@ where
 }
 
 /// Network session
-#[derive(Serialize)]
+#[derive(Clone, Default, Serialize)]
 #[cfg_attr(feature = "arkime", serde(rename_all = "camelCase"))]
 pub struct Session {
     #[serde(skip_serializing_if = "String::is_empty")]
