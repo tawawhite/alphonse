@@ -13,8 +13,8 @@ use api::packet::{Packet, PacketHashKey, Protocol};
 use api::parsers::{ParserID, ProtocolParserTrait};
 use api::utils::timeval::TimeVal;
 
-use super::config;
 use super::sessions::Session;
+use crate::config::Config;
 
 /// Data structure to store session info and session's protocol parsers
 #[derive(Default)]
@@ -22,6 +22,8 @@ struct SessionData {
     info: Box<Session>,
     parsers: Box<FnvHashMap<ParserID, Box<dyn ProtocolParserTrait>>>,
 }
+
+type SessionTable = FnvHashMap<PacketHashKey, Box<SessionData>>;
 
 /// 数据包处理线程
 pub struct SessionThread {
@@ -90,8 +92,8 @@ impl SessionThread {
     #[inline]
     fn timeout(
         ts: u64,
-        session_table: &mut FnvHashMap<PacketHashKey, Box<SessionData>>,
-        cfg: &Arc<config::Config>,
+        session_table: &mut SessionTable,
+        cfg: &Config,
         sender: &Sender<Box<Session>>,
     ) -> Result<()> {
         &mut session_table.retain(|key, ses| {
@@ -116,10 +118,10 @@ impl SessionThread {
 
     pub fn spawn(
         &mut self,
-        cfg: Arc<config::Config>,
+        cfg: Arc<Config>,
         mut protocol_parsers: Box<Vec<Box<dyn ProtocolParserTrait>>>,
     ) -> Result<()> {
-        let mut session_table: FnvHashMap<PacketHashKey, Box<SessionData>> = Default::default();
+        let mut session_table: SessionTable = Default::default();
 
         let mut classify_scratch = match self.classifier.alloc_scratch() {
             Ok(scratch) => scratch,
