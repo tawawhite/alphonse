@@ -132,8 +132,8 @@ impl SessionThread {
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_secs();
-        let mut last_timeout_check_time: u64 = last_packet_time + cfg.timeout_interval;
-        println!("session thread {} started", self.id);
+        let mut next_timeout_check_time: u64 = last_packet_time + cfg.timeout_interval;
+        println!("{} started", self.name());
 
         while !self.exit.load(Ordering::Relaxed) {
             let mut pkt = match self.receiver.recv() {
@@ -175,9 +175,9 @@ impl SessionThread {
                 }
             }
 
-            if last_packet_time > last_timeout_check_time {
+            if last_packet_time > next_timeout_check_time {
                 Self::timeout(last_packet_time, &mut session_table, &cfg, &self.sender)?;
-                last_timeout_check_time = last_packet_time;
+                next_timeout_check_time = last_packet_time + cfg.timeout_interval;
             }
         }
 
@@ -186,7 +186,7 @@ impl SessionThread {
             self.sender.try_send(ses.clone())?;
         }
 
-        println!("session thread {} exit", self.id);
+        println!("{} exit", self.name());
         Ok(())
     }
 }
