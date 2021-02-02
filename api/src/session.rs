@@ -43,42 +43,54 @@ where
 pub struct Session {
     #[serde(skip_serializing_if = "String::is_empty")]
     pub id: Box<String>,
+
     /// Some session only contains one direction's packets
     /// Some protocols may work in that way
     /// but network problems could cause single direction
     pub single_direction: bool,
+
     /// session total packets
     #[cfg_attr(feature = "arkime", serde(flatten))]
     #[cfg_attr(feature = "arkime", serde(serialize_with = "packets_serialize"))]
     pub pkt_count: [u32; 2],
+
     /// session total bytes
     #[cfg_attr(feature = "arkime", serde(flatten))]
     #[cfg_attr(feature = "arkime", serde(serialize_with = "bytes_serialize"))]
     pub bytes: [u64; 2],
+
     /// session total data bytes
     #[cfg_attr(feature = "arkime", serde(flatten))]
     #[cfg_attr(feature = "arkime", serde(serialize_with = "data_bytes_serialize"))]
     pub data_bytes: [u64; 2],
+
     /// session start time
     #[cfg_attr(feature = "arkime", serde(rename = "firstPacket"))]
     pub start_time: TimeVal<precision::Millisecond>,
+
     /// session end time
     #[cfg_attr(feature = "arkime", serde(rename = "lastPacket"))]
     pub end_time: TimeVal<precision::Millisecond>,
+
     /// Session next save time, used for long connection with few packets
     #[serde(skip_serializing)]
     pub save_time: u64,
+
     /// indicate nothing to parse here
     #[serde(skip_serializing)]
     pub parse_finished: bool,
     /// custom fields
     #[serde(flatten)]
     pub fields: Box<serde_json::Value>,
+
     /// Tags
     tags: Box<HashSet<String>>,
+
     /// Protocols
     protocols: Box<HashSet<String>>,
+
     /// Tunnel Protocols
+    #[serde(skip_serializing_if = "packet::Tunnel::is_empty")]
     tunnels: packet::Tunnel,
 }
 
