@@ -163,6 +163,7 @@ impl SessionThread {
                 None => {
                     let mut ses = Box::new(SessionData::default());
                     let info = ses.info.as_mut();
+                    info.fields = Box::new(serde_json::json!({}));
                     info.start_time = TimeVal::new(*pkt.ts());
                     info.save_time = pkt.ts().tv_sec as u64;
                     info.update(&pkt);
