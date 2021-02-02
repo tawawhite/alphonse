@@ -7,6 +7,7 @@ use super::parsers::ParserID;
 pub mod all;
 pub mod dpi;
 pub mod port;
+pub mod protocol;
 
 type RuleID = u32;
 
@@ -17,11 +18,12 @@ pub enum RuleType {
     // Get packets by transport layer port
     Port(port::Rule),
     // Get packets by protocol
-    Protocol,
+    Protocol(protocol::Rule),
     // Get all packets
     All,
 }
 
+/// Rule struct use for rule binding
 #[derive(Debug, Clone, PartialEq)]
 pub struct Rule {
     /// Rule ID
@@ -72,7 +74,7 @@ pub mod matched {
                 super::RuleType::All => RuleType::All,
                 super::RuleType::Port(_) => RuleType::Port,
                 super::RuleType::DPI(_) => RuleType::DPI,
-                super::RuleType::Protocol => RuleType::Protocol,
+                super::RuleType::Protocol(_) => RuleType::Protocol,
             }
         }
     }
@@ -138,6 +140,8 @@ pub struct ClassifierManager {
     port_classifier: port::Classifier,
     /// DPI classifier
     dpi_classifier: dpi::Classifier,
+    /// Protocol classifier
+    proto_classifier: protocol::Classifier,
 }
 
 pub type ClassifyScratch = dpi::ClassifyScratch;
@@ -154,6 +158,7 @@ impl ClassifierManager {
             all_pkt_classifier: all::Classifier::default(),
             port_classifier: port::Classifier::default(),
             dpi_classifier: dpi::Classifier::default(),
+            proto_classifier: protocol::Classifier::default(),
         }
     }
 
@@ -197,9 +202,7 @@ impl ClassifierManager {
             RuleType::All => self.all_pkt_classifier.add_rule(rule)?,
             RuleType::DPI(_) => self.dpi_classifier.add_rule(rule)?,
             RuleType::Port(_) => self.port_classifier.add_rule(rule)?,
-            RuleType::Protocol => {
-                unimplemented!()
-            }
+            RuleType::Protocol(_) => self.proto_classifier.add_rule(rule)?,
         };
 
         self.rules[rule.id() as usize].parsers = rule.parsers.clone();
@@ -228,6 +231,8 @@ impl ClassifierManager {
         scratch: &mut dpi::ClassifyScratch,
     ) -> Result<()> {
         self.all_pkt_classifier.classify(pkt);
+
+        self.proto_classifier.classify(pkt);
 
         self.port_classifier.classify(pkt);
 

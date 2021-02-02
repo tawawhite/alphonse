@@ -72,7 +72,9 @@ mod test {
     fn add_invalid_rule_type_rule() {
         let mut classifier = Classifier::default();
         let mut rule = super::super::Rule::new(0);
-        rule.rule_type = super::super::RuleType::Protocol;
+        rule.rule_type = super::super::RuleType::Protocol(crate::classifiers::protocol::Rule(
+            packet::Protocol::UNKNOWN,
+        ));
         assert!(matches!(classifier.add_rule(&rule), Err(_)));
     }
 
