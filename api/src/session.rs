@@ -135,6 +135,18 @@ impl Session {
         self.tags.insert(tag.clone());
     }
 
+    /// Add field
+    #[inline]
+    pub fn add_field<S: AsRef<str>>(&mut self, key: &S, value: &serde_json::Value) {
+        match self.fields.as_mut() {
+            serde_json::Value::Object(obj) => match obj.get(key.as_ref()) {
+                None => obj.insert(key.as_ref().to_string(), value.clone()),
+                Some(_) => todo!(),
+            },
+            _ => todo!("need to guarantee fields is an object in Session initialization"),
+        };
+    }
+
     /// Whether this session needs to do a middle save operation
     #[inline]
     pub fn need_mid_save(&mut self, max_packets: u32, tv_sec: u64) -> bool {
