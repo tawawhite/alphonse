@@ -120,21 +120,6 @@ mod test {
     }
 
     #[test]
-    fn rule_exceed_max_parser_num() {
-        let mut classifier = Box::new(Classifier::default());
-        for i in 0..8 {
-            let port_rule = Rule {
-                port: 80,
-                protocol: packet::Protocol::UDP,
-            };
-            let mut rule = super::super::Rule::new(i as super::super::ParserID);
-            rule.rule_type = super::super::RuleType::Port(port_rule);
-            rule.id = i as RuleID;
-            assert!(matches!(classifier.add_rule(&rule), Ok(_)));
-        }
-    }
-
-    #[test]
     fn add_invalid_rule_type_rule() {
         let mut classifier = Classifier::default();
         let mut rule = super::super::Rule::new(0);
