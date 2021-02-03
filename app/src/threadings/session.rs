@@ -17,10 +17,19 @@ use super::sessions::Session;
 use crate::config::Config;
 
 /// Data structure to store session info and session's protocol parsers
-#[derive(Default)]
 struct SessionData {
     info: Box<Session>,
     parsers: Box<FnvHashMap<ParserID, Box<dyn ProtocolParserTrait>>>,
+}
+
+impl Default for SessionData {
+    fn default() -> SessionData {
+        SessionData {
+            // Here we use Session::new(), since default() doesn't generate the struct we need
+            info: Box::new(Session::new()),
+            parsers: Box::new(FnvHashMap::default()),
+        }
+    }
 }
 
 type SessionTable = FnvHashMap<PacketHashKey, Box<SessionData>>;
@@ -163,7 +172,6 @@ impl SessionThread {
                 None => {
                     let mut ses = Box::new(SessionData::default());
                     let info = ses.info.as_mut();
-                    info.fields = Box::new(serde_json::json!({}));
                     info.start_time = TimeVal::new(*pkt.ts());
                     info.save_time = pkt.ts().tv_sec as u64;
                     info.update(&pkt);

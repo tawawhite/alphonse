@@ -95,6 +95,12 @@ pub struct Session {
 }
 
 impl Session {
+    pub fn new() -> Session {
+        let mut ses = Session::default();
+        ses.fields = Box::new(serde_json::json!({}));
+        ses
+    }
+
     #[inline]
     /// update session information
     pub fn update(&mut self, pkt: &Box<dyn packet::Packet>) {
