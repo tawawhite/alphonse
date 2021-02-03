@@ -1,7 +1,6 @@
 use anyhow::Result;
 use fnv::FnvHashMap;
 use hyperscan::pattern;
-use serde_json::json;
 
 use alphonse_api as api;
 use api::classifiers::{dpi, ClassifierManager, Rule, RuleID, RuleType};
@@ -28,7 +27,7 @@ pub fn register_classify_rules(
 
 fn classify(ses: &mut Session, pkt: &Box<dyn Packet>) {
     match &pkt.payload()[5..].windows(4).position(|win| win == b"IMAP") {
-        Some(_) => ses.add_protocol("rdp"),
+        Some(_) => ses.add_protocol("imap"),
         None => {}
     }
 }
@@ -59,6 +58,6 @@ mod test {
 
         let mut ses = Session::new();
         parser.parse_pkt(&pkt, &pkt.rules()[0], &mut ses).unwrap();
-        assert!(ses.has_protocol("rdp"));
+        assert!(ses.has_protocol("imap"));
     }
 }
