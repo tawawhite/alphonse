@@ -5,8 +5,6 @@ use anyhow::Result;
 use crate::classifiers::ClassifierManager;
 use crate::{packet, session};
 
-mod ffi;
-
 pub type ParserID = u8;
 
 /// Create a Box of the protocol parser
