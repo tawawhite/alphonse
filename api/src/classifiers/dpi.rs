@@ -5,9 +5,29 @@ use hyperscan::Builder;
 
 use super::{matched, packet};
 
+bitflags! {
+    pub struct Protocol: u8 {
+        const TCP = 0b00000001;
+        const UDP = 0b00000010;
+        const SCTP = 0b00000100;
+    }
+}
+
+impl From<packet::Protocol> for Protocol {
+    fn from(protocol: packet::Protocol) -> Self {
+        match protocol {
+            packet::Protocol::TCP => Protocol::TCP,
+            packet::Protocol::UDP => Protocol::UDP,
+            packet::Protocol::SCTP => Protocol::SCTP,
+            _ => Protocol::all(),
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Rule {
     hs_pattern: hyperscan::Pattern,
+    pub protocol: Protocol,
 }
 
 impl PartialEq for Rule {
@@ -16,14 +36,19 @@ impl PartialEq for Rule {
             && (self.hs_pattern.flags == other.hs_pattern.flags)
             && (self.hs_pattern.ext == self.hs_pattern.ext)
             && (self.hs_pattern.som == self.hs_pattern.som)
+            && (self.protocol == self.protocol)
     }
 }
 
 impl Eq for Rule {}
 
 impl Rule {
+    /// Crate a new DPI rule, matching all protocol(TCP/UDP/SCTP)
     pub fn new(hs_pattern: hyperscan::Pattern) -> Self {
-        Rule { hs_pattern }
+        Rule {
+            hs_pattern,
+            protocol: Protocol::all(),
+        }
     }
 }
 
@@ -84,7 +109,10 @@ impl Classifier {
                 })?;
 
                 for id in ids {
-                    pkt.rules_mut().push(self.rules[id].clone());
+                    let proto = Protocol::from(pkt.layers().trans.protocol);
+                    if self.dpi_rules[id].protocol.contains(proto) {
+                        pkt.rules_mut().push(self.rules[id].clone());
+                    }
                 }
 
                 Ok(())
@@ -188,6 +216,34 @@ mod test {
         let mut pkt = Box::new(packet::test::Packet::default());
         let buf = b"a sentence does not contains the word";
         pkt.raw = Box::new(buf.iter().cloned().collect());
+        let mut pkt: Box<dyn PacketTrait> = pkt;
+        classifier.classify(&mut pkt, &mut scratch).unwrap();
+        assert_eq!(pkt.rules().len(), 0);
+    }
+
+    #[test]
+    fn classify_protocol_mismatch() {
+        let mut classifier = Classifier::default();
+        let expression = String::from("regex");
+        let mut dpi_rule = Rule::new(hyperscan::Pattern::new(expression.clone()).unwrap());
+        dpi_rule.protocol = Protocol::SCTP;
+        let rule = super::super::Rule {
+            id: 10,
+            priority: 100,
+            parsers: vec![0],
+            rule_type: super::super::RuleType::DPI(dpi_rule),
+        };
+
+        assert!(matches!(classifier.add_rule(&rule), Ok(_)));
+
+        classifier.prepare().unwrap();
+        let mut scratch = classifier.alloc_scratch().unwrap();
+
+        // matched
+        let mut pkt = Box::new(packet::test::Packet::default());
+        let buf = b"a sentence contains word regex";
+        pkt.raw = Box::new(buf.iter().cloned().collect());
+        pkt.layers_mut().trans.protocol = packet::Protocol::TCP;
         let mut pkt: Box<dyn PacketTrait> = pkt;
         classifier.classify(&mut pkt, &mut scratch).unwrap();
         assert_eq!(pkt.rules().len(), 0);
