@@ -75,6 +75,7 @@ mod test {
 
     use crate::classifiers::Classifier as ClassifierTrait;
     use crate::packet::Packet as PacketTrait;
+    use crate::utils;
 
     #[test]
     fn add_same_protocol_rule() {
@@ -116,7 +117,7 @@ mod test {
         rule.rule_type = crate::classifiers::RuleType::Protocol(proto_rule);
         classifier.add_rule(&rule).unwrap();
 
-        let mut pkt = Box::new(packet::test::Packet::default());
+        let mut pkt = Box::new(utils::packet::Packet::default());
         pkt.layers_mut().data_link = packet::Layer {
             offset: 0,
             protocol: packet::Protocol::ETHERNET,

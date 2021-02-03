@@ -155,6 +155,7 @@ mod test {
     use super::*;
     use crate::classifiers::Classifier as ClassifierTrait;
     use crate::packet::Packet as PacketTrait;
+    use crate::utils;
 
     #[test]
     fn add_same_dpi_rule() {
@@ -201,7 +202,7 @@ mod test {
         let mut scratch = classifier.alloc_scratch().unwrap();
 
         // matched
-        let mut pkt = Box::new(packet::test::Packet::default());
+        let mut pkt = Box::new(utils::packet::Packet::default());
         let buf = b"a sentence contains word regex";
         pkt.raw = Box::new(buf.iter().cloned().collect());
         let mut pkt: Box<dyn PacketTrait> = pkt;
@@ -213,7 +214,7 @@ mod test {
         assert_eq!(pkt.rules()[0].parsers[0], 0);
 
         // unmatched
-        let mut pkt = Box::new(packet::test::Packet::default());
+        let mut pkt = Box::new(utils::packet::Packet::default());
         let buf = b"a sentence does not contains the word";
         pkt.raw = Box::new(buf.iter().cloned().collect());
         let mut pkt: Box<dyn PacketTrait> = pkt;
@@ -240,7 +241,7 @@ mod test {
         let mut scratch = classifier.alloc_scratch().unwrap();
 
         // matched
-        let mut pkt = Box::new(packet::test::Packet::default());
+        let mut pkt = Box::new(utils::packet::Packet::default());
         let buf = b"a sentence contains word regex";
         pkt.raw = Box::new(buf.iter().cloned().collect());
         pkt.layers_mut().trans.protocol = packet::Protocol::TCP;
