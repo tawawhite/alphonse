@@ -45,8 +45,7 @@ fn start_rx(
     Ok(handles)
 }
 
-#[tokio::main]
-async fn main() -> Result<()> {
+fn main() -> Result<()> {
     let root_cmd = commands::new_root_command();
     let mut cfg = config::parse_args(root_cmd)?;
     let exit = Arc::new(AtomicBool::new(false));
