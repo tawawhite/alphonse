@@ -131,8 +131,13 @@ impl Session {
 
     /// Add session protocol information
     #[inline]
-    pub fn add_protocol(&mut self, protocol: &String) {
-        self.protocols.insert(protocol.clone());
+    pub fn add_protocol(&mut self, protocol: &str) {
+        self.protocols.insert(protocol.to_string());
+    }
+
+    #[inline]
+    pub fn has_protocol(&self, protocol: &str) -> bool {
+        self.protocols.contains(protocol)
     }
 
     /// Add tag

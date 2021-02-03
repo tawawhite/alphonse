@@ -1,0 +1,15 @@
+[package]
+name = "misc"
+version = "0.1.0"
+authors = ["Jack Liar <15205739+JackLiar@users.noreply.github.com>"]
+edition = "2018"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "misc"
+
+[dependencies]
+anyhow = "1.0"
+alphonse-api = { path = "../../api", optional = false }
+fnv = "1.0"
+hyperscan = "0.2"

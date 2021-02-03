@@ -9,7 +9,7 @@ pub mod dpi;
 pub mod port;
 pub mod protocol;
 
-type RuleID = u32;
+pub type RuleID = u32;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RuleType {

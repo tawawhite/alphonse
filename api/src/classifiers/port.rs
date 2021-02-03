@@ -86,7 +86,6 @@ impl Classifier {
 
 #[cfg(test)]
 mod test {
-    use super::super::RuleID;
     use super::*;
     use crate::classifiers::Classifier as ClassifierTrait;
     use crate::packet::Packet as PacketTrait;
