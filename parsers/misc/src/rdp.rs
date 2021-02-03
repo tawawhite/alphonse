@@ -35,13 +35,10 @@ fn classify(ses: &mut Session, pkt: &Box<dyn Packet>) {
     {
         ses.add_protocol("rdp");
         if pkt.payload().len() > 30 && &payload[11..28] == b"Cookie: mstshash=" {
-            match &pkt.payload()[28..]
-                .windows(2)
-                .position(|win| win == b"\r\n")
-            {
+            match payload[28..].windows(2).position(|win| win == b"\r\n") {
                 Some(pos) => ses.add_field(
                     &"user",
-                    &json!(String::from_utf8_lossy(&payload[28..28 + *pos]).to_string()),
+                    &json!(String::from_utf8_lossy(&payload[28..28 + pos]).to_string()),
                 ),
                 None => {}
             }
