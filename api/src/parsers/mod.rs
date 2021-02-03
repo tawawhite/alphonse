@@ -2,8 +2,10 @@ use std::ops::{Deref, DerefMut};
 
 use anyhow::Result;
 
-use super::classifiers::ClassifierManager;
-use super::{packet, session};
+use crate::classifiers::ClassifierManager;
+use crate::{packet, session};
+
+mod ffi;
 
 pub type ParserID = u8;
 
@@ -52,7 +54,7 @@ pub trait ProtocolParserTrait: Send + Sync {
     fn set_id(&mut self, id: ParserID);
 
     /// Get parser name
-    fn name(&self) -> &String;
+    fn name(&self) -> &str;
 
     /// Initialize parser required global resources
     fn init(&mut self) -> Result<()> {

@@ -50,8 +50,8 @@ impl api::parsers::ProtocolParserTrait for ProtocolParser {
     }
 
     /// Get parser name
-    fn name(&self) -> &String {
-        &self.name
+    fn name(&self) -> &str {
+        &self.name.as_str()
     }
 
     fn register_classify_rules(
