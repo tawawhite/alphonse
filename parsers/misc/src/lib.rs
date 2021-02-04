@@ -1,3 +1,5 @@
+use std::any::Any;
+
 use anyhow::Result;
 use fnv::FnvHashMap;
 
@@ -10,6 +12,7 @@ use api::session::Session;
 
 mod bitcoin;
 mod bittorrent;
+mod gh0st;
 mod imap;
 mod pop3;
 mod rdp;
@@ -55,6 +58,7 @@ impl ProtocolParserTrait for ProtocolParser {
     fn register_classify_rules(&mut self, manager: &mut ClassifierManager) -> Result<()> {
         bittorrent::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
         bitcoin::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
+        gh0st::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
         imap::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
         pop3::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
         rdp::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
