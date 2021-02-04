@@ -17,6 +17,7 @@ mod other220;
 mod pop3;
 mod rdp;
 mod redis;
+mod sip;
 mod vnc;
 
 #[derive(Clone, Default)]
@@ -66,6 +67,7 @@ impl ProtocolParserTrait for ProtocolParser {
         pop3::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
         rdp::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
         redis::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
+        sip::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
         vnc::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
 
         Ok(())
