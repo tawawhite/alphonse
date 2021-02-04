@@ -1,5 +1,3 @@
-use std::any::Any;
-
 use anyhow::Result;
 use fnv::FnvHashMap;
 
@@ -14,6 +12,7 @@ mod bitcoin;
 mod bittorrent;
 mod gh0st;
 mod imap;
+mod other220;
 mod pop3;
 mod rdp;
 mod redis;
@@ -60,6 +59,7 @@ impl ProtocolParserTrait for ProtocolParser {
         bitcoin::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
         gh0st::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
         imap::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
+        other220::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
         pop3::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
         rdp::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
         redis::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
