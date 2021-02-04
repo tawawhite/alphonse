@@ -10,6 +10,7 @@ use api::session::Session;
 
 mod bitcoin;
 mod bittorrent;
+mod imap;
 mod rdp;
 mod redis;
 
@@ -53,6 +54,7 @@ impl ProtocolParserTrait for ProtocolParser {
     fn register_classify_rules(&mut self, manager: &mut ClassifierManager) -> Result<()> {
         bittorrent::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
         bitcoin::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
+        imap::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
         rdp::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
         redis::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
 
