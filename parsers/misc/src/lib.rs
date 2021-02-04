@@ -12,6 +12,7 @@ mod bitcoin;
 mod bittorrent;
 mod gh0st;
 mod imap;
+mod mongo;
 mod other220;
 mod pop3;
 mod rdp;
@@ -60,6 +61,7 @@ impl ProtocolParserTrait for ProtocolParser {
         bitcoin::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
         gh0st::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
         imap::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
+        mongo::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
         other220::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
         pop3::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
         rdp::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
