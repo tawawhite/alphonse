@@ -97,23 +97,25 @@ impl From<&dyn Packet> for PacketHashKey {
         key.network_proto = pkt.layers().network.protocol;
         key.trans_proto = pkt.layers().trans.protocol;
 
-        match key.trans_proto {
-            Protocol::TCP | Protocol::UDP | Protocol::SCTP => {
-                if pkt.src_port() > pkt.dst_port() {
-                    key.src_port = pkt.src_port();
-                    key.dst_port = pkt.dst_port();
-                } else {
-                    key.src_port = pkt.dst_port();
-                    key.dst_port = pkt.src_port();
+        unsafe {
+            match key.trans_proto {
+                Protocol::TCP | Protocol::UDP | Protocol::SCTP => {
+                    if pkt.src_port() > pkt.dst_port() {
+                        key.src_port = pkt.src_port();
+                        key.dst_port = pkt.dst_port();
+                    } else {
+                        key.src_port = pkt.dst_port();
+                        key.dst_port = pkt.src_port();
+                    }
                 }
-            }
-            _ => {}
-        };
+                _ => {}
+            };
+        }
 
         match key.network_proto {
             Protocol::IPV4 => {
-                let src_ip = pkt.src_ipv4();
-                let dst_ip = pkt.dst_ipv4();
+                let src_ip = unsafe { pkt.src_ipv4() };
+                let dst_ip = unsafe { pkt.dst_ipv4() };
                 if src_ip > dst_ip {
                     key.src_ip = IpAddr::V4(Ipv4Addr::from(src_ip));
                     key.dst_ip = IpAddr::V4(Ipv4Addr::from(dst_ip));
@@ -123,8 +125,8 @@ impl From<&dyn Packet> for PacketHashKey {
                 }
             }
             Protocol::IPV6 => {
-                let src_ip = *pkt.src_ipv6();
-                let dst_ip = *pkt.dst_ipv6();
+                let src_ip = unsafe { *pkt.src_ipv6() };
+                let dst_ip = unsafe { *pkt.dst_ipv6() };
                 if src_ip > dst_ip {
                     key.src_ip = IpAddr::V6(Ipv6Addr::from(src_ip));
                     key.dst_ip = IpAddr::V6(Ipv6Addr::from(dst_ip));
@@ -140,8 +142,8 @@ impl From<&dyn Packet> for PacketHashKey {
         {
             match key.hash_method {
                 PacketHashMethod::MacOnly => {
-                    let src_mac = pkt.src_mac();
-                    let dst_mac = pkt.dst_mac();
+                    let src_mac = unsafe { pkt.src_mac() };
+                    let dst_mac = unsafe { pkt.dst_mac() };
                     if src_mac > dst_mac {
                         key.src_mac.copy_from_slice(src_mac);
                         key.dst_mac.copy_from_slice(dst_mac);
@@ -267,61 +269,61 @@ pub trait Packet: Send {
     ///
     /// It's the caller's duty to guarantee transport layer is TCP/UDP
     #[inline]
-    fn src_port(&self) -> u16 {
+    unsafe fn src_port(&self) -> u16 {
         let src_port_pos = (self.layers().trans.offset) as usize;
-        unsafe { (*(self.raw().as_ptr().add(src_port_pos) as *const u16)).to_be() }
+        (*(self.raw().as_ptr().add(src_port_pos) as *const u16)).to_be()
     }
 
     /// Get dst port
     ///
     /// It's the caller's duty to guarantee transport layer is TCP/UDP
     #[inline]
-    fn dst_port(&self) -> u16 {
+    unsafe fn dst_port(&self) -> u16 {
         let dst_port_pos = (self.layers().trans.offset + 2) as usize;
-        unsafe { (*(self.raw().as_ptr().add(dst_port_pos) as *const u16)).to_be() }
+        (*(self.raw().as_ptr().add(dst_port_pos) as *const u16)).to_be()
     }
 
     /// Get src ipv4 address
     ///
     /// It's the caller's duty to guarantee network layer is IPV4
     #[inline]
-    fn src_ipv4(&self) -> u32 {
+    unsafe fn src_ipv4(&self) -> u32 {
         let src_ip_pos = (self.layers().network.offset + 12) as usize;
-        unsafe { (*(self.raw().as_ptr().add(src_ip_pos) as *const u32)).to_be() }
+        (*(self.raw().as_ptr().add(src_ip_pos) as *const u32)).to_be()
     }
 
     /// Get dst ipv4 address
     ///
     /// It's the caller's duty to guarantee network layer is IPV4
     #[inline]
-    fn dst_ipv4(&self) -> u32 {
+    unsafe fn dst_ipv4(&self) -> u32 {
         let dst_ip_pos = (self.layers().network.offset + 16) as usize;
-        unsafe { (*(self.raw().as_ptr().add(dst_ip_pos) as *const u32)).to_be() }
+        (*(self.raw().as_ptr().add(dst_ip_pos) as *const u32)).to_be()
     }
 
     /// Get src ipv6 address
     ///
     /// It's the caller's duty to guarantee network layer is IPV6
     #[inline]
-    fn src_ipv6(&self) -> &u128 {
+    unsafe fn src_ipv6(&self) -> &u128 {
         let src_ip_pos = (self.layers().network.offset + 8) as usize;
-        unsafe { &*(self.raw().as_ptr().add(src_ip_pos) as *const u128) }
+        &*(self.raw().as_ptr().add(src_ip_pos) as *const u128)
     }
 
     /// Get dst ipv6 address
     ///
     /// It's the caller's duty to guarantee network layer is IPV6
     #[inline]
-    fn dst_ipv6(&self) -> &u128 {
+    unsafe fn dst_ipv6(&self) -> &u128 {
         let dst_ip_pos = (self.layers().network.offset + 8 + 16) as usize;
-        unsafe { &*(self.raw().as_ptr().add(dst_ip_pos) as *const u128) }
+        &*(self.raw().as_ptr().add(dst_ip_pos) as *const u128)
     }
 
     /// Get src mac address
     ///
     /// It's the caller's duty to guarantee datalink layer is Ethernet
     #[inline]
-    fn src_mac(&self) -> &[u8; 6] {
+    unsafe fn src_mac(&self) -> &[u8; 6] {
         <&[u8; 6]>::try_from(&self.raw()[6..12]).unwrap()
     }
 
@@ -329,7 +331,7 @@ pub trait Packet: Send {
     ///
     /// It's the caller's duty to guarantee datalink layer is Ethernet
     #[inline]
-    fn dst_mac(&self) -> &[u8; 6] {
+    unsafe fn dst_mac(&self) -> &[u8; 6] {
         <&[u8; 6]>::try_from(&self.raw()[0..6]).unwrap()
     }
 
@@ -343,7 +345,7 @@ pub trait Packet: Send {
     fn direction(&self) -> Direction {
         match self.layers().trans.protocol {
             Protocol::TCP | Protocol::UDP | Protocol::SCTP => {
-                if self.src_port() > self.dst_port() {
+                if unsafe { self.src_port() > self.dst_port() } {
                     return Direction::LEFT;
                 } else {
                     return Direction::RIGHT;
@@ -354,14 +356,14 @@ pub trait Packet: Send {
 
         match self.layers().network.protocol {
             Protocol::IPV4 => {
-                if self.src_ipv4() > self.src_ipv4() {
+                if unsafe { self.src_ipv4() > self.src_ipv4() } {
                     return Direction::LEFT;
                 } else {
                     return Direction::RIGHT;
                 }
             }
             Protocol::IPV6 => {
-                if *self.src_ipv6() > *self.src_ipv6() {
+                if unsafe { *self.src_ipv6() > *self.src_ipv6() } {
                     return Direction::LEFT;
                 } else {
                     return Direction::RIGHT;
@@ -510,7 +512,7 @@ pub mod test {
         let mut pkt = Packet::default();
         pkt.raw = Box::new(vec![0x14, 0xe9]);
         pkt.layers_mut().trans.offset = 0;
-        assert_eq!(pkt.src_port(), 5353);
+        unsafe { assert_eq!(pkt.src_port(), 5353) };
     }
 
     #[test]
@@ -518,7 +520,7 @@ pub mod test {
         let mut pkt = Packet::default();
         pkt.raw = Box::new(vec![0, 0, 0x14, 0xe9]);
         pkt.layers_mut().trans.offset = 0;
-        assert_eq!(pkt.dst_port(), 5353);
+        unsafe { assert_eq!(pkt.dst_port(), 5353) };
     }
 
     #[test]
@@ -530,7 +532,7 @@ pub mod test {
             0x66, 0x96, 0xcf, 0xb8, 0x50, 0x18, 0x10, 0x00, 0x8a, 0xcf, 0x00, 0x00,
         ]);
         pkt.layers_mut().network.offset = 0;
-        assert_eq!(pkt.src_ipv4(), 0xc0a802de);
+        unsafe { assert_eq!(pkt.src_ipv4(), 0xc0a802de) };
     }
 
     #[test]
@@ -542,7 +544,7 @@ pub mod test {
             0x66, 0x96, 0xcf, 0xb8, 0x50, 0x18, 0x10, 0x00, 0x8a, 0xcf, 0x00, 0x00,
         ]);
         pkt.layers_mut().network.offset = 0;
-        assert_eq!(pkt.dst_ipv4(), 0xda6221c5);
+        unsafe { assert_eq!(pkt.dst_ipv4(), 0xda6221c5) };
     }
 
     #[test]
@@ -554,7 +556,7 @@ pub mod test {
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xfb,
         ]);
         pkt.layers_mut().network.offset = 0;
-        assert_eq!(pkt.src_ipv6().to_be(), 0xfe800000000000001008fa7046e84204);
+        unsafe { assert_eq!(pkt.src_ipv6().to_be(), 0xfe800000000000001008fa7046e84204) };
     }
 
     #[test]
@@ -566,7 +568,7 @@ pub mod test {
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xfb,
         ]);
         pkt.layers_mut().network.offset = 0;
-        assert_eq!(pkt.dst_ipv6().to_be(), 0xff0200000000000000000000000000fb);
+        unsafe { assert_eq!(pkt.dst_ipv6().to_be(), 0xff0200000000000000000000000000fb) };
     }
 
     #[test]
