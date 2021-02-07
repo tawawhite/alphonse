@@ -1,13 +1,10 @@
 use anyhow::Result;
 use fnv::FnvHashMap;
 use hyperscan::pattern;
-use serde_json::json;
 
 use alphonse_api as api;
 use api::classifiers::{dpi, ClassifierManager, Rule, RuleID, RuleType};
-use api::packet::Packet;
 use api::parsers::ParserID;
-use api::session::Session;
 
 use super::MatchCallBack;
 

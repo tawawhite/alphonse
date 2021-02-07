@@ -1,5 +1,4 @@
 use anyhow::Result;
-use dpi::Protocol;
 use fnv::FnvHashMap;
 use hyperscan::pattern;
 
