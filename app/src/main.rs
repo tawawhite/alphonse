@@ -73,7 +73,8 @@ fn main() -> Result<()> {
     let mut protocol_parsers = Vec::new();
 
     for p in &cfg.as_ref().parsers {
-        parser_libraries.insert(p.clone(), libloading::Library::new(p)?);
+        let lib = unsafe { libloading::Library::new(p)? };
+        parser_libraries.insert(p.clone(), lib);
         let lib = parser_libraries.get(p).unwrap();
 
         unsafe {
