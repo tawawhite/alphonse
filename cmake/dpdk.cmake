@@ -43,7 +43,7 @@ ExternalProject_Add(dpdk-kmods
     CONFIGURE_COMMAND echo ""
     COMMAND sed -i.bak -e "s/supported(udev->pdev)/supported(udev->pdev)||true/g" <SOURCE_DIR>/linux/igb_uio/igb_uio.c
     BUILD_COMMAND cd linux/igb_uio && make 
-    INSTALL_COMMAND ${SUDO} ${CMAKE_COMMAND} -E copy <SOURCE_DIR>/linux/igb_uio/igb_uio.ko /lib/modules/${KERNEL_MODULE_DIR}/extra/dpdk
+    INSTALL_COMMAND ${SUDO} ${CMAKE_COMMAND} -E copy <SOURCE_DIR>/linux/igb_uio/igb_uio.ko /lib/modules/${KERNEL_MODULE_DIR}/extra/dpdk/igb_uio.ko
 )
 
 # yum install numactl-devel elfutils-libelf-devel jansson-devel libfdt-devel bcc-devel
