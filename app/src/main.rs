@@ -1,7 +1,5 @@
 #[macro_use]
 extern crate clap;
-#[cfg(all(target_os = "linux", feature = "dpdk"))]
-extern crate rte;
 
 use std::collections::HashMap;
 use std::sync::atomic::AtomicBool;
@@ -39,6 +37,7 @@ fn start_rx(
             Some(handles) => handles,
             None => vec![],
         },
+        #[cfg(all(target_os = "linux", feature = "dpdk"))]
         "dpdk" => match (rx::dpdk::UTILITY.start)(exit, cfg, sender)? {
             Some(handles) => handles,
             None => vec![],
