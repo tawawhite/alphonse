@@ -39,6 +39,10 @@ fn start_rx(
             Some(handles) => handles,
             None => vec![],
         },
+        "dpdk" => match (rx::dpdk::UTILITY.start)(exit, cfg, sender)? {
+            Some(handles) => handles,
+            None => vec![],
+        },
         _ => unreachable!(),
     };
 

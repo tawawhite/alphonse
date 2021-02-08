@@ -25,12 +25,82 @@ pub const UTILITY: RxUtility = RxUtility {
     cleanup,
 };
 
+fn init(cfg: &mut Config) -> Result<()> {
+    init_eal(cfg)?;
+
+    Ok(())
+}
+
 fn start(
     exit: Arc<AtomicBool>,
     cfg: Arc<Config>,
     sender: Sender<Box<dyn PacketTrait>>,
 ) -> Result<Option<Vec<JoinHandle<Result<()>>>>> {
+    init_ports(&cfg)?;
+
+    let pool_size = cfg.get_integer(
+        &"dpdk.pkt.pool.size",
+        2i64.pow(22) - 1,
+        2i64.pow(21) - 1,
+        2i64.pow(24) - 1,
+    ) as u32;
+
+    if !is_power_of_two(pool_size + 1) {
+        eprintln!(
+            "dpdk.pkt.pool.size {} is not optimal, consider make it a power of two minus one",
+            pool_size
+        );
+    }
+
+    let cache_size = cfg.get_integer(&"dpdk.pkt.pool.cache.size", 512, 32, 2048) as u32;
+    if !is_cache_size_valid(cache_size, pool_size) {
+        anyhow!("Invalid dpdk.pkt.pool.cache.size: {}", cache_size);
+    }
+
+    let mempool = rte::mbuf::pool_create(
+        &"alphonse-pkt-pool",
+        pool_size,
+        cache_size,
+        0,
+        2048,
+        rte::socket_id() as i32,
+    )?;
+
     Ok(None)
+}
+
+fn cleanup(_: &Config) -> Result<()> {
+    rte::eal::cleanup()
+}
+
+fn is_power_of_two<T: Into<u64>>(x: T) -> bool {
+    let x: u64 = x.into();
+    x != 0 && ((x & (x - 1)) == 0)
+}
+
+fn is_cache_size_valid<T: Into<u64>>(cache_size: T, pool_size: u32) -> bool {
+    let x: u64 = cache_size.into();
+    if x == 0 {
+        return true;
+    }
+
+    if x > rte::ffi::RTE_MEMPOOL_CACHE_MAX_SIZE as u64 {
+        return false;
+    }
+
+    if x as f64 > pool_size as f64 / 1.5 {
+        return false;
+    }
+
+    if (pool_size + 1) as u64 % x != 0 {
+        eprintln!(
+            "dpdk.pkt.pool.cache.size {} is not optimal,\
+                 it is advised to choose cache_size to have: pool_size modulo cache_size == 0",
+            x
+        );
+    }
+
+    true
 }
 
 /// Minimium DPDK rx unit
@@ -116,7 +186,9 @@ pub fn devices(cfg: &Config) -> Result<Vec<(rte::lcore::Id, Device)>> {
         .collect();
 
     let doc = &cfg.docs[0];
-    let rx_ports = &doc["dpdk.rx.ports"].as_hash().ok_or(anyhow!(""))?;
+    let rx_ports = doc["dpdk.rx.ports"]
+        .as_hash()
+        .ok_or(anyhow!("dpdk.rx.ports is not hash"))?;
     for (k, v) in rx_ports.iter() {
         let pci = k.as_str().ok_or(anyhow!("key is not a string"))?;
         let port = match ports.get(pci) {
@@ -191,18 +263,6 @@ fn init_ports(cfg: &Config) -> Result<()> {
     }
 
     Ok(())
-}
-
-fn init(cfg: &mut Config) -> Result<()> {
-    init_eal(cfg)?;
-
-    init_ports(cfg)?;
-
-    Ok(())
-}
-
-fn cleanup(_: &Config) -> Result<()> {
-    rte::eal::cleanup()
 }
 
 impl Device {
@@ -293,5 +353,17 @@ impl PacketTrait for Packet {
 
     fn clone_box(&self) -> Box<dyn PacketTrait + '_> {
         Box::new(self.clone())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_is_power_of_two() {
+        assert!(!is_power_of_two(0u32));
+        assert!(is_power_of_two(2u32));
+        assert!(is_power_of_two(4194304u32));
     }
 }
