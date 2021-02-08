@@ -1,0 +1,37 @@
+rx.backend: libpcap
+rx.stats.log.interval: 1
+channel.pkt.size: 2000000
+
+interfaces: ["eth0"]
+
+dpdk.eal.args: [
+    "-l", "0-3",
+    "--main-lcore", "0",
+    "-a", "0000:02:02.0",
+    "-n", "4",
+    "--file-prefix", "alphonse",
+    # "--log-level", "lib.eal:debug"
+]
+dpdk.rx.ports:
+  "0000:02:02.0":
+    - { core: 1, queue: 1 }
+dpdk.pkt.pool.size: 65535
+dpdk.pkt.pool.cache.size: 32
+
+elasticsearch: http://localhost:9200
+
+timeout.interval: 1
+timeout.default: 60
+timeout.tcp: 60
+timeout.udp: 60
+timeout.sctp: 60
+timeout.ses.save: 180
+ses.max.packets: 10000
+threads.pkt: 1
+threads.rx: 1
+threads.session: 1
+threads.output: 1
+parsers: [
+    "target/debug/libhttp.so",
+    "target/debug/libmisc.so"
+]
