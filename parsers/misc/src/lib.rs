@@ -104,3 +104,8 @@ impl ProtocolParserTrait for ProtocolParser {
         Ok(())
     }
 }
+
+#[no_mangle]
+pub extern "C" fn al_new_protocol_parser() -> Box<Box<dyn api::parsers::ProtocolParserTrait>> {
+    Box::new(Box::new(ProtocolParser::default()))
+}
