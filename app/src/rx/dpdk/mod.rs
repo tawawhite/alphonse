@@ -46,7 +46,7 @@ fn start(
         let cfg = cfg.clone();
         let mut thread = RxThread {
             exit: exit.clone(),
-            sender: sender.clone(),
+            _sender: sender.clone(),
             device: device.clone(),
         };
         let builder = std::thread::Builder::new().name(thread.name());
