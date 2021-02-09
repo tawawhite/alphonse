@@ -7,6 +7,7 @@ use serde::{Serialize, Serializer};
 use crate::packet;
 use crate::utils::timeval::{precision, TimeVal};
 
+#[allow(dead_code)]
 fn packets_serialize<S>(packets: &[u32; 2], s: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
@@ -17,6 +18,7 @@ where
     state.end()
 }
 
+#[allow(dead_code)]
 fn bytes_serialize<S>(bytes: &[u64; 2], s: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
@@ -27,6 +29,7 @@ where
     state.end()
 }
 
+#[allow(dead_code)]
 fn data_bytes_serialize<S>(data_bytes: &[u64; 2], s: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
