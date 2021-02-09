@@ -26,7 +26,7 @@ fn start(
     exit: Arc<AtomicBool>,
     cfg: Arc<Config>,
     sender: Sender<Box<dyn PacketTrait>>,
-) -> Result<Option<Vec<JoinHandle<Result<()>>>>> {
+) -> Result<Vec<JoinHandle<Result<()>>>> {
     let mut handles = vec![];
     let mut thread = RxThread {
         exit: exit.clone(),
@@ -36,7 +36,7 @@ fn start(
     let builder = std::thread::Builder::new().name(thread.name());
     let handle = builder.spawn(move || thread.spawn(cfg))?;
     handles.push(handle);
-    Ok(Some(handles))
+    Ok(handles)
 }
 
 /// get pcap files according to command line arguments/configuration file

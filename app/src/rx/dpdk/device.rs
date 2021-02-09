@@ -31,6 +31,16 @@ impl Device {
         }
     }
 
+    pub fn pci_address(&self) -> String {
+        let info = self.port.info();
+        unsafe {
+            CStr::from_ptr((*info.device).name)
+                .to_str()
+                .unwrap()
+                .to_string()
+        }
+    }
+
     pub fn configure(&mut self, _: &Config) -> Result<()> {
         Ok(())
     }

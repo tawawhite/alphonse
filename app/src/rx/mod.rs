@@ -19,6 +19,6 @@ pub struct RxUtility {
         exit: Arc<AtomicBool>,
         cfg: Arc<Config>,
         sender: Sender<Box<dyn Packet>>,
-    ) -> Result<Option<Vec<JoinHandle<Result<()>>>>>,
+    ) -> Result<Vec<JoinHandle<Result<()>>>>,
     pub cleanup: fn(cfg: &Config) -> Result<()>,
 }

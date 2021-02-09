@@ -24,7 +24,7 @@ pub fn start(
     exit: Arc<AtomicBool>,
     cfg: Arc<Config>,
     sender: Sender<Box<dyn PacketTrait>>,
-) -> Result<Option<Vec<JoinHandle<Result<()>>>>> {
+) -> Result<Vec<JoinHandle<Result<()>>>> {
     let mut handles = vec![];
     for interface in cfg.interfaces.iter() {
         let cfg = cfg.clone();
@@ -38,7 +38,7 @@ pub fn start(
         handles.push(handle);
     }
 
-    Ok(Some(handles))
+    Ok(handles)
 }
 
 struct RxThread {

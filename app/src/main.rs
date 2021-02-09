@@ -10,7 +10,7 @@ use anyhow::Result;
 use crossbeam_channel::{bounded, Sender};
 
 use alphonse_api as api;
-use api::{classifiers, parsers::NewProtocolParserFunc, parsers::ParserID, session};
+use api::{classifiers, parsers::NewProtocolParserFunc, parsers::ParserID};
 
 mod commands;
 mod config;
@@ -25,27 +25,15 @@ fn start_rx(
     sender: Sender<Box<dyn api::packet::Packet>>,
 ) -> Result<Vec<JoinHandle<Result<()>>>> {
     if !cfg.pcap_file.is_empty() {
-        let handles = match (rx::files::UTILITY.start)(exit, cfg, sender)? {
-            Some(handles) => handles,
-            None => vec![],
-        };
-        return Ok(handles);
+        return (rx::files::UTILITY.start)(exit, cfg, sender);
     }
 
-    let handles = match cfg.rx_backend.as_str() {
-        "libpcap" => match (rx::libpcap::UTILITY.start)(exit, cfg, sender)? {
-            Some(handles) => handles,
-            None => vec![],
-        },
+    match cfg.rx_backend.as_str() {
+        "libpcap" => return (rx::libpcap::UTILITY.start)(exit, cfg, sender),
         #[cfg(all(target_os = "linux", feature = "dpdk"))]
-        "dpdk" => match (rx::dpdk::UTILITY.start)(exit, cfg, sender)? {
-            Some(handles) => handles,
-            None => vec![],
-        },
+        "dpdk" => return (rx::dpdk::UTILITY.start)(exit, cfg, sender),
         _ => unreachable!(),
     };
-
-    Ok(handles)
 }
 
 fn main() -> Result<()> {
