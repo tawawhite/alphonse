@@ -8,6 +8,7 @@ set(FLAGS "-I${CMAKE_CURRENT_BINARY_DIR}/install/include -L${CMAKE_CURRENT_BINAR
 
 ExternalProject_Add(hyperscan
     URL ${hyperscan_url}
+    URL_MD5 65e08385038c24470a248f6ff2fa379b
     EXCLUDE_FROM_ALL ON
     PREFIX hyperscan
     INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR}/install

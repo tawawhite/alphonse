@@ -6,6 +6,7 @@ endif()
 
 ExternalProject_Add(dpdk
     URL ${dpdk_url}
+    URL_MD5 13a990dc3b300635f685e268b36918a3
     EXCLUDE_FROM_ALL ON
     PREFIX dpdk
     INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR}/install

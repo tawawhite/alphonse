@@ -6,6 +6,7 @@ endif()
 
 ExternalProject_Add(llhttp
     URL ${llhttp_url}
+    URL_MD5 a7714ce9e0b9c692a08ec27da399885e
     EXCLUDE_FROM_ALL ON
     PREFIX llhttp
     INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR}/install

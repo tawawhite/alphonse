@@ -6,6 +6,7 @@ endif()
 
 ExternalProject_Add(libpcre
     URL ${pcre_url}
+    URL_MD5 cf7326204cc46c755b5b2608033d9d24
     EXCLUDE_FROM_ALL ON
     PREFIX pcre
     INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR}/install

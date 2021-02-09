@@ -6,6 +6,7 @@ endif()
 
 ExternalProject_Add(ragel
     URL ${ragel_url}
+    URL_MD5 0c3110d7f17f7af4d9cb774443898dc1
     EXCLUDE_FROM_ALL ON
     PREFIX ragel
     INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR}/install

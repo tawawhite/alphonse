@@ -6,6 +6,7 @@ endif()
 
 ExternalProject_Add(libpcap
     URL ${libpcap_url}
+    URL_MD5 9feb4d1ccc5ea8c8b3e1558aa0c2be6f
     EXCLUDE_FROM_ALL ON
     PREFIX libpcap
     INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR}/install

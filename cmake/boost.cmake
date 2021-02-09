@@ -6,6 +6,7 @@ endif()
 
 ExternalProject_Add(boost
     URL ${boost_url}
+    URL_MD5 9273c8c4576423562bbe84574b07b2bd
     EXCLUDE_FROM_ALL ON
     PREFIX boost
     CONFIGURE_COMMAND ""
