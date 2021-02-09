@@ -11,9 +11,9 @@ use alphonse_api as api;
 use api::classifiers::ClassifierManager;
 use api::packet::{Packet, PacketHashKey, Protocol};
 use api::parsers::{ParserID, ProtocolParserTrait};
+use api::session::Session;
 use api::utils::timeval::TimeVal;
 
-use super::sessions::Session;
 use crate::config::Config;
 
 /// Data structure to store session info and session's protocol parsers
