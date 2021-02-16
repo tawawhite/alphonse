@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Result};
 
-use super::{matched, packet};
+use super::{matched, packet, Rule, RuleType};
 
 pub struct Classifier {
     // The receive all pkt rule
@@ -15,10 +15,21 @@ impl Default for Classifier {
     }
 }
 
+impl Into<Rule> for matched::Rule {
+    fn into(self) -> Rule {
+        Rule {
+            id: self.id,
+            priority: self.priority,
+            rule_type: super::RuleType::All,
+            parsers: self.parsers.clone(),
+        }
+    }
+}
+
 impl super::Classifier for Classifier {
-    fn add_rule(&mut self, rule: &super::Rule) -> Result<&matched::Rule> {
+    fn add_rule(&mut self, rule: &Rule) -> Result<Rule> {
         let parser_id = match rule.rule_type {
-            super::RuleType::All => rule.parsers[0],
+            RuleType::All => rule.parsers[0],
             _ => {
                 return Err(anyhow!(
                     "Mismatched rule type, expecting Port Rule, get {:?}",
@@ -30,13 +41,13 @@ impl super::Classifier for Classifier {
         // Prevent add same parser again, unlikely happen
         if self.rule.parsers.len() > 0 {
             match self.rule.parsers.iter().find(|id| **id == parser_id) {
-                Some(_) => return Ok(&self.rule),
+                Some(_) => return Ok(self.rule.clone().into()),
                 None => {}
             };
         }
 
         self.rule.parsers.push(parser_id);
-        Ok(&self.rule)
+        Ok(self.rule.clone().into())
     }
 }
 

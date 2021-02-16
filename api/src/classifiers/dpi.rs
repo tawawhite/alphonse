@@ -1,4 +1,4 @@
-use std::iter::FromIterator;
+use std::{borrow::Borrow, iter::FromIterator};
 
 use anyhow::{anyhow, Result};
 use hyperscan::Builder;
@@ -26,7 +26,7 @@ impl From<packet::Protocol> for Protocol {
 
 #[derive(Clone, Debug)]
 pub struct Rule {
-    hs_pattern: hyperscan::Pattern,
+    pub hs_pattern: hyperscan::Pattern,
     pub protocol: Protocol,
 }
 
@@ -52,6 +52,17 @@ impl Rule {
     }
 }
 
+impl From<(&Rule, &matched::Rule)> for super::Rule {
+    fn from(r: (&Rule, &matched::Rule)) -> Self {
+        super::Rule {
+            id: r.1.id(),
+            priority: r.1.priority,
+            rule_type: super::RuleType::DPI(r.0.clone()),
+            parsers: r.1.parsers.clone(),
+        }
+    }
+}
+
 #[derive(Default)]
 pub struct Classifier {
     /// DPI rules
@@ -62,7 +73,7 @@ pub struct Classifier {
 }
 
 impl super::Classifier for Classifier {
-    fn add_rule(&mut self, rule: &super::Rule) -> Result<&matched::Rule> {
+    fn add_rule(&mut self, rule: &super::Rule) -> Result<super::Rule> {
         let mut dpi_rule = match &rule.rule_type {
             super::RuleType::DPI(r) => r.clone(),
             r => {
@@ -73,8 +84,8 @@ impl super::Classifier for Classifier {
             }
         };
 
-        // reset rule's id to None
-        dpi_rule.hs_pattern.id = None;
+        // reset rule's hyperscan id
+        dpi_rule.hs_pattern.id = Some(self.rules.len());
 
         let mut same_pattern_index: Option<usize> = None;
         for (i, drule) in (&*self.dpi_rules).iter().enumerate() {
@@ -85,11 +96,23 @@ impl super::Classifier for Classifier {
 
         match same_pattern_index {
             None => {
-                self.rules.push(matched::Rule::from(rule));
+                self.rules.push(matched::Rule::from(rule.borrow()));
                 self.dpi_rules.push(dpi_rule.clone());
-                Ok(&self.rules[self.rules.len() - 1])
+                Ok(super::Rule::from((
+                    &self.dpi_rules[self.rules.len() - 1],
+                    &self.rules[self.rules.len() - 1],
+                )))
             }
-            Some(i) => Ok(&self.rules[i]),
+            Some(i) => {
+                // If same parser register same rule, skip
+                // Other wise append this parser's id into rule's parser list
+                let r = &mut self.rules[i];
+                match r.parsers.iter().find(|id| **id == rule.parsers[0]) {
+                    Some(_) => {}
+                    None => r.parsers.push(rule.parsers[0]),
+                };
+                Ok(super::Rule::from((&self.dpi_rules[i], &self.rules[i])))
+            }
         }
     }
 }
@@ -162,17 +185,13 @@ mod test {
         let mut classifier = Classifier::default();
         let expression = String::from("regex");
         let dpi_rule = Rule::new(hyperscan::Pattern::new(expression.clone()).unwrap());
-        let rule = super::super::Rule {
-            id: 0,
-            priority: 0,
-            parsers: Vec::new(),
-            rule_type: super::super::RuleType::DPI(dpi_rule),
-        };
+        let mut rule = crate::classifiers::Rule::new(0);
+        rule.rule_type = crate::classifiers::RuleType::DPI(dpi_rule);
 
         assert!(matches!(classifier.add_rule(&rule), Ok(_)));
 
         let mut rule = rule.clone();
-        rule.parsers.push(1);
+        rule.parsers = vec![1];
         assert!(matches!(classifier.add_rule(&rule), Ok(rule) if rule.id == 0));
     }
 

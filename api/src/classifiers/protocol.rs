@@ -29,7 +29,7 @@ impl Default for Classifier {
 }
 
 impl super::Classifier for Classifier {
-    fn add_rule(&mut self, rule: &super::Rule) -> Result<&matched::Rule> {
+    fn add_rule(&mut self, rule: &super::Rule) -> Result<super::Rule> {
         let proto_rule = match &rule.rule_type {
             super::RuleType::Protocol(r) => r,
             r => {
@@ -43,8 +43,12 @@ impl super::Classifier for Classifier {
         let i = proto_rule.0 as u8 as usize;
         self.rules[i].id = rule.id;
         self.rules[i].parsers.push(rule.parsers[0]);
-
-        Ok(&self.rules[i])
+        Ok(super::Rule {
+            id: self.rules[i].id(),
+            priority: self.rules[i].priority,
+            rule_type: rule.rule_type.clone(),
+            parsers: self.rules[i].parsers.clone(),
+        })
     }
 }
 
@@ -83,7 +87,7 @@ mod test {
         let proto_rule = Rule(packet::Protocol::TCP);
         let mut rule = crate::classifiers::Rule::new(1);
         rule.rule_type = crate::classifiers::RuleType::Protocol(proto_rule);
-        assert!(matches!(classifier.add_rule(&rule), Ok(_)));
+        assert!(matches!(classifier.add_rule(&mut rule), Ok(_)));
 
         let rule = &classifier.rules[proto_rule.0 as usize];
         assert_eq!(rule.parsers.len(), 1);
@@ -93,7 +97,7 @@ mod test {
         let proto_rule = Rule(packet::Protocol::TCP);
         let mut rule = crate::classifiers::Rule::new(2);
         rule.rule_type = crate::classifiers::RuleType::Protocol(proto_rule);
-        assert!(matches!(classifier.add_rule(&rule), Ok(rule) if rule.id == 0));
+        assert!(matches!(classifier.add_rule(&mut rule), Ok(rule) if rule.id == 0));
 
         let rule = &classifier.rules[proto_rule.0 as usize];
         assert_eq!(rule.parsers.len(), 2);
@@ -105,7 +109,7 @@ mod test {
         let mut classifier = Classifier::default();
         let mut rule = super::super::Rule::new(0);
         rule.rule_type = super::super::RuleType::All;
-        assert!(matches!(classifier.add_rule(&rule), Err(_)));
+        assert!(matches!(classifier.add_rule(&mut rule), Err(_)));
     }
 
     /// Classify a normal TCP/IP stack packet
@@ -115,7 +119,7 @@ mod test {
         let proto_rule = Rule(packet::Protocol::TCP);
         let mut rule = crate::classifiers::Rule::new(1);
         rule.rule_type = crate::classifiers::RuleType::Protocol(proto_rule);
-        classifier.add_rule(&rule).unwrap();
+        classifier.add_rule(&mut rule).unwrap();
 
         let mut pkt = Box::new(utils::packet::Packet::default());
         pkt.layers_mut().data_link = packet::Layer {

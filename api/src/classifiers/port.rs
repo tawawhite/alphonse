@@ -32,7 +32,7 @@ impl Default for Classifier {
 }
 
 impl super::Classifier for Classifier {
-    fn add_rule(&mut self, rule: &super::Rule) -> Result<&matched::Rule> {
+    fn add_rule(&mut self, rule: &super::Rule) -> Result<super::Rule> {
         let port_rule = match &rule.rule_type {
             super::RuleType::Port(r) => r,
             r => {
@@ -58,7 +58,12 @@ impl super::Classifier for Classifier {
         self.rules[index].id = rule.id;
         self.rules[index].parsers.push(rule.parsers[0]);
 
-        Ok(&self.rules[index])
+        Ok(super::Rule {
+            id: self.rules[index].id(),
+            priority: self.rules[index].priority,
+            rule_type: rule.rule_type.clone(),
+            parsers: self.rules[index].parsers.clone(),
+        })
     }
 }
 
@@ -100,7 +105,7 @@ mod test {
         };
         let mut rule = super::super::Rule::new(1);
         rule.rule_type = super::super::RuleType::Port(port_rule);
-        assert!(matches!(classifier.add_rule(&rule), Ok(_)));
+        assert!(matches!(classifier.add_rule(&mut rule), Ok(_)));
 
         let rule = &classifier.rules[(port_rule.port) as usize];
         assert_eq!(rule.parsers.len(), 1);
@@ -112,7 +117,7 @@ mod test {
         };
         let mut rule = super::super::Rule::new(12);
         rule.rule_type = super::super::RuleType::Port(port_rule);
-        assert!(matches!(classifier.add_rule(&rule), Ok(rule) if rule.id == 0));
+        assert!(matches!(classifier.add_rule(&mut rule), Ok(rule) if rule.id == 0));
 
         let rule = &classifier.rules[(port_rule.port) as usize];
         assert_eq!(rule.parsers.len(), 2);
@@ -124,7 +129,7 @@ mod test {
         let mut classifier = Classifier::default();
         let mut rule = super::super::Rule::new(0);
         rule.rule_type = super::super::RuleType::All;
-        assert!(matches!(classifier.add_rule(&rule), Err(_)));
+        assert!(matches!(classifier.add_rule(&mut rule), Err(_)));
     }
 
     #[test]
@@ -135,7 +140,7 @@ mod test {
             port: 0,
             protocol: packet::Protocol::ETHERNET,
         });
-        assert!(matches!(classifier.add_rule(&rule), Err(_)));
+        assert!(matches!(classifier.add_rule(&mut rule), Err(_)));
     }
 
     #[test]
@@ -148,7 +153,7 @@ mod test {
         let mut rule = super::super::Rule::new(1);
         rule.rule_type = super::super::RuleType::Port(port_rule);
 
-        classifier.add_rule(&rule).unwrap();
+        classifier.add_rule(&mut rule).unwrap();
 
         let mut pkt = Box::new(utils::packet::Packet::default());
         pkt.raw = Box::new(vec![
@@ -197,7 +202,7 @@ mod test {
         let mut rule = super::super::Rule::new(2);
         rule.rule_type = super::super::RuleType::Port(port_rule);
 
-        classifier.add_rule(&rule).unwrap();
+        classifier.add_rule(&mut rule).unwrap();
 
         let mut pkt = Box::new(utils::packet::Packet::default());
         pkt.raw = Box::new(vec![
@@ -227,7 +232,7 @@ mod test {
         let mut rule = super::super::Rule::new(3);
         rule.rule_type = super::super::RuleType::Port(port_rule);
 
-        classifier.add_rule(&rule).unwrap();
+        classifier.add_rule(&mut rule).unwrap();
 
         let mut pkt = Box::new(utils::packet::Packet::default());
         pkt.raw = Box::new(vec![

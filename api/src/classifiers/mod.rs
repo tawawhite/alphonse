@@ -24,7 +24,7 @@ pub enum RuleType {
 }
 
 /// Rule struct use for rule binding
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct Rule {
     /// Rule ID
     id: RuleID,
@@ -53,6 +53,17 @@ impl Rule {
     }
 }
 
+impl PartialEq for Rule {
+    fn eq(&self, other: &Rule) -> bool {
+        match (&self.rule_type, &other.rule_type) {
+            (RuleType::All, RuleType::All) => true,
+            (RuleType::All, _) => false,
+            (_, RuleType::All) => false,
+            _ => (self.priority == other.priority) && (self.rule_type == other.rule_type),
+        }
+    }
+}
+
 pub mod matched {
     use super::{ParserID, RuleID};
     #[repr(u8)]
@@ -69,6 +80,7 @@ pub mod matched {
     }
 
     impl From<&super::RuleType> for RuleType {
+        #[inline]
         fn from(rule_type: &super::RuleType) -> Self {
             match rule_type {
                 super::RuleType::All => RuleType::All,
@@ -80,6 +92,19 @@ pub mod matched {
     }
 
     #[derive(Debug, Clone, PartialEq)]
+    /// Data struct used by Packet trait, only contains necessary information about matched rule
+    ///
+    /// General Rule struct is quite huge, since it contains the real classify rule information,
+    /// but most of the time we don't need that information for every packet.
+    ///
+    /// For example, we want to process a http stream, we only need to know that one of
+    /// the tcp packets of this session matched the HTTP Request rule. But we do not need to know
+    /// which method it matches, just leave it to the http parser.
+    ///
+    /// So for performance reason(reduce bytes to copy and heap allocation),
+    /// we use a simplified `RuleType` & `Rule`. This is enough for parsers to work.
+    ///
+    /// TODO: test tinyvec crate to reduce heap allocation of Vec<ParserID>
     pub struct Rule {
         pub id: RuleID,
         pub priority: u8,
@@ -126,14 +151,14 @@ pub trait Classifier {
     ///
     /// # Returns
     ///
-    /// * `Result<&matched::Rule>` - Rule
-    fn add_rule(&mut self, rule: &Rule) -> Result<&matched::Rule>;
+    /// * `Result<&Rule>` - Rule
+    fn add_rule(&mut self, rule: &Rule) -> Result<Rule>;
 }
 
 /// Protocol Classifier
 pub struct ClassifierManager {
     /// Store rule detail information
-    rules: Vec<Box<Rule>>,
+    rules: Vec<Rule>,
     /// Receive all pkts rules
     all_pkt_classifier: all::Classifier,
     /// Port classifier
@@ -149,12 +174,12 @@ pub type ClassifyScratch = dpi::ClassifyScratch;
 impl ClassifierManager {
     pub fn new() -> ClassifierManager {
         ClassifierManager {
-            rules: vec![Box::new(Rule {
+            rules: vec![Rule {
                 id: 0,
                 priority: 255,
                 rule_type: RuleType::All,
                 parsers: Vec::new(),
-            })], // first rule is always the receive all pkt rule
+            }], // first rule is always the receive all pkt rule
             all_pkt_classifier: all::Classifier::default(),
             port_classifier: port::Classifier::default(),
             dpi_classifier: dpi::Classifier::default(),
@@ -170,42 +195,45 @@ impl ClassifierManager {
     ///
     /// # Returns
     ///
-    /// * 'Option<&Rule>` - Find result
+    /// * `Option<&Rule>` - Find result
     fn find(&self, rule: &Rule) -> Option<&Rule> {
-        fn eq(a: &Rule, b: &Rule) -> bool {
-            match (&a.rule_type, &b.rule_type) {
-                (RuleType::All, RuleType::All) => true,
-                (RuleType::All, _) => false,
-                (_, RuleType::All) => false,
-                _ => (a.priority == b.priority) && (a.rule_type == b.rule_type),
-            }
-        }
-
-        for r in &self.rules {
-            if eq(r.as_ref(), rule) {
-                return Some(r.as_ref());
-            }
-        }
-        None
+        self.rules.iter().find(|r| *r == rule)
     }
 
+    /// Get rule by ID
+    #[inline]
+    pub fn get_rule(&self, id: RuleID) -> Option<&Rule> {
+        self.rules.get(id as usize)
+    }
+
+    /// Add a classify rule
     pub fn add_rule(&mut self, rule: &mut Rule) -> Result<RuleID> {
-        match self.find(rule) {
+        // Find existing rule first, let individual classifiers handle same rule situation
+        let rule = match self.find(rule) {
+            Some(r) => {
+                rule.id = r.id;
+                match rule.rule_type {
+                    RuleType::All => self.all_pkt_classifier.add_rule(rule)?,
+                    RuleType::DPI(_) => self.dpi_classifier.add_rule(rule)?,
+                    RuleType::Port(_) => self.port_classifier.add_rule(rule)?,
+                    RuleType::Protocol(_) => self.proto_classifier.add_rule(rule)?,
+                }
+            }
             None => {
                 rule.id = self.rules.len() as RuleID;
-                self.rules.push(Box::new(rule.clone()));
+                let match_rule = match rule.rule_type {
+                    RuleType::All => self.all_pkt_classifier.add_rule(rule)?,
+                    RuleType::DPI(_) => self.dpi_classifier.add_rule(rule)?,
+                    RuleType::Port(_) => self.port_classifier.add_rule(rule)?,
+                    RuleType::Protocol(_) => self.proto_classifier.add_rule(rule)?,
+                };
+                self.rules.push(rule.clone());
+                match_rule
             }
-            Some(r) => rule.id = r.id(),
         };
 
-        let rule = match rule.rule_type {
-            RuleType::All => self.all_pkt_classifier.add_rule(rule)?,
-            RuleType::DPI(_) => self.dpi_classifier.add_rule(rule)?,
-            RuleType::Port(_) => self.port_classifier.add_rule(rule)?,
-            RuleType::Protocol(_) => self.proto_classifier.add_rule(rule)?,
-        };
-
-        self.rules[rule.id() as usize].parsers = rule.parsers.clone();
+        self.rules[rule.id() as usize] = rule.clone();
+        // self.rules[rule.id() as usize].parsers = rule.parsers.clone();
 
         Ok(rule.id())
     }
@@ -240,12 +268,6 @@ impl ClassifierManager {
 
         Ok(())
     }
-
-    /// Get rule by ID
-    #[inline]
-    pub fn get_rule(&self, id: RuleID) -> Option<&Box<Rule>> {
-        self.rules.get(id as usize)
-    }
 }
 
 #[cfg(test)]
@@ -256,13 +278,7 @@ mod tests {
     fn add_all_pkt_rule() {
         let mut classifier = ClassifierManager::new();
         // add a regular receive all pkt rule
-        let mut rule: Rule = Rule {
-            id: 0,
-            priority: 255,
-            parsers: Vec::new(),
-            rule_type: RuleType::All,
-        };
-        rule.parsers.push(1);
+        let mut rule = Rule::new(1);
 
         classifier.add_rule(&mut rule).unwrap();
         assert_eq!(classifier.rules.len(), 1);
@@ -273,13 +289,7 @@ mod tests {
         assert!(matches!(classifier.rules[0].rule_type, RuleType::All));
 
         // add a rule that has different id and priority
-        let mut rule: Rule = Rule {
-            id: 1,
-            priority: 0,
-            parsers: Vec::new(),
-            rule_type: RuleType::All,
-        };
-        rule.parsers.push(2);
+        let mut rule = Rule::new(2);
         classifier.add_rule(&mut rule).unwrap();
         assert_eq!(classifier.rules.len(), 1);
         assert_eq!(classifier.rules[0].id(), 0);
@@ -293,20 +303,15 @@ mod tests {
     fn add_port_rule() {
         let mut classifier = ClassifierManager::new();
         // add a regular port rule
-        let mut rule: Rule = Rule {
-            id: 0,
-            priority: 255,
-            parsers: Vec::new(),
-            rule_type: RuleType::Port(port::Rule {
-                port: 80,
-                protocol: packet::Protocol::TCP,
-            }),
-        };
-        rule.parsers.push(1);
+        let mut rule = Rule::new(1);
+        rule.rule_type = RuleType::Port(port::Rule {
+            port: 80,
+            protocol: packet::Protocol::TCP,
+        });
         classifier.add_rule(&mut rule).unwrap();
         assert_eq!(classifier.rules.len(), 2);
         assert_eq!(classifier.rules[1].id(), 1);
-        assert_eq!(classifier.rules[1].priority, 255);
+        assert_eq!(classifier.rules[1].priority, 0);
         assert_eq!(classifier.rules[1].parsers.len(), 1);
         assert_eq!(classifier.rules[1].parsers[0], 1);
         assert!(matches!(classifier.rules[1].rule_type, RuleType::Port(r) if r.port == 80));
