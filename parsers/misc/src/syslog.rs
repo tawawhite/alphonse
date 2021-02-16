@@ -14,7 +14,7 @@ pub fn register_classify_rules(
     match_cbs: &mut FnvHashMap<RuleID, MatchCallBack>,
 ) -> Result<()> {
     let mut dpi_rule = dpi::Rule::new(pattern! {r"^<[0-9]\d*>"});
-    dpi_rule.protocol = dpi::Protocol::TCP;
+    dpi_rule.protocol = dpi::Protocol::TCP | dpi::Protocol::UDP;
     let mut rule = Rule::new(id);
     rule.rule_type = RuleType::DPI(dpi_rule);
     let rule_id = manager.add_rule(&mut rule)?;
