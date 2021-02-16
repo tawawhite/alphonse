@@ -8,6 +8,7 @@ use api::parsers::ParserID;
 use api::parsers::ProtocolParserTrait;
 use api::session::Session;
 
+mod areospike;
 mod bitcoin;
 mod bittorrent;
 mod gh0st;
@@ -62,6 +63,7 @@ impl ProtocolParserTrait for ProtocolParser {
     }
 
     fn register_classify_rules(&mut self, manager: &mut ClassifierManager) -> Result<()> {
+        areospike::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
         bittorrent::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
         bitcoin::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
         gh0st::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
