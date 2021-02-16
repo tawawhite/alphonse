@@ -51,7 +51,7 @@ mod test {
     use crate::ProtocolParser;
 
     #[test]
-    fn areospike() {
+    fn ntp() {
         let mut manager = ClassifierManager::new();
         let mut parser = ProtocolParser::default();
         parser.register_classify_rules(&mut manager).unwrap();

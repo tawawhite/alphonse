@@ -11,6 +11,7 @@ use api::session::Session;
 mod areospike;
 mod bitcoin;
 mod bittorrent;
+mod bjnp;
 mod cassandra;
 mod gh0st;
 mod imap;
@@ -68,6 +69,7 @@ impl ProtocolParserTrait for ProtocolParser {
         areospike::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
         bittorrent::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
         bitcoin::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
+        bjnp::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
         cassandra::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
         gh0st::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
         imap::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
