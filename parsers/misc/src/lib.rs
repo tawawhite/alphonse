@@ -16,6 +16,7 @@ mod gh0st;
 mod imap;
 mod jabber;
 mod mongo;
+mod ntp;
 mod other220;
 mod pop3;
 mod rdp;
@@ -72,6 +73,7 @@ impl ProtocolParserTrait for ProtocolParser {
         imap::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
         jabber::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
         mongo::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
+        ntp::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
         other220::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
         pop3::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
         rdp::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
