@@ -4,9 +4,7 @@ use hyperscan::pattern;
 
 use alphonse_api as api;
 use api::classifiers::{dpi, ClassifierManager, Rule, RuleID, RuleType};
-use api::packet::Packet;
 use api::parsers::ParserID;
-use api::session::Session;
 
 use super::MatchCallBack;
 
@@ -22,21 +20,14 @@ pub fn register_classify_rules(
     let rule_id = manager.add_rule(&mut rule)?;
     match_cbs.insert(rule_id, MatchCallBack::ProtocolName("thrift".to_string()));
 
-    let mut dpi_rule = dpi::Rule::new(pattern! {r"^\x00\x00..\x80\x01\x00"});
+    let mut dpi_rule = dpi::Rule::new(pattern! {r"^\x00\x00..\x80\x01\x00.{14}"});
     dpi_rule.protocol = dpi::Protocol::TCP;
     let mut rule = Rule::new(id);
     rule.rule_type = RuleType::DPI(dpi_rule);
     let rule_id = manager.add_rule(&mut rule)?;
-    match_cbs.insert(rule_id, MatchCallBack::Func(classify));
+    match_cbs.insert(rule_id, MatchCallBack::ProtocolName("thrift".to_string()));
 
     Ok(())
-}
-
-fn classify(ses: &mut Session, pkt: &Box<dyn Packet>) {
-    if pkt.payload().len() <= 20 {
-        return;
-    }
-    ses.add_protocol("thrift");
 }
 
 #[cfg(test)]
