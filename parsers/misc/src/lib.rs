@@ -23,6 +23,7 @@ mod pop3;
 mod rdp;
 mod redis;
 mod sip;
+mod stun;
 mod syslog;
 mod thrift;
 mod user;
@@ -82,6 +83,7 @@ impl ProtocolParserTrait for ProtocolParser {
         rdp::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
         redis::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
         sip::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
+        stun::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
         syslog::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
         thrift::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
         user::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
