@@ -19,6 +19,7 @@ mod pop3;
 mod rdp;
 mod redis;
 mod sip;
+mod user;
 mod vnc;
 
 #[derive(Clone, Default)]
@@ -36,6 +37,7 @@ type ClassifyFunc = fn(ses: &mut Session, pkt: &Box<dyn Packet>);
 pub enum MatchCallBack {
     Func(ClassifyFunc),
     ProtocolName(String),
+    None,
 }
 
 impl ProtocolParserTrait for ProtocolParser {
@@ -70,6 +72,7 @@ impl ProtocolParserTrait for ProtocolParser {
         rdp::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
         redis::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
         sip::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
+        user::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
         vnc::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
 
         Ok(())
@@ -96,6 +99,7 @@ impl ProtocolParserTrait for ProtocolParser {
                     ses.add_protocol(protocol);
                 }
                 MatchCallBack::Func(func) => func(ses, pkt),
+                MatchCallBack::None => {}
             },
             None => {
                 todo!("handle rule matched, but no callback found")
