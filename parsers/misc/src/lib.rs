@@ -13,6 +13,7 @@ mod bitcoin;
 mod bittorrent;
 mod bjnp;
 mod cassandra;
+mod flap;
 mod gh0st;
 mod imap;
 mod jabber;
@@ -74,6 +75,7 @@ impl ProtocolParserTrait for ProtocolParser {
         bitcoin::register_classify_rules(self, manager)?;
         bjnp::register_classify_rules(self, manager)?;
         cassandra::register_classify_rules(self, manager)?;
+        flap::register_classify_rules(self, manager)?;
         gh0st::register_classify_rules(self, manager)?;
         imap::register_classify_rules(self, manager)?;
         jabber::register_classify_rules(self, manager)?;
