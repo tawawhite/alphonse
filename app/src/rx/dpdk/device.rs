@@ -192,6 +192,7 @@ pub fn init_ports(cfg: &Config, mb_pool: &mut rte::mempool::MemoryPool) -> Resul
 
         // TODO: set mtu by alphonse config
         port.set_mtu(1514)?;
+        port.promiscuous_enable();
         port.start()?;
     }
 
