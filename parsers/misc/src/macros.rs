@@ -97,6 +97,28 @@ macro_rules! add_dpi_udp_rule_with_func {
 }
 
 #[macro_export]
+macro_rules! add_dpi_tcp_udp_rule_with_func {
+    ($hs_pattern:literal, $func:ident, $parser: expr, $manager: expr) => {
+        add_dpi_rule_with_func!(
+            $hs_pattern,
+            $func,
+            dpi::Protocol::TCP | dpi::Protocol::UDP,
+            $parser,
+            $manager
+        )
+    };
+    ($hs_pattern:expr, $func:ident, $parser: expr, $manager: expr) => {
+        add_dpi_rule_with_func!(
+            $hs_pattern,
+            $func,
+            dpi::Protocol::TCP | dpi::Protocol::UDP,
+            $parser,
+            $manager
+        )
+    };
+}
+
+#[macro_export]
 macro_rules! add_none_dpi_rule {
     ($hs_pattern:literal, $trans_protocol: expr, $parser: expr, $manager: expr) => {{
         let mut dpi_rule = dpi::Rule::new(pattern! {$hs_pattern});
