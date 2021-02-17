@@ -16,6 +16,7 @@ mod cassandra;
 mod gh0st;
 mod imap;
 mod jabber;
+mod macros;
 mod mongo;
 mod ntp;
 mod other220;
@@ -30,7 +31,7 @@ mod user;
 mod vnc;
 
 #[derive(Clone, Default)]
-struct ProtocolParser {
+pub struct ProtocolParser {
     id: ParserID,
     name: String,
     classified: bool,
@@ -68,26 +69,26 @@ impl ProtocolParserTrait for ProtocolParser {
     }
 
     fn register_classify_rules(&mut self, manager: &mut ClassifierManager) -> Result<()> {
-        areospike::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
-        bittorrent::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
-        bitcoin::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
-        bjnp::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
-        cassandra::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
-        gh0st::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
-        imap::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
-        jabber::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
-        mongo::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
-        ntp::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
-        other220::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
-        pop3::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
-        rdp::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
-        redis::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
-        sip::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
-        stun::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
-        syslog::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
-        thrift::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
-        user::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
-        vnc::register_classify_rules(self.id, manager, &mut self.match_cbs)?;
+        areospike::register_classify_rules(self, manager)?;
+        bittorrent::register_classify_rules(self, manager)?;
+        bitcoin::register_classify_rules(self, manager)?;
+        bjnp::register_classify_rules(self, manager)?;
+        cassandra::register_classify_rules(self, manager)?;
+        gh0st::register_classify_rules(self, manager)?;
+        imap::register_classify_rules(self, manager)?;
+        jabber::register_classify_rules(self, manager)?;
+        mongo::register_classify_rules(self, manager)?;
+        ntp::register_classify_rules(self, manager)?;
+        other220::register_classify_rules(self, manager)?;
+        pop3::register_classify_rules(self, manager)?;
+        rdp::register_classify_rules(self, manager)?;
+        redis::register_classify_rules(self, manager)?;
+        sip::register_classify_rules(self, manager)?;
+        stun::register_classify_rules(self, manager)?;
+        syslog::register_classify_rules(self, manager)?;
+        thrift::register_classify_rules(self, manager)?;
+        user::register_classify_rules(self, manager)?;
+        vnc::register_classify_rules(self, manager)?;
 
         Ok(())
     }

@@ -1,25 +1,16 @@
 use anyhow::Result;
-use fnv::FnvHashMap;
 use hyperscan::pattern;
 
 use alphonse_api as api;
-use api::classifiers::{dpi, ClassifierManager, Rule, RuleID, RuleType};
-use api::parsers::ParserID;
+use api::classifiers::{dpi, ClassifierManager, Rule, RuleType};
 
-use super::MatchCallBack;
+use crate::{add_simple_dpi_rule, add_simple_dpi_udp_rule, MatchCallBack, ProtocolParser};
 
 pub fn register_classify_rules(
-    id: ParserID,
+    parser: &mut ProtocolParser,
     manager: &mut ClassifierManager,
-    match_cbs: &mut FnvHashMap<RuleID, MatchCallBack>,
 ) -> Result<()> {
-    let mut dpi_rule = dpi::Rule::new(pattern! {r"^BJNP"});
-    dpi_rule.protocol = dpi::Protocol::UDP;
-    let mut rule = Rule::new(id);
-    rule.rule_type = RuleType::DPI(dpi_rule);
-    let rule_id = manager.add_rule(&mut rule)?;
-    match_cbs.insert(rule_id, MatchCallBack::ProtocolName("bjnp".to_string()));
-
+    add_simple_dpi_udp_rule!(r"^BJNP", "bjnp", parser, manager);
     Ok(())
 }
 

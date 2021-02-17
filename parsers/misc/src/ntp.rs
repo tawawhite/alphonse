@@ -1,27 +1,23 @@
 use anyhow::Result;
-use fnv::FnvHashMap;
 use hyperscan::pattern;
 
 use alphonse_api as api;
-use api::classifiers::{dpi, ClassifierManager, Rule, RuleID, RuleType};
+use api::classifiers::{dpi, ClassifierManager, Rule, RuleType};
 use api::packet::Packet;
-use api::parsers::ParserID;
 use api::session::Session;
 
-use super::MatchCallBack;
+use super::{add_dpi_rule_with_func, add_dpi_udp_rule_with_func, MatchCallBack, ProtocolParser};
 
 pub fn register_classify_rules(
-    id: ParserID,
+    parser: &mut ProtocolParser,
     manager: &mut ClassifierManager,
-    match_cbs: &mut FnvHashMap<RuleID, MatchCallBack>,
 ) -> Result<()> {
-    // TODO: test whether using this huge bounded repeat is bad for performance
-    let mut dpi_rule = dpi::Rule::new(pattern! {r"^[\x13\x19\x1a\x1b\x1cx21\x23\x24\xd9\xdb\xe3]"});
-    dpi_rule.protocol = dpi::Protocol::UDP;
-    let mut rule = Rule::new(id);
-    rule.rule_type = RuleType::DPI(dpi_rule);
-    let rule_id = manager.add_rule(&mut rule)?;
-    match_cbs.insert(rule_id, MatchCallBack::Func(classify));
+    add_dpi_udp_rule_with_func!(
+        r"^[\x13\x19\x1a\x1b\x1cx21\x23\x24\xd9\xdb\xe3]",
+        classify,
+        parser,
+        manager
+    );
 
     Ok(())
 }

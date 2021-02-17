@@ -1,42 +1,22 @@
 use anyhow::Result;
-use fnv::FnvHashMap;
 
 use alphonse_api as api;
-use api::classifiers::{dpi, ClassifierManager, Rule, RuleID, RuleType};
+use api::classifiers::{dpi, ClassifierManager, Rule, RuleType};
 use api::packet::Packet;
-use api::parsers::ParserID;
 use api::session::Session;
 use hyperscan::pattern;
 
-use super::MatchCallBack;
+use crate::{
+    add_dpi_rule_with_func, add_dpi_tcp_rule_with_func, add_none_dpi_rule, add_none_dpi_tcp_rule,
+    MatchCallBack, ProtocolParser,
+};
 
 pub fn register_classify_rules(
-    id: ParserID,
+    parser: &mut ProtocolParser,
     manager: &mut ClassifierManager,
-    match_cbs: &mut FnvHashMap<RuleID, MatchCallBack>,
 ) -> Result<()> {
-    let mut dpi_rule = dpi::Rule::new(pattern! {r"^USER\s"});
-    dpi_rule.protocol = dpi::Protocol::TCP;
-    let mut rule = Rule::new(id);
-    rule.rule_type = RuleType::DPI(dpi_rule);
-    let rule_id = manager.add_rule(&mut rule)?;
-    match_cbs.insert(rule_id, MatchCallBack::None);
-    let user_pattern_id = match &manager.get_rule(rule_id).unwrap().rule_type {
-        RuleType::DPI(rule) => rule.hs_pattern.id.unwrap(),
-        _ => unreachable!(),
-    };
-
-    let mut dpi_rule = dpi::Rule::new(pattern! {r"((\sNICK)|(\+iw))"});
-    dpi_rule.protocol = dpi::Protocol::TCP;
-    let mut rule = Rule::new(id);
-    rule.rule_type = RuleType::DPI(dpi_rule);
-    let rule_id = manager.add_rule(&mut rule)?;
-    match_cbs.insert(rule_id, MatchCallBack::None);
-    let irc_pattern_id = match &manager.get_rule(rule_id).unwrap().rule_type {
-        RuleType::DPI(rule) => rule.hs_pattern.id.unwrap(),
-        _ => unreachable!(),
-    };
-
+    let user_pattern_id = add_none_dpi_tcp_rule!(r"^USER\s", parser, manager);
+    let irc_pattern_id = add_none_dpi_tcp_rule!(r"((\sNICK)|(\+iw))", parser, manager);
     let com_pattern = hyperscan::Pattern {
         expression: format!("{}&!{}", user_pattern_id, irc_pattern_id),
         flags: hyperscan::PatternFlags::COMBINATION,
@@ -44,12 +24,7 @@ pub fn register_classify_rules(
         ext: hyperscan::ExprExt::default(),
         som: None,
     };
-    let mut dpi_rule = dpi::Rule::new(com_pattern);
-    dpi_rule.protocol = dpi::Protocol::TCP;
-    let mut rule = Rule::new(id);
-    rule.rule_type = RuleType::DPI(dpi_rule);
-    let rule_id = manager.add_rule(&mut rule)?;
-    match_cbs.insert(rule_id, MatchCallBack::Func(classify));
+    add_dpi_tcp_rule_with_func!(com_pattern, classify, parser, manager);
 
     Ok(())
 }

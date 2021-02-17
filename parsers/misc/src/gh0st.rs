@@ -1,33 +1,29 @@
 use anyhow::Result;
-use fnv::FnvHashMap;
 use hyperscan::pattern;
 
 use alphonse_api as api;
-use api::classifiers::{dpi, ClassifierManager, Rule, RuleID, RuleType};
+use api::classifiers::{dpi, ClassifierManager, Rule, RuleType};
 use api::packet::Packet;
-use api::parsers::ParserID;
 use api::session::Session;
 
-use super::MatchCallBack;
+use super::{add_dpi_rule_with_func, add_dpi_tcp_rule_with_func, MatchCallBack, ProtocolParser};
 
 pub fn register_classify_rules(
-    id: ParserID,
+    parser: &mut ProtocolParser,
     manager: &mut ClassifierManager,
-    match_cbs: &mut FnvHashMap<RuleID, MatchCallBack>,
 ) -> Result<()> {
-    let mut dpi_rule = dpi::Rule::new(pattern! {r"^[a-zA-z0-9:]{5}..\x00\x00....\x78\x9c"});
-    dpi_rule.protocol = dpi::Protocol::TCP;
-    let mut rule = Rule::new(id);
-    rule.rule_type = RuleType::DPI(dpi_rule);
-    let rule_id = manager.add_rule(&mut rule)?;
-    match_cbs.insert(rule_id, MatchCallBack::Func(classify_windows));
-
-    let mut dpi_rule = dpi::Rule::new(pattern! {r"^[a-zA-z0-9:]{5}\x00\x00.{6}\x78\x9c"});
-    dpi_rule.protocol = dpi::Protocol::TCP;
-    let mut rule = Rule::new(id);
-    rule.rule_type = RuleType::DPI(dpi_rule);
-    let rule_id = manager.add_rule(&mut rule)?;
-    match_cbs.insert(rule_id, MatchCallBack::Func(classify_mac));
+    add_dpi_tcp_rule_with_func!(
+        r"^[a-zA-z0-9:]{5}..\x00\x00....\x78\x9c",
+        classify_windows,
+        parser,
+        manager
+    );
+    add_dpi_tcp_rule_with_func!(
+        r"^[a-zA-z0-9:]{5}\x00\x00.{6}\x78\x9c",
+        classify_mac,
+        parser,
+        manager
+    );
 
     Ok(())
 }
