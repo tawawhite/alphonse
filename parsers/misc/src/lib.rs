@@ -19,17 +19,21 @@ mod imap;
 mod jabber;
 mod macros;
 mod mongo;
+mod nsclient;
 mod ntp;
 mod other220;
 mod pop3;
 mod rdp;
 mod redis;
+mod rmi;
 mod sip;
+mod ssdp;
 mod stun;
 mod syslog;
 mod thrift;
 mod user;
 mod vnc;
+mod zabbix;
 
 #[derive(Clone, Default)]
 pub struct ProtocolParser {
@@ -80,17 +84,21 @@ impl ProtocolParserTrait for ProtocolParser {
         imap::register_classify_rules(self, manager)?;
         jabber::register_classify_rules(self, manager)?;
         mongo::register_classify_rules(self, manager)?;
+        nsclient::register_classify_rules(self, manager)?;
         ntp::register_classify_rules(self, manager)?;
         other220::register_classify_rules(self, manager)?;
         pop3::register_classify_rules(self, manager)?;
         rdp::register_classify_rules(self, manager)?;
         redis::register_classify_rules(self, manager)?;
+        rmi::register_classify_rules(self, manager)?;
         sip::register_classify_rules(self, manager)?;
+        ssdp::register_classify_rules(self, manager)?;
         stun::register_classify_rules(self, manager)?;
         syslog::register_classify_rules(self, manager)?;
         thrift::register_classify_rules(self, manager)?;
         user::register_classify_rules(self, manager)?;
         vnc::register_classify_rules(self, manager)?;
+        zabbix::register_classify_rules(self, manager)?;
 
         Ok(())
     }
