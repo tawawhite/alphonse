@@ -24,7 +24,6 @@ pub fn register_classify_rules(
 
 fn classify(ses: &mut Session, pkt: &Box<dyn Packet>) {
     unsafe {
-        println!("{} {}", pkt.src_port(), pkt.dst_port());
         if pkt.src_port() != 123 && pkt.dst_port() != 123 {
             return;
         }
