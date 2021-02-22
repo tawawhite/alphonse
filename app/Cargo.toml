@@ -12,6 +12,7 @@ crossbeam-channel = "0.5"
 chrono = "0.4"
 elasticsearch = "7.10.1-alpha.1"
 fnv = "1.0"
+hyperscan = { version = "0.2", features = ["chimera"] }
 libc = "0.2"
 libloading = "0.7"
 path-absolutize = "3.0"
@@ -28,11 +29,7 @@ path = "../api"
 optional = false
 version = "0.1.0"
 
-[dependencies.hyperscan]
-version = "0.2.0"
-features = ["chimera"]
-
 [features]
-arkime = [ "alphonse-api/arkime" ]
-dpdk = [ "rte" ]
+arkime = ["alphonse-api/arkime"]
+dpdk = ["rte"]
 heuristic-mpls = []

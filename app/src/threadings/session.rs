@@ -79,18 +79,33 @@ impl SessionThread {
         for rule in pkt.rules().iter() {
             for parser_id in rule.parsers.iter() {
                 match ses_parsers.get_mut(parser_id) {
-                    Some(parser) => {
-                        parser.parse_pkt(pkt, rule, ses)?;
-                    }
+                    Some(_) => {}
                     None => {
-                        let mut parser = protocol_parsers
+                        let parser = protocol_parsers
                             .get_mut(*parser_id as usize)
                             .unwrap()
                             .box_clone();
-                        parser.parse_pkt(pkt, rule, ses)?;
                         ses_parsers.insert(parser.id(), parser);
                     }
                 };
+            }
+        }
+
+        for (_, parser) in ses_parsers.iter_mut() {
+            let mut matched = false;
+            for rule in pkt.rules().iter() {
+                // If parser has bind a rule this packet matches, parse with this rule
+                // otherwise this pkt belongs to the same flow, parse witout rule information
+                for parser_id in rule.parsers.iter() {
+                    if *parser_id == parser.id() {
+                        parser.parse_pkt(pkt, Some(rule), ses)?;
+                        matched = true;
+                    }
+                }
+            }
+
+            if !matched {
+                parser.parse_pkt(pkt, None, ses)?;
             }
         }
 
@@ -119,6 +134,9 @@ impl SessionThread {
                 sender.try_send(ses.info.clone()).unwrap();
                 ses.info.mid_save_reset(ts + cfg.ses_save_timeout as u64);
             } else if timeout {
+                for (_, parser) in ses.parsers.iter_mut() {
+                    parser.finish(ses.info.as_mut());
+                }
                 sender.try_send(ses.info.clone()).unwrap();
             }
 
@@ -194,9 +212,11 @@ impl SessionThread {
             }
         }
 
-        for (_, ses) in &session_table {
-            let ses = &ses.info;
-            self.sender.try_send(ses.clone())?;
+        for (_, ses) in session_table.iter_mut() {
+            for (_, parser) in ses.parsers.iter_mut() {
+                parser.finish(ses.info.as_mut());
+            }
+            self.sender.try_send(ses.info.clone())?;
         }
 
         println!("{} exit", self.name());

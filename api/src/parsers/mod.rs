@@ -71,7 +71,7 @@ pub trait ProtocolParserTrait: Send + Sync {
     fn parse_pkt(
         &mut self,
         _pkt: &Box<dyn packet::Packet>,
-        _rule: &super::classifiers::matched::Rule,
+        _rule: Option<&super::classifiers::matched::Rule>,
         ses: &mut session::Session,
     ) -> Result<()> {
         if !self.is_classified() {
@@ -88,4 +88,7 @@ pub trait ProtocolParserTrait: Send + Sync {
 
     /// Change this protocol parser's internal state to indicate this session is classfied as this protocol
     fn classified_as_this_protocol(&mut self) -> Result<()>;
+
+    /// Cleanup operations
+    fn finish(&mut self, _: &mut session::Session) {}
 }
