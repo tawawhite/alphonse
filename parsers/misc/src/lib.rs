@@ -123,9 +123,15 @@ impl ProtocolParserTrait for ProtocolParser {
     fn parse_pkt(
         &mut self,
         pkt: &Box<dyn api::packet::Packet>,
-        rule: &api::classifiers::matched::Rule,
+        rule: Option<&api::classifiers::matched::Rule>,
         ses: &mut api::session::Session,
     ) -> Result<()> {
+        let rule = match rule {
+            None => {
+                return Ok(());
+            }
+            Some(r) => r,
+        };
         match self.match_cbs.get(&rule.id()) {
             Some(cb) => match cb {
                 MatchCallBack::ProtocolName(protocol) => {
