@@ -201,15 +201,10 @@ impl<'a> api::parsers::ProtocolParserTrait for ProtocolParser<'static> {
         match self.parsers[direction].parse(pkt.payload()) {
             llhttp::Error::Ok => {}
             llhttp::Error::Paused | llhttp::Error::PausedUpgrade => {}
-            e => {
+            _ => {
                 let data = self.parsers[direction].data();
                 self.parsers[direction].init(&SETTINGS, llhttp::Type::BOTH);
                 self.parsers[direction].set_data(data);
-
-                return Err(anyhow!(
-                    "llhttp parsing error: {:?}, reset llhttp Parser",
-                    e
-                ));
             }
         };
 
