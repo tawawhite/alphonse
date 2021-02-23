@@ -1,11 +1,11 @@
 use anyhow::Result;
-// use hyperscan::{BlockDatabase, Builder};
 
-use super::packet;
-use super::parsers::ParserID;
+use crate::packet;
+use crate::parsers::ParserID;
 
 pub mod all;
 pub mod dpi;
+pub mod macros;
 pub mod port;
 pub mod protocol;
 
@@ -236,6 +236,13 @@ impl ClassifierManager {
         // self.rules[rule.id() as usize].parsers = rule.parsers.clone();
 
         Ok(rule.id())
+    }
+
+    pub fn get_dpi_rule_internal_id(&self, rule_id: RuleID) -> usize {
+        match &self.get_rule(rule_id).unwrap().rule_type {
+            RuleType::DPI(rule) => rule.hs_pattern.id.unwrap(),
+            _ => unreachable!(),
+        }
     }
 
     /// Allocate a protocol classifier scratch
