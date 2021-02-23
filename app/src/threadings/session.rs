@@ -191,7 +191,7 @@ impl SessionThread {
                     let mut ses = Box::new(SessionData::default());
                     let info = ses.info.as_mut();
                     info.start_time = TimeVal::new(*pkt.ts());
-                    info.save_time = pkt.ts().tv_sec as u64;
+                    info.save_time = pkt.ts().tv_sec as u64 + cfg.ses_save_timeout as u64;
                     info.update(&pkt);
                     self.parse_pkt(
                         &mut classify_scratch,
