@@ -80,8 +80,8 @@ mod test {
         assert_eq!(pkt.rules().len(), 2);
 
         let mut ses = Session::new();
-        for i in 0..pkt.rules().len() {
-            parser.parse_pkt(&pkt, &pkt.rules()[i], &mut ses).unwrap();
+        for rule in pkt.rules() {
+            parser.parse_pkt(&pkt, Some(rule), &mut ses).unwrap();
         }
         assert_eq!("\"test_user\"", ses.fields["user"].to_string());
     }

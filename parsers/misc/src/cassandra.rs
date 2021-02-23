@@ -54,7 +54,7 @@ mod test {
 
         let mut ses = Session::new();
         for rule in pkt.rules() {
-            parser.parse_pkt(&pkt, rule, &mut ses).unwrap();
+            parser.parse_pkt(&pkt, Some(rule), &mut ses).unwrap();
         }
         assert!(ses.has_protocol("cassandra"));
 
@@ -68,7 +68,7 @@ mod test {
 
         let mut ses = Session::new();
         for rule in pkt.rules() {
-            parser.parse_pkt(&pkt, rule, &mut ses).unwrap();
+            parser.parse_pkt(&pkt, Some(rule), &mut ses).unwrap();
         }
         assert!(ses.has_protocol("cassandra"));
     }
