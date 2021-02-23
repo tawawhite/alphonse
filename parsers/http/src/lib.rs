@@ -174,11 +174,11 @@ impl<'a> api::parsers::ProtocolParserTrait for ProtocolParser<'static> {
                 Some(s) => s,
                 None => return Err(anyhow!("Global llhttp sttings is empty or initializing")),
             };
-            self.parsers[0].init(settings, llhttp::Type::BOTH);
-            self.parsers[1].init(settings, llhttp::Type::BOTH);
             let http = Box::into_raw(Box::new(HTTP::default()));
-            self.parsers[0].set_data(http);
-            self.parsers[1].set_data(http);
+            for parser in &mut self.parsers {
+                parser.init(settings, llhttp::Type::BOTH);
+                parser.set_data(http);
+            }
         }
 
         let direction = pkt.direction() as u8 as usize;
