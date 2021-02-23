@@ -184,16 +184,6 @@ impl<'a> api::parsers::ProtocolParserTrait for ProtocolParser<'static> {
 
         let direction = pkt.direction() as u8 as usize;
 
-        match rule {
-            Some(r) => {
-                if r.id() == self.pwd_rule_id {
-                    let data = unsafe { &mut *(self.parsers[direction].data() as *mut HTTP) };
-                    data.has_pwd = true;
-                }
-            }
-            None => {}
-        };
-
         match self.parsers[direction].parse(pkt.payload()) {
             llhttp::Error::Ok => {}
             llhttp::Error::Paused | llhttp::Error::PausedUpgrade => {}
@@ -220,10 +210,6 @@ impl<'a> api::parsers::ProtocolParserTrait for ProtocolParser<'static> {
         let http = unsafe { Box::from_raw(data as *mut HTTP) };
         self.parsers[1].set_data(std::ptr::null_mut());
         ses.add_field(&"http.uri", &serde_json::json!(http.url));
-
-        if http.has_pwd {
-            ses.add_tag(&"http:password");
-        }
     }
 }
 
@@ -234,9 +220,6 @@ pub extern "C" fn al_new_protocol_parser() -> Box<Box<dyn api::parsers::Protocol
 
     llhttp::data_cb_wrapper!(_on_url, on_url);
     settings.on_url(Some(_on_url));
-
-    llhttp::cb_wrapper!(_on_headers_complete, on_headers_complete);
-    settings.on_headers_complete(Some(_on_headers_complete));
 
     SETTINGS.set(settings).unwrap();
 
