@@ -1,23 +1,15 @@
-#[macro_use]
-extern crate lazy_static;
-
 use anyhow::{anyhow, Result};
 use hyperscan::pattern;
+use once_cell::sync::OnceCell;
 
 use alphonse_api as api;
 use api::classifiers;
-use api::classifiers::dpi;
+use api::classifiers::{dpi, Rule, RuleID, RuleType};
 use api::parsers::ParserID;
 use api::session::Session;
+use api::{add_simple_dpi_rule, add_simple_dpi_tcp_rule};
 
-lazy_static! {
-    static ref SETTINGS: llhttp::Settings = {
-        let mut settings = llhttp::Settings::default();
-        llhttp::data_cb_wrapper!(_on_url, on_url);
-        settings.on_url(Some(_on_url));
-        settings
-    };
-}
+static SETTINGS: OnceCell<llhttp::Settings> = OnceCell::new();
 
 #[derive(Clone)]
 struct ProtocolParser<'a> {
@@ -28,27 +20,19 @@ struct ProtocolParser<'a> {
 }
 
 fn on_url(parser: &mut llhttp::Parser, at: *const libc::c_char, length: usize) -> libc::c_int {
-    let http = if parser.data().is_null() {
-        println!("null ptr for llhttp parser");
-        return 0;
-    } else {
-        unsafe { &mut *(parser.data() as *mut HTTP) }
+    let http = match parser.data::<HTTP>() {
+        Some(h) => h,
+        None => return 0,
     };
 
-    if http.url.is_empty() {
-        let url = unsafe { std::slice::from_raw_parts(at as *const u8, length) };
-        http.url = String::from_utf8_lossy(url).to_string();
-    } else {
-        let url = unsafe { std::slice::from_raw_parts(at as *const u8, length) };
-        let url = String::from_utf8_lossy(url).to_string();
-        http.url.extend(url.chars());
-    }
+    let url = unsafe { std::slice::from_raw_parts(at as *const u8, length) };
+    http.url.push(String::from_utf8_lossy(url).to_string());
     0
 }
 
 #[derive(Clone, Default)]
 struct HTTP {
-    url: String,
+    url: Vec<String>,
     host: String,
     cookie: String,
     auth: String,
@@ -62,15 +46,12 @@ unsafe impl Sync for ProtocolParser<'_> {}
 
 impl<'a> ProtocolParser<'a> {
     fn new() -> Self {
-        let mut parser = ProtocolParser {
+        ProtocolParser {
             id: 0,
             name: String::from("http"),
             classified: false,
             parsers: [llhttp::Parser::default(), llhttp::Parser::default()],
-        };
-        parser.parsers[0].init(&SETTINGS, llhttp::Type::BOTH);
-        parser.parsers[1].init(&SETTINGS, llhttp::Type::BOTH);
-        parser
+        }
     }
 }
 
@@ -189,8 +170,12 @@ impl<'a> api::parsers::ProtocolParserTrait for ProtocolParser<'static> {
             // If this session is already classified as this protocol, skip
             self.classified_as_this_protocol()?;
             ses.add_protocol(self.name());
-            self.parsers[0].init(&SETTINGS, llhttp::Type::BOTH);
-            self.parsers[1].init(&SETTINGS, llhttp::Type::BOTH);
+            let settings = match SETTINGS.get() {
+                Some(s) => s,
+                None => return Err(anyhow!("Global llhttp sttings is empty or initializing")),
+            };
+            self.parsers[0].init(settings, llhttp::Type::BOTH);
+            self.parsers[1].init(settings, llhttp::Type::BOTH);
             let http = Box::new(HTTP::default());
             let http = Box::into_raw(http) as *mut libc::c_void;
             self.parsers[0].set_data(http);
@@ -198,12 +183,31 @@ impl<'a> api::parsers::ProtocolParserTrait for ProtocolParser<'static> {
         }
 
         let direction = pkt.direction() as u8 as usize;
+
+        match rule {
+            Some(r) => {
+                if r.id() == self.pwd_rule_id {
+                    let data = unsafe { &mut *(self.parsers[direction].data() as *mut HTTP) };
+                    data.has_pwd = true;
+                }
+            }
+            None => {}
+        };
+
         match self.parsers[direction].parse(pkt.payload()) {
             llhttp::Error::Ok => {}
             llhttp::Error::Paused | llhttp::Error::PausedUpgrade => {}
             _ => {
                 let data = self.parsers[direction].data();
-                self.parsers[direction].init(&SETTINGS, llhttp::Type::BOTH);
+                let settings = match SETTINGS.get() {
+                    Some(s) => s,
+                    None => {
+                        return Err(anyhow!(
+                            "Global llhttp sttings is empty or being initialized"
+                        ))
+                    }
+                };
+                self.parsers[direction].init(settings, llhttp::Type::BOTH);
                 self.parsers[direction].set_data(data);
             }
         };
@@ -216,10 +220,25 @@ impl<'a> api::parsers::ProtocolParserTrait for ProtocolParser<'static> {
         let http = unsafe { Box::from_raw(data as *mut HTTP) };
         self.parsers[1].set_data(std::ptr::null_mut());
         ses.add_field(&"http.uri", &serde_json::json!(http.url));
+
+        if http.has_pwd {
+            ses.add_tag(&"http:password");
+        }
     }
 }
 
 #[no_mangle]
 pub extern "C" fn al_new_protocol_parser() -> Box<Box<dyn api::parsers::ProtocolParserTrait>> {
+    // initialize global llhttp settings
+    let mut settings = llhttp::Settings::default();
+
+    llhttp::data_cb_wrapper!(_on_url, on_url);
+    settings.on_url(Some(_on_url));
+
+    llhttp::cb_wrapper!(_on_headers_complete, on_headers_complete);
+    settings.on_headers_complete(Some(_on_headers_complete));
+
+    SETTINGS.set(settings).unwrap();
+
     Box::new(Box::new(ProtocolParser::new()))
 }
