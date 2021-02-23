@@ -176,10 +176,9 @@ impl<'a> api::parsers::ProtocolParserTrait for ProtocolParser<'static> {
             };
             self.parsers[0].init(settings, llhttp::Type::BOTH);
             self.parsers[1].init(settings, llhttp::Type::BOTH);
-            let http = Box::new(HTTP::default());
-            let http = Box::into_raw(http) as *mut libc::c_void;
-            self.parsers[0].set_data(http);
-            self.parsers[1].set_data(http);
+            let mut http = HTTP::default();
+            self.parsers[0].set_data(&mut http);
+            self.parsers[1].set_data(&mut http);
         }
 
         let direction = pkt.direction() as u8 as usize;
@@ -188,7 +187,7 @@ impl<'a> api::parsers::ProtocolParserTrait for ProtocolParser<'static> {
             llhttp::Error::Ok => {}
             llhttp::Error::Paused | llhttp::Error::PausedUpgrade => {}
             _ => {
-                let data = self.parsers[direction].data();
+                let data = self.parsers[direction].set_data::<HTTP>(std::ptr::null_mut());
                 let settings = match SETTINGS.get() {
                     Some(s) => s,
                     None => {
@@ -206,9 +205,14 @@ impl<'a> api::parsers::ProtocolParserTrait for ProtocolParser<'static> {
     }
 
     fn finish(&mut self, ses: &mut Session) {
-        let data = self.parsers[0].set_data(std::ptr::null_mut());
-        let http = unsafe { Box::from_raw(data as *mut HTTP) };
-        self.parsers[1].set_data(std::ptr::null_mut());
+        self.parsers[0].set_data::<HTTP>(std::ptr::null_mut());
+        let http = self.parsers[1].set_data::<HTTP>(std::ptr::null_mut());
+        let http = if http.is_null() {
+            return;
+        } else {
+            unsafe { Box::from_raw(http) }
+        };
+
         ses.add_field(&"http.uri", &serde_json::json!(http.url));
     }
 }
