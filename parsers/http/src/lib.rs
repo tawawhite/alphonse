@@ -176,9 +176,9 @@ impl<'a> api::parsers::ProtocolParserTrait for ProtocolParser<'static> {
             };
             self.parsers[0].init(settings, llhttp::Type::BOTH);
             self.parsers[1].init(settings, llhttp::Type::BOTH);
-            let mut http = HTTP::default();
-            self.parsers[0].set_data(&mut http);
-            self.parsers[1].set_data(&mut http);
+            let http = Box::into_raw(Box::new(HTTP::default()));
+            self.parsers[0].set_data(http);
+            self.parsers[1].set_data(http);
         }
 
         let direction = pkt.direction() as u8 as usize;
