@@ -69,12 +69,20 @@ struct RxThread {
 
 impl RxThread {
     pub fn spawn(&mut self, _cfg: Arc<Config>) -> Result<()> {
-        let mut pkts = Vec::new();
+        let mut mbufs = vec![None; 8];
+        let mut rx_count: u64 = 0;
         println!("{} started", self.name());
 
         while !self.exit.load(Ordering::Relaxed) {
             for queue in &self.device.rx_queues {
-                let _cnt = self.device.port.rx_burst(*queue, &mut pkts);
+                let cnt = self.device.port.rx_burst(*queue, &mut mbufs);
+                rx_count += cnt as u64;
+                for mbuf in mbufs[0..cnt].iter() {
+                    match mbuf {
+                        Some(_) => {}
+                        None => break,
+                    }
+                }
             }
         }
 
