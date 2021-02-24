@@ -19,18 +19,10 @@ pub fn register_classify_rules(
 
 fn classify(ses: &mut Session, pkt: &Box<dyn Packet>) {
     let payload = pkt.payload();
-    println!(
-        "{} {} {} {}",
-        payload.len(),
-        payload[4],
-        payload[5],
-        payload[7]
-    );
     if payload.len() < 10 || payload[4] != 0 || payload[5] > 6 || payload[7] != 0 {
         return;
     }
     let flen = 4 + ((payload[2] as u16) << 8 | payload[3] as u16) as usize;
-    println!("{} {}", payload.len(), flen);
     if payload.len() != flen {
         return;
     }
