@@ -1,4 +1,5 @@
 use anyhow::Result;
+use tinyvec::TinyVec;
 
 use crate::packet;
 use crate::parsers::ParserID;
@@ -10,6 +11,7 @@ pub mod port;
 pub mod protocol;
 
 pub type RuleID = u32;
+pub type Parsers = TinyVec<[ParserID; 4]>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RuleType {
@@ -33,7 +35,7 @@ pub struct Rule {
     /// Rule type, see details in RuleType
     pub rule_type: RuleType,
     /// Matched protocol parsers
-    parsers: Vec<ParserID>,
+    parsers: Parsers,
 }
 
 impl Rule {
@@ -44,11 +46,13 @@ impl Rule {
 
     /// Create a new classify rule
     pub fn new(parser_id: ParserID) -> Self {
+        let mut parsers = Parsers::default();
+        parsers.push(parser_id);
         Rule {
             id: 0,
             priority: 0,
             rule_type: RuleType::All,
-            parsers: vec![parser_id],
+            parsers,
         }
     }
 }
@@ -65,7 +69,7 @@ impl PartialEq for Rule {
 }
 
 pub mod matched {
-    use super::{ParserID, RuleID};
+    use super::{Parsers, RuleID};
     #[repr(u8)]
     #[derive(Debug, Clone, Copy, PartialEq, Primitive)]
     pub enum RuleType {
@@ -109,7 +113,7 @@ pub mod matched {
         pub id: RuleID,
         pub priority: u8,
         pub rule_type: RuleType,
-        pub parsers: Vec<ParserID>,
+        pub parsers: Parsers,
     }
 
     impl Default for Rule {
@@ -118,7 +122,7 @@ pub mod matched {
                 id: 0,
                 priority: 255,
                 rule_type: RuleType::All,
-                parsers: Vec::new(),
+                parsers: Parsers::default(),
             }
         }
     }
@@ -178,7 +182,7 @@ impl ClassifierManager {
                 id: 0,
                 priority: 255,
                 rule_type: RuleType::All,
-                parsers: Vec::new(),
+                parsers: Parsers::default(),
             }], // first rule is always the receive all pkt rule
             all_pkt_classifier: all::Classifier::default(),
             port_classifier: port::Classifier::default(),

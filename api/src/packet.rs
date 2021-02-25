@@ -8,6 +8,8 @@ use std::convert::TryFrom;
 use std::hash::{Hash, Hasher};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
+use tinyvec::TinyVec;
+
 use serde::ser::SerializeSeq;
 use serde::{Serialize, Serializer};
 
@@ -234,6 +236,15 @@ impl PartialEq for PacketHashKey {
     }
 }
 
+/// By default, we consider one packet couldn't match more than 8 rules.
+/// However, if matched rules exceed 8, use heap instead
+/// In this way, we could guarantee all rules could be added, also
+/// reduce heap allocation using a Vec
+pub const DEFAULT_MAX_MATCHED_RULES: usize = 8;
+
+/// Type alia for matched rule vector
+pub type Rules = TinyVec<[Rule; DEFAULT_MAX_MATCHED_RULES]>;
+
 pub trait Packet: Send {
     /// Get raw packet data
     fn raw(&self) -> &[u8];
@@ -248,7 +259,7 @@ pub trait Packet: Send {
     fn layers_mut(&mut self) -> &mut Layers;
 
     fn rules(&self) -> &[Rule];
-    fn rules_mut(&mut self) -> &mut Vec<Rule>;
+    fn rules_mut(&mut self) -> &mut Rules;
 
     fn tunnel(&self) -> Tunnel;
     fn tunnel_mut(&mut self) -> &mut Tunnel;

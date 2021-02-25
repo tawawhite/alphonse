@@ -1,6 +1,8 @@
 use anyhow::{anyhow, Result};
 
-use super::{matched, packet};
+use crate::packet;
+
+use super::{matched, Parsers};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Rule {
@@ -23,7 +25,7 @@ impl Default for Classifier {
                     id: 0,
                     priority: 0,
                     rule_type: matched::RuleType::Port,
-                    parsers: Vec::new(),
+                    parsers: Parsers::default(),
                 };
                 std::u16::MAX as usize * 3
             ],

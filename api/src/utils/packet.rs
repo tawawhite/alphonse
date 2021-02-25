@@ -1,5 +1,5 @@
 use crate::classifiers::matched::Rule;
-use crate::packet::{Layers, Packet as PacketTrait, Tunnel};
+use crate::packet::{Layers, Packet as PacketTrait, Rules, Tunnel};
 
 // Packet structure only for test use
 #[derive(Clone)]
@@ -14,7 +14,7 @@ pub struct Packet {
     pub layers: Layers,
     /// Packet hash, improve hash performance
     pub hash: u64,
-    pub rules: Box<Vec<Rule>>,
+    pub rules: Rules,
     pub tunnel: Tunnel,
 }
 
@@ -29,7 +29,7 @@ impl Default for Packet {
             raw: Box::new(Vec::new()),
             layers: Layers::default(),
             hash: 0,
-            rules: Box::new(Vec::new()),
+            rules: Rules::default(),
             tunnel: Tunnel::default(),
         }
     }
@@ -60,7 +60,7 @@ impl PacketTrait for Packet {
         self.rules.as_slice()
     }
 
-    fn rules_mut(&mut self) -> &mut Vec<Rule> {
+    fn rules_mut(&mut self) -> &mut Rules {
         &mut self.rules
     }
 

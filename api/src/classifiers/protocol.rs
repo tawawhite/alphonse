@@ -2,7 +2,9 @@ use std::hash::Hash;
 
 use anyhow::{anyhow, Result};
 
-use super::{matched, packet};
+use crate::packet;
+
+use super::{matched, Parsers};
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct Rule(pub packet::Protocol);
@@ -20,7 +22,7 @@ impl Default for Classifier {
                     id: 0,
                     priority: 0,
                     rule_type: matched::RuleType::Protocol,
-                    parsers: Vec::new(),
+                    parsers: Parsers::default(),
                 };
                 u8::MAX as usize
             ],
