@@ -175,6 +175,8 @@ pub struct ClassifyScratch {
 
 #[cfg(test)]
 mod test {
+    use tinyvec::tiny_vec;
+
     use super::*;
     use crate::classifiers::Classifier as ClassifierTrait;
     use crate::packet::Packet as PacketTrait;
@@ -191,7 +193,7 @@ mod test {
         assert!(matches!(classifier.add_rule(&rule), Ok(_)));
 
         let mut rule = rule.clone();
-        rule.parsers = vec![1];
+        rule.parsers = tiny_vec![1];
         assert!(matches!(classifier.add_rule(&rule), Ok(rule) if rule.id == 0));
     }
 
@@ -211,7 +213,7 @@ mod test {
         let rule = super::super::Rule {
             id: 10,
             priority: 100,
-            parsers: vec![0],
+            parsers: tiny_vec![0],
             rule_type: super::super::RuleType::DPI(dpi_rule),
         };
 
@@ -250,7 +252,7 @@ mod test {
         let rule = super::super::Rule {
             id: 10,
             priority: 100,
-            parsers: vec![0],
+            parsers: tiny_vec![0],
             rule_type: super::super::RuleType::DPI(dpi_rule),
         };
 
