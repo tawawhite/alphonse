@@ -8,7 +8,7 @@ use yaml_rust::Yaml;
 
 use alphonse_api as api;
 use api::classifiers::matched::Rule;
-use api::packet::{Layers, Packet as PacketTrait, Tunnel};
+use api::packet::{Layers, Packet as PacketTrait, Rules, Tunnel};
 use api::utils::timeval::{precision, TimeVal};
 
 use crate::config::Config;
@@ -203,7 +203,7 @@ pub struct Packet {
     mbuf: Box<rte::mbuf::MBuf>,
     ts: TimeVal<precision::Millisecond>,
     layers: Layers,
-    rules: Box<Vec<Rule>>,
+    rules: Rules,
     tunnel: Tunnel,
     drop: bool,
 }
@@ -259,7 +259,7 @@ impl PacketTrait for Packet {
         self.rules.as_slice()
     }
 
-    fn rules_mut(&mut self) -> &mut Vec<Rule> {
+    fn rules_mut(&mut self) -> &mut Rules {
         &mut self.rules
     }
 
