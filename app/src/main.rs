@@ -19,17 +19,18 @@ mod rx;
 mod stats;
 mod threadings;
 
-fn start_rx(
+fn start_rx<'a>(
     exit: Arc<AtomicBool>,
     cfg: Arc<config::Config>,
     sender: Sender<Box<dyn api::packet::Packet>>,
+    session_table: Arc<rx::SessionTable>,
 ) -> Result<Vec<JoinHandle<Result<()>>>> {
     if !cfg.pcap_file.is_empty() {
-        return (rx::files::UTILITY.start)(exit, cfg, sender);
+        return (rx::files::UTILITY.start)(exit, cfg, sender, session_table);
     }
 
     match cfg.rx_backend.as_str() {
-        "libpcap" => return (rx::libpcap::UTILITY.start)(exit, cfg, sender),
+        "libpcap" => return (rx::libpcap::UTILITY.start)(exit, cfg, sender, session_table),
         #[cfg(all(target_os = "linux", feature = "dpdk"))]
         "dpdk" => return (rx::dpdk::UTILITY.start)(exit, cfg, sender),
         _ => unreachable!(),
@@ -41,6 +42,10 @@ fn main() -> Result<()> {
     let mut cfg = config::parse_args(root_cmd)?;
     let exit = Arc::new(AtomicBool::new(false));
 
+    let session_table = Arc::new(dashmap::DashMap::with_capacity_and_hasher(
+        1000000,
+        fnv::FnvBuildHasher::default(),
+    ));
     match cfg.rx_backend.as_str() {
         "libpcap" => {
             (rx::libpcap::UTILITY.init)(&mut cfg)?;
@@ -147,7 +152,12 @@ fn main() -> Result<()> {
         handles.push(handle);
     }
 
-    let rx_handles = start_rx(exit.clone(), cfg.clone(), pkt_sender.clone())?;
+    let rx_handles = start_rx(
+        exit.clone(),
+        cfg.clone(),
+        pkt_sender.clone(),
+        session_table.clone(),
+    )?;
     for h in rx_handles {
         handles.push(h);
     }

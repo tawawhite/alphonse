@@ -11,7 +11,7 @@ use api::packet::Packet as PacketTrait;
 use api::packet::{Layers, Rules, Tunnel};
 
 use crate::config::Config;
-use crate::rx::RxUtility;
+use crate::rx::{RxUtility, SessionTable};
 use crate::stats::CaptureStat;
 
 pub const UTILITY: RxUtility = RxUtility {
@@ -24,17 +24,19 @@ pub fn start(
     exit: Arc<AtomicBool>,
     cfg: Arc<Config>,
     sender: Sender<Box<dyn PacketTrait>>,
+    session_table: Arc<SessionTable>,
 ) -> Result<Vec<JoinHandle<Result<()>>>> {
     let mut handles = vec![];
     for interface in cfg.interfaces.iter() {
         let cfg = cfg.clone();
+        let session_table = session_table.clone();
         let mut thread = RxThread {
             exit: exit.clone(),
             sender: sender.clone(),
             interface: interface.clone(),
         };
         let builder = std::thread::Builder::new().name(thread.name());
-        let handle = builder.spawn(move || thread.spawn(cfg))?;
+        let handle = builder.spawn(move || thread.spawn(cfg, session_table))?;
         handles.push(handle);
     }
 
@@ -48,7 +50,7 @@ struct RxThread {
 }
 
 impl RxThread {
-    pub fn spawn(&mut self, _cfg: Arc<Config>) -> Result<()> {
+    pub fn spawn(&mut self, _cfg: Arc<Config>, session_table: Arc<SessionTable>) -> Result<()> {
         let mut cap = NetworkInterface::try_from_str(self.interface.as_str())?;
         let mut overflow_cnt = 0;
 

@@ -13,7 +13,7 @@ use api::packet::Packet as PacketTrait;
 
 use crate::config::Config;
 use crate::rx::libpcap::Packet;
-use crate::rx::RxUtility;
+use crate::rx::{RxUtility, SessionTable};
 use crate::stats::CaptureStat;
 
 pub const UTILITY: RxUtility = RxUtility {
@@ -22,10 +22,11 @@ pub const UTILITY: RxUtility = RxUtility {
     cleanup: |_| Ok(()),
 };
 
-fn start(
+fn start<'a>(
     exit: Arc<AtomicBool>,
     cfg: Arc<Config>,
     sender: Sender<Box<dyn PacketTrait>>,
+    session_table: Arc<SessionTable>,
 ) -> Result<Vec<JoinHandle<Result<()>>>> {
     let mut handles = vec![];
     let mut thread = RxThread {
@@ -34,7 +35,7 @@ fn start(
         files: get_pcap_files(cfg.as_ref()),
     };
     let builder = std::thread::Builder::new().name(thread.name());
-    let handle = builder.spawn(move || thread.spawn(cfg))?;
+    let handle = builder.spawn(move || thread.spawn(cfg, session_table))?;
     handles.push(handle);
     Ok(handles)
 }
@@ -81,7 +82,7 @@ struct RxThread {
 }
 
 impl RxThread {
-    fn spawn(&mut self, _cfg: Arc<Config>) -> Result<()> {
+    fn spawn(&mut self, _cfg: Arc<Config>, session_table: Arc<SessionTable>) -> Result<()> {
         if self.files.is_empty() {
             return Ok(());
         }
