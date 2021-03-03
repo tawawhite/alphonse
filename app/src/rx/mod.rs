@@ -24,7 +24,6 @@ pub struct RxUtility {
         exit: Arc<AtomicBool>,
         cfg: Arc<Config>,
         sender: Sender<Box<dyn Packet>>,
-        session_table: Arc<SessionTable>,
     ) -> Result<Vec<JoinHandle<Result<()>>>>,
     pub cleanup: fn(cfg: &Config) -> Result<()>,
 }
@@ -32,6 +31,16 @@ pub struct RxUtility {
 pub struct SessionData {
     pub info: Box<Session>,
     pub parsers: Box<FnvHashMap<ParserID, Box<dyn ProtocolParserTrait>>>,
+}
+
+impl Default for SessionData {
+    fn default() -> SessionData {
+        SessionData {
+            // Here we use Session::new(), since default() doesn't generate the struct we need
+            info: Box::new(Session::new()),
+            parsers: Box::new(FnvHashMap::default()),
+        }
+    }
 }
 
 pub type SessionTable = DashMap<PacketHashKey, Box<SessionData>, FnvBuildHasher>;

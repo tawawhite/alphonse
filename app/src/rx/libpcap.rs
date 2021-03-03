@@ -2,7 +2,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread::JoinHandle;
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use crossbeam_channel::Sender;
 
 use alphonse_api as api;
@@ -11,7 +11,7 @@ use api::packet::Packet as PacketTrait;
 use api::packet::{Layers, Rules, Tunnel};
 
 use crate::config::Config;
-use crate::rx::{RxUtility, SessionTable};
+use crate::rx::RxUtility;
 use crate::stats::CaptureStat;
 
 pub const UTILITY: RxUtility = RxUtility {
@@ -24,19 +24,17 @@ pub fn start(
     exit: Arc<AtomicBool>,
     cfg: Arc<Config>,
     sender: Sender<Box<dyn PacketTrait>>,
-    session_table: Arc<SessionTable>,
 ) -> Result<Vec<JoinHandle<Result<()>>>> {
     let mut handles = vec![];
     for interface in cfg.interfaces.iter() {
         let cfg = cfg.clone();
-        let session_table = session_table.clone();
         let mut thread = RxThread {
             exit: exit.clone(),
             sender: sender.clone(),
             interface: interface.clone(),
         };
         let builder = std::thread::Builder::new().name(thread.name());
-        let handle = builder.spawn(move || thread.spawn(cfg, session_table))?;
+        let handle = builder.spawn(move || thread.spawn(cfg))?;
         handles.push(handle);
     }
 
@@ -50,14 +48,43 @@ struct RxThread {
 }
 
 impl RxThread {
-    pub fn spawn(&mut self, _cfg: Arc<Config>, session_table: Arc<SessionTable>) -> Result<()> {
+    pub fn spawn(&mut self, cfg: Arc<Config>) -> Result<()> {
         let mut cap = NetworkInterface::try_from_str(self.interface.as_str())?;
-        let mut overflow_cnt = 0;
+        let mut overflow_cnt: u64 = 0;
+        let mut rx_cnt: u64 = 0;
 
         println!("{} started", self.name());
 
         while !self.exit.load(Ordering::Relaxed) {
-            let pkt = cap.next()?;
+            let pkt = match cap.next() {
+                Ok(p) => p,
+                Err(e) => {
+                    match e {
+                        pcap::Error::TimeoutExpired => {
+                            std::thread::sleep(std::time::Duration::from_millis(100));
+                            continue;
+                        }
+                        _ => return Err(anyhow!("{}", e)),
+                    };
+                }
+            };
+
+            rx_cnt += 1;
+            if rx_cnt % cfg.rx_stat_log_interval == 0 {
+                match cap.stats() {
+                    Ok(stats) => {
+                        println!(
+                            "{} {}({:.3}) {}",
+                            stats.rx_pkts,
+                            stats.dropped,
+                            stats.dropped as f64 / stats.rx_pkts as f64,
+                            stats.if_dropped,
+                        );
+                    }
+                    Err(_) => {}
+                };
+            }
+
             match self.sender.try_send(pkt) {
                 Ok(_) => {}
                 Err(err) => match err {
@@ -94,7 +121,7 @@ struct NetworkInterface {
 
 impl NetworkInterface {
     #[inline]
-    fn next(&mut self) -> Result<Box<dyn PacketTrait>> {
+    fn next(&mut self) -> Result<Box<dyn PacketTrait>, pcap::Error> {
         let raw = self.cap.as_mut().next()?;
         let pkt: Box<Packet> = Box::new(Packet::from(&raw));
         Ok(pkt)

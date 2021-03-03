@@ -10,7 +10,7 @@ anyhow = "1.0"
 clap = "2.33.3"
 crossbeam-channel = "0.5"
 chrono = "0.4"
-dashmap = "4.0"
+dashmap = { version = "4.0", features = ["raw-api"] }
 elasticsearch = "7.10.1-alpha.1"
 fnv = "1.0"
 hyperscan = { version = "0.2", features = ["chimera"] }

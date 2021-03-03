@@ -98,12 +98,9 @@ impl Thread {
 
         rt.block_on(async {
             while !self.exit.load(Ordering::Relaxed) {
-                let ses = match self.receiver.try_recv() {
+                let ses = match self.receiver.recv() {
                     Ok(ses) => ses,
-                    Err(err) => match err {
-                        crossbeam_channel::TryRecvError::Empty => continue,
-                        crossbeam_channel::TryRecvError::Disconnected => break,
-                    },
+                    Err(_) => break,
                 };
 
                 if cfg.dry_run {

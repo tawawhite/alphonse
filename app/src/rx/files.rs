@@ -7,13 +7,14 @@ use std::thread::JoinHandle;
 use anyhow::{anyhow, Result};
 use crossbeam_channel::Sender;
 use path_absolutize::Absolutize;
+use signal_hook::low_level::raise;
 
 use alphonse_api as api;
 use api::packet::Packet as PacketTrait;
 
 use crate::config::Config;
 use crate::rx::libpcap::Packet;
-use crate::rx::{RxUtility, SessionTable};
+use crate::rx::RxUtility;
 use crate::stats::CaptureStat;
 
 pub const UTILITY: RxUtility = RxUtility {
@@ -22,20 +23,19 @@ pub const UTILITY: RxUtility = RxUtility {
     cleanup: |_| Ok(()),
 };
 
-fn start<'a>(
+fn start(
     exit: Arc<AtomicBool>,
     cfg: Arc<Config>,
     sender: Sender<Box<dyn PacketTrait>>,
-    session_table: Arc<SessionTable>,
 ) -> Result<Vec<JoinHandle<Result<()>>>> {
     let mut handles = vec![];
     let mut thread = RxThread {
         exit: exit.clone(),
-        sender: sender.clone(),
         files: get_pcap_files(cfg.as_ref()),
+        sender: sender.clone(),
     };
     let builder = std::thread::Builder::new().name(thread.name());
-    let handle = builder.spawn(move || thread.spawn(cfg, session_table))?;
+    let handle = builder.spawn(move || thread.spawn(cfg))?;
     handles.push(handle);
     Ok(handles)
 }
@@ -82,7 +82,7 @@ struct RxThread {
 }
 
 impl RxThread {
-    fn spawn(&mut self, _cfg: Arc<Config>, session_table: Arc<SessionTable>) -> Result<()> {
+    fn spawn(&mut self, _cfg: Arc<Config>) -> Result<()> {
         if self.files.is_empty() {
             return Ok(());
         }
@@ -130,6 +130,9 @@ impl RxThread {
                 };
             }
         }
+
+        // terminate alphonse
+        raise(signal_hook::consts::SIGTERM)?;
 
         println!("{} exit", self.name());
 
