@@ -97,10 +97,13 @@ impl Thread {
         let mut sessions = vec![];
 
         rt.block_on(async {
-            while !self.exit.load(Ordering::Relaxed) {
-                let ses = match self.receiver.recv() {
+            loop {
+                let ses = match self.receiver.try_recv() {
                     Ok(ses) => ses,
-                    Err(_) => break,
+                    Err(err) => match err {
+                        crossbeam_channel::TryRecvError::Disconnected => break,
+                        _ => continue,
+                    },
                 };
 
                 if cfg.dry_run {

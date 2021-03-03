@@ -83,6 +83,21 @@ impl TimeoutThread {
                 });
         }
 
+        session_table
+            .shards()
+            .iter()
+            .par_bridge()
+            .for_each(|shard| {
+                shard.write().retain(|_, ses| {
+                    let ses = ses.get_mut();
+                    for (_, parser) in ses.parsers.iter_mut() {
+                        parser.finish(ses.info.as_mut());
+                    }
+                    self.sender.try_send(ses.info.clone()).unwrap();
+                    false
+                })
+            });
+
         println!("{} exit", self.name());
 
         Ok(())
