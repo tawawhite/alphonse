@@ -99,7 +99,7 @@ fn main() -> Result<()> {
     let classifier_manager = Arc::new(classifier_manager);
 
     let (ses_sender, ses_receiver) = bounded(cfg.pkt_channel_size as usize);
-    let mut output_thread = threadings::output::Thread::new(exit.clone(), ses_receiver.clone());
+    let mut output_thread = threadings::output::Thread::new(ses_receiver.clone());
 
     // initialize pkt threads
     let (pkt_sender, pkt_receiver) = bounded(cfg.pkt_channel_size as usize);
