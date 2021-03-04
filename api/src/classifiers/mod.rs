@@ -297,7 +297,7 @@ mod tests {
         classifier.add_rule(&mut rule).unwrap();
         assert_eq!(classifier.rules.len(), 1);
         assert_eq!(classifier.rules[0].id(), 0);
-        assert_eq!(classifier.rules[0].priority, 255);
+        assert_eq!(classifier.rules[0].priority, 0);
         assert_eq!(classifier.rules[0].parsers.len(), 1);
         assert_eq!(classifier.rules[0].parsers[0], 1);
         assert!(matches!(classifier.rules[0].rule_type, RuleType::All));
@@ -307,7 +307,7 @@ mod tests {
         classifier.add_rule(&mut rule).unwrap();
         assert_eq!(classifier.rules.len(), 1);
         assert_eq!(classifier.rules[0].id(), 0);
-        assert_eq!(classifier.rules[0].priority, 255);
+        assert_eq!(classifier.rules[0].priority, 0);
         assert_eq!(classifier.rules[0].parsers.len(), 2);
         assert_eq!(classifier.rules[0].parsers[0], 1);
         assert_eq!(classifier.rules[0].parsers[1], 2);

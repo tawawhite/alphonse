@@ -68,7 +68,7 @@ mod test {
         parser
             .parse_pkt(&pkt, Some(&pkt.rules()[0]), &mut ses)
             .unwrap();
-        assert!(ses.has_protocol("rdp"));
+        assert!(ses.has_protocol(&"rdp"));
         assert_eq!(ses.fields.as_object().unwrap().get("user").unwrap(), "user");
     }
 }

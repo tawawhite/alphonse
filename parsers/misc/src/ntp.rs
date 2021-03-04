@@ -71,6 +71,6 @@ mod test {
         for rule in pkt.rules() {
             parser.parse_pkt(&pkt, Some(rule), &mut ses).unwrap();
         }
-        assert!(ses.has_protocol("ntp"));
+        assert!(ses.has_protocol(&"ntp"));
     }
 }

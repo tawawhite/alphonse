@@ -58,6 +58,6 @@ mod test {
         parser
             .parse_pkt(&pkt, Some(&pkt.rules()[0]), &mut ses)
             .unwrap();
-        assert!(ses.has_protocol("dropbox-lan-sync"));
+        assert!(ses.has_protocol(&"dropbox-lan-sync"));
     }
 }
