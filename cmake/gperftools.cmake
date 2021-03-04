@@ -9,6 +9,7 @@ if(OFFLINE_ENVIRONMENT)
                     -D CMAKE_INSTALL_PREFIX=<INSTALL_DIR>
                     -D BUILD_TESTING=OFF
                     -D gperftools_build_benchmark=OFF
+                    -D GPERFTOOLS_BUILD_CPU_PROFILER=OFF
                     -D CMAKE_POSITION_INDEPENDENT_CODE=ON
     )
 else()
@@ -23,6 +24,7 @@ else()
                     -D CMAKE_INSTALL_PREFIX=<INSTALL_DIR>
                     -D BUILD_TESTING=OFF
                     -D gperftools_build_benchmark=OFF
+                    -D GPERFTOOLS_BUILD_CPU_PROFILER=OFF
                     -D CMAKE_POSITION_INDEPENDENT_CODE=ON
     )
 endif()
