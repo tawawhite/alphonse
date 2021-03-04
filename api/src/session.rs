@@ -163,7 +163,7 @@ impl Session {
 
     /// Whether this session needs to do a middle save operation
     #[inline]
-    pub fn need_mid_save(&mut self, max_packets: u32, tv_sec: u64) -> bool {
+    pub fn need_mid_save(&self, max_packets: u32, tv_sec: u64) -> bool {
         if self.truncate(max_packets as u32) {
             return true;
         }
