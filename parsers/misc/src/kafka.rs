@@ -26,7 +26,7 @@ fn classify(ses: &mut Session, pkt: &Box<dyn Packet>) {
     if payload.len() != flen {
         return;
     }
-    ses.add_protocol("kafka");
+    ses.add_protocol(&"kafka");
 }
 
 #[cfg(test)]

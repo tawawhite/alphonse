@@ -20,7 +20,7 @@ pub fn register_classify_rules(
 fn classify(ses: &mut Session, pkt: &Box<dyn Packet>) {
     unsafe {
         if pkt.src_port() == 17500 || pkt.dst_port() == 17500 {
-            ses.add_protocol("dropbox-lan-sync");
+            ses.add_protocol(&"dropbox-lan-sync");
         }
     }
 }

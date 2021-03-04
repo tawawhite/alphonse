@@ -19,7 +19,7 @@ pub fn register_classify_rules(
 
 fn classify(ses: &mut Session, pkt: &Box<dyn Packet>) {
     match &pkt.payload()[5..].windows(4).position(|win| win == b"IMAP") {
-        Some(_) => ses.add_protocol("imap"),
+        Some(_) => ses.add_protocol(&"imap"),
         None => {}
     }
 }

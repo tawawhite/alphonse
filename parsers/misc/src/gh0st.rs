@@ -35,9 +35,9 @@ fn classify_windows(ses: &mut Session, pkt: &Box<dyn Packet>) {
     }
 
     if ((payload[6] as u16 & 0xff) << 8 | (payload[5] as u16 & 0xff)) == payload.len() as u16 {
-        ses.add_protocol("gh0st");
+        ses.add_protocol(&"gh0st");
     } else if payload[11] == 0 && payload[12] == 0 {
-        ses.add_protocol("gh0st");
+        ses.add_protocol(&"gh0st");
     }
 }
 
@@ -48,7 +48,7 @@ fn classify_mac(ses: &mut Session, pkt: &Box<dyn Packet>) {
     }
 
     if ((payload[7] as u16 & 0xff) << 8 | (payload[8] as u16 & 0xff)) == payload.len() as u16 {
-        ses.add_protocol("gh0st");
+        ses.add_protocol(&"gh0st");
     }
 }
 

@@ -33,7 +33,7 @@ fn classify(ses: &mut Session, pkt: &Box<dyn Packet>) {
         return;
     }
 
-    ses.add_protocol("ntp");
+    ses.add_protocol(&"ntp");
 }
 
 #[cfg(test)]

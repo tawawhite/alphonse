@@ -25,7 +25,7 @@ fn classify(ses: &mut Session, pkt: &Box<dyn Packet>) {
         && payload[4] == payload[3] - 5
         && payload[5] == 0xe0
     {
-        ses.add_protocol("rdp");
+        ses.add_protocol(&"rdp");
         if payload.len() > 30 && &payload[11..28] == b"Cookie: mstshash=" {
             match payload[28..].windows(2).position(|win| win == b"\r\n") {
                 Some(pos) => ses.add_field(
