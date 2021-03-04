@@ -35,3 +35,4 @@ version = "0.1.0"
 arkime = ["alphonse-api/arkime"]
 dpdk = ["rte"]
 heuristic-mpls = []
+use-tcmalloc = ["alphonse-api/tcmalloc"]
