@@ -134,19 +134,19 @@ impl Session {
 
     /// Add session protocol information
     #[inline]
-    pub fn add_protocol(&mut self, protocol: &str) {
-        self.protocols.insert(protocol.to_string());
+    pub fn add_protocol<S: AsRef<str>>(&mut self, protocol: &S) {
+        self.protocols.insert(protocol.as_ref().to_string());
     }
 
     #[inline]
-    pub fn has_protocol(&self, protocol: &str) -> bool {
-        self.protocols.contains(protocol)
+    pub fn has_protocol<S: AsRef<str>>(&self, protocol: &S) -> bool {
+        self.protocols.contains(protocol.as_ref())
     }
 
     /// Add tag
     #[inline]
-    pub fn add_tag(&mut self, tag: &String) {
-        self.tags.insert(tag.clone());
+    pub fn add_tag<S: AsRef<str>>(&mut self, tag: &S) {
+        self.tags.insert(tag.as_ref().to_string());
     }
 
     /// Add field
