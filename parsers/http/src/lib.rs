@@ -162,7 +162,7 @@ impl<'a> api::parsers::ProtocolParserTrait for ProtocolParser<'static> {
 
     fn parse_pkt(
         &mut self,
-        pkt: &Box<dyn api::packet::Packet>,
+        pkt: &dyn api::packet::Packet,
         _rule: Option<&api::classifiers::matched::Rule>,
         ses: &mut Session,
     ) -> Result<()> {
