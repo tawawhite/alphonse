@@ -17,7 +17,7 @@ pub fn register_classify_rules(
     Ok(())
 }
 
-fn classify(ses: &mut Session, pkt: &Box<dyn Packet>) {
+fn classify(ses: &mut Session, pkt: &dyn Packet) {
     unsafe {
         if pkt.src_port() == 17500 || pkt.dst_port() == 17500 {
             ses.add_protocol(&"dropbox-lan-sync");
@@ -51,12 +51,12 @@ mod test {
         pkt.layers.trans.protocol = Protocol::UDP;
         pkt.layers.app.offset = 20;
         let mut pkt: Box<dyn api::packet::Packet> = pkt;
-        manager.classify(&mut pkt, &mut scratch).unwrap();
+        manager.classify(pkt.as_mut(), &mut scratch).unwrap();
         assert_eq!(pkt.rules().len(), 1);
 
         let mut ses = Session::new();
         parser
-            .parse_pkt(&pkt, Some(&pkt.rules()[0]), &mut ses)
+            .parse_pkt(pkt.as_ref(), Some(&pkt.rules()[0]), &mut ses)
             .unwrap();
         assert!(ses.has_protocol(&"dropbox-lan-sync"));
     }

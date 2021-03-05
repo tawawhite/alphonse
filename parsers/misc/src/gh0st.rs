@@ -28,7 +28,7 @@ pub fn register_classify_rules(
     Ok(())
 }
 
-fn classify_windows(ses: &mut Session, pkt: &Box<dyn Packet>) {
+fn classify_windows(ses: &mut Session, pkt: &dyn Packet) {
     let payload = pkt.payload();
     if payload.len() < 15 {
         return;
@@ -41,7 +41,7 @@ fn classify_windows(ses: &mut Session, pkt: &Box<dyn Packet>) {
     }
 }
 
-fn classify_mac(ses: &mut Session, pkt: &Box<dyn Packet>) {
+fn classify_mac(ses: &mut Session, pkt: &dyn Packet) {
     let payload = pkt.payload();
     if payload.len() < 15 {
         return;
@@ -74,12 +74,12 @@ mod test {
         pkt.raw = Box::new(b"Gh0st\x0f\x00\x00\x00\x09\x10\x11\x12\x78\x9c".to_vec());
         pkt.layers.trans.protocol = Protocol::TCP;
         let mut pkt: Box<dyn api::packet::Packet> = pkt;
-        manager.classify(&mut pkt, &mut scratch).unwrap();
+        manager.classify(pkt.as_mut(), &mut scratch).unwrap();
         assert_eq!(pkt.rules().len(), 1);
 
         let mut ses = Session::new();
         parser
-            .parse_pkt(&pkt, Some(&pkt.rules()[0]), &mut ses)
+            .parse_pkt(pkt.as_ref(), Some(&pkt.rules()[0]), &mut ses)
             .unwrap();
         assert!(ses.has_protocol(&"gh0st"));
 
@@ -88,12 +88,12 @@ mod test {
         pkt.raw = Box::new(b"Gh0st\x05\x06\x00\x00\x09\x10\x00\x00\x78\x9c".to_vec());
         pkt.layers.trans.protocol = Protocol::TCP;
         let mut pkt: Box<dyn api::packet::Packet> = pkt;
-        manager.classify(&mut pkt, &mut scratch).unwrap();
+        manager.classify(pkt.as_mut(), &mut scratch).unwrap();
         assert_eq!(pkt.rules().len(), 1);
 
         let mut ses = Session::new();
         parser
-            .parse_pkt(&pkt, Some(&pkt.rules()[0]), &mut ses)
+            .parse_pkt(pkt.as_ref(), Some(&pkt.rules()[0]), &mut ses)
             .unwrap();
         assert!(ses.has_protocol(&"gh0st"));
 
@@ -102,12 +102,12 @@ mod test {
         pkt.raw = Box::new(b"Gh0st\x00\x00\x00\x0f\x09\x10\x11\x12\x78\x9c".to_vec());
         pkt.layers.trans.protocol = Protocol::TCP;
         let mut pkt: Box<dyn api::packet::Packet> = pkt;
-        manager.classify(&mut pkt, &mut scratch).unwrap();
+        manager.classify(pkt.as_mut(), &mut scratch).unwrap();
         assert_eq!(pkt.rules().len(), 1);
 
         let mut ses = Session::new();
         parser
-            .parse_pkt(&pkt, Some(&pkt.rules()[0]), &mut ses)
+            .parse_pkt(pkt.as_ref(), Some(&pkt.rules()[0]), &mut ses)
             .unwrap();
         assert!(ses.has_protocol(&"gh0st"));
     }

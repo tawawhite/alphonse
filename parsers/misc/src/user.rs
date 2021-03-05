@@ -29,7 +29,7 @@ pub fn register_classify_rules(
     Ok(())
 }
 
-fn classify(ses: &mut Session, pkt: &Box<dyn Packet>) {
+fn classify(ses: &mut Session, pkt: &dyn Packet) {
     let payload = pkt.payload();
     if payload.len() <= 5 {
         return;
@@ -76,12 +76,14 @@ mod test {
         pkt.raw = Box::new(b"USER test_user".to_vec());
         pkt.layers.trans.protocol = Protocol::TCP;
         let mut pkt: Box<dyn api::packet::Packet> = pkt;
-        manager.classify(&mut pkt, &mut scratch).unwrap();
+        manager.classify(pkt.as_mut(), &mut scratch).unwrap();
         assert_eq!(pkt.rules().len(), 2);
 
         let mut ses = Session::new();
         for rule in pkt.rules() {
-            parser.parse_pkt(&pkt, Some(rule), &mut ses).unwrap();
+            parser
+                .parse_pkt(pkt.as_ref(), Some(rule), &mut ses)
+                .unwrap();
         }
         assert_eq!("\"test_user\"", ses.fields["user"].to_string());
     }

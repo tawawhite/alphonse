@@ -63,7 +63,7 @@ impl super::Classifier for Classifier {
 
 impl Classifier {
     /// Classify packet by transport protocol and port
-    pub fn classify(&self, pkt: &mut Box<dyn packet::Packet>) {
+    pub fn classify(&self, pkt: &mut dyn packet::Packet) {
         let base_index = match pkt.layers().trans.protocol {
             packet::Protocol::TCP => std::u16::MAX as usize * 0,
             packet::Protocol::UDP => std::u16::MAX as usize * 1,
@@ -183,7 +183,7 @@ mod test {
             protocol: packet::Protocol::TCP,
         };
         let mut pkt: Box<dyn PacketTrait> = pkt;
-        classifier.classify(&mut pkt);
+        classifier.classify(pkt.as_mut());
         assert_eq!(pkt.rules().len(), 1);
         assert_eq!(pkt.rules()[0].rule_type, matched::RuleType::Port);
         assert_eq!(pkt.rules()[0].parsers[0], 1);
@@ -213,7 +213,7 @@ mod test {
             protocol: packet::Protocol::UDP,
         };
         let mut pkt: Box<dyn PacketTrait> = pkt;
-        classifier.classify(&mut pkt);
+        classifier.classify(pkt.as_mut());
         assert_eq!(pkt.rules().len(), 1);
         assert_eq!(pkt.rules()[0].rule_type, matched::RuleType::Port);
         assert_eq!(pkt.rules()[0].parsers[0], 2);
@@ -270,7 +270,7 @@ mod test {
             protocol: packet::Protocol::SCTP,
         };
         let mut pkt: Box<dyn PacketTrait> = pkt;
-        classifier.classify(&mut pkt);
+        classifier.classify(pkt.as_mut());
         assert_eq!(pkt.rules().len(), 1);
         assert_eq!(pkt.rules()[0].rule_type, matched::RuleType::Port);
         assert_eq!(pkt.rules()[0].parsers[0], 3);

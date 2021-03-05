@@ -38,12 +38,12 @@ mod test {
         pkt.raw = Box::new(b"\x80\x01\x00\x01\x00\x00\x00".to_vec());
         pkt.layers.trans.protocol = Protocol::TCP;
         let mut pkt: Box<dyn api::packet::Packet> = pkt;
-        manager.classify(&mut pkt, &mut scratch).unwrap();
+        manager.classify(pkt.as_mut(), &mut scratch).unwrap();
         assert_eq!(pkt.rules().len(), 1);
 
         let mut ses = Session::new();
         parser
-            .parse_pkt(&pkt, Some(&pkt.rules()[0]), &mut ses)
+            .parse_pkt(pkt.as_ref(), Some(&pkt.rules()[0]), &mut ses)
             .unwrap();
         assert!(ses.has_protocol(&"thrift"));
 
@@ -52,11 +52,13 @@ mod test {
         pkt.raw = Box::new(b"\x00\x00\x02\x03\x80\x01\x00890123456789012345".to_vec());
         pkt.layers.trans.protocol = Protocol::TCP;
         let mut pkt: Box<dyn api::packet::Packet> = pkt;
-        manager.classify(&mut pkt, &mut scratch).unwrap();
+        manager.classify(pkt.as_mut(), &mut scratch).unwrap();
 
         let mut ses = Session::new();
         for rule in pkt.rules() {
-            parser.parse_pkt(&pkt, Some(rule), &mut ses).unwrap();
+            parser
+                .parse_pkt(pkt.as_ref(), Some(rule), &mut ses)
+                .unwrap();
         }
         assert!(ses.has_protocol(&"thrift"));
     }

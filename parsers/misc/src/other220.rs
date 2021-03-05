@@ -17,7 +17,7 @@ pub fn register_classify_rules(
     Ok(())
 }
 
-fn classify(ses: &mut Session, pkt: &Box<dyn Packet>) {
+fn classify(ses: &mut Session, pkt: &dyn Packet) {
     let payload = pkt.payload();
     match payload[4..].windows(4).position(|win| win == b"LMTP") {
         Some(_) => {
@@ -58,12 +58,12 @@ mod test {
         pkt.raw = Box::new(b"220 LMTP".to_vec());
         pkt.layers.trans.protocol = Protocol::TCP;
         let mut pkt: Box<dyn api::packet::Packet> = pkt;
-        manager.classify(&mut pkt, &mut scratch).unwrap();
+        manager.classify(pkt.as_mut(), &mut scratch).unwrap();
         assert_eq!(pkt.rules().len(), 1);
 
         let mut ses = Session::new();
         parser
-            .parse_pkt(&pkt, Some(&pkt.rules()[0]), &mut ses)
+            .parse_pkt(pkt.as_ref(), Some(&pkt.rules()[0]), &mut ses)
             .unwrap();
         assert!(ses.has_protocol(&"lmtp"));
 
@@ -72,12 +72,12 @@ mod test {
         pkt.raw = Box::new(b"220 FTP".to_vec());
         pkt.layers.trans.protocol = Protocol::TCP;
         let mut pkt: Box<dyn api::packet::Packet> = pkt;
-        manager.classify(&mut pkt, &mut scratch).unwrap();
+        manager.classify(pkt.as_mut(), &mut scratch).unwrap();
         assert_eq!(pkt.rules().len(), 1);
 
         let mut ses = Session::new();
         parser
-            .parse_pkt(&pkt, Some(&pkt.rules()[0]), &mut ses)
+            .parse_pkt(pkt.as_ref(), Some(&pkt.rules()[0]), &mut ses)
             .unwrap();
         assert!(ses.has_protocol(&"ftp"));
     }

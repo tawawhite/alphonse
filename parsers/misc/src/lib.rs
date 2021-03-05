@@ -48,7 +48,7 @@ pub struct ProtocolParser {
 }
 
 // fn classify_func(ses: &mut Session, payload: &[u8]) {}
-type ClassifyFunc = fn(ses: &mut Session, pkt: &Box<dyn Packet>);
+type ClassifyFunc = fn(ses: &mut Session, pkt: &dyn Packet);
 
 #[derive(Clone)]
 pub enum MatchCallBack {
@@ -122,7 +122,7 @@ impl ProtocolParserTrait for ProtocolParser {
 
     fn parse_pkt(
         &mut self,
-        pkt: &Box<dyn api::packet::Packet>,
+        pkt: &dyn api::packet::Packet,
         rule: Option<&api::classifiers::matched::Rule>,
         ses: &mut api::session::Session,
     ) -> Result<()> {

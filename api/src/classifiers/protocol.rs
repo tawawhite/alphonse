@@ -47,7 +47,7 @@ impl super::Classifier for Classifier {
 }
 
 impl Classifier {
-    pub fn classify(&self, pkt: &mut Box<dyn packet::Packet>) {
+    pub fn classify(&self, pkt: &mut dyn packet::Packet) {
         macro_rules! classify_layer {
             ($layer:ident) => {
                 let i = pkt.layers().$layer.protocol as usize;
@@ -129,7 +129,7 @@ mod test {
             protocol: packet::Protocol::TCP,
         };
         let mut pkt: Box<dyn PacketTrait> = pkt;
-        classifier.classify(&mut pkt);
+        classifier.classify(pkt.as_mut());
         assert_eq!(pkt.rules().len(), 1);
         assert_eq!(pkt.rules()[0].rule_type, matched::RuleType::Protocol);
         assert_eq!(pkt.rules()[0].parsers[0], 1);

@@ -50,11 +50,13 @@ mod test {
             Box::new(b"\x00\x00\x00\x25\x80\x01\x00\x01\x00\x00\x00\x0c\x73\x65\x74\x5f".to_vec());
         pkt.layers.trans.protocol = Protocol::TCP;
         let mut pkt: Box<dyn api::packet::Packet> = pkt;
-        manager.classify(&mut pkt, &mut scratch).unwrap();
+        manager.classify(pkt.as_mut(), &mut scratch).unwrap();
 
         let mut ses = Session::new();
         for rule in pkt.rules() {
-            parser.parse_pkt(&pkt, Some(rule), &mut ses).unwrap();
+            parser
+                .parse_pkt(pkt.as_ref(), Some(rule), &mut ses)
+                .unwrap();
         }
         assert!(ses.has_protocol(&"cassandra"));
 
@@ -64,11 +66,13 @@ mod test {
             Box::new(b"\x00\x00\x00\x1d\x80\x01\x00\x01\x00\x00\x00\x10\x64\x65\x73\x63".to_vec());
         pkt.layers.trans.protocol = Protocol::TCP;
         let mut pkt: Box<dyn api::packet::Packet> = pkt;
-        manager.classify(&mut pkt, &mut scratch).unwrap();
+        manager.classify(pkt.as_mut(), &mut scratch).unwrap();
 
         let mut ses = Session::new();
         for rule in pkt.rules() {
-            parser.parse_pkt(&pkt, Some(rule), &mut ses).unwrap();
+            parser
+                .parse_pkt(pkt.as_ref(), Some(rule), &mut ses)
+                .unwrap();
         }
         assert!(ses.has_protocol(&"cassandra"));
     }

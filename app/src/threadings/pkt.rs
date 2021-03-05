@@ -44,7 +44,7 @@ impl PktThread {
         &self,
         scratch: &mut api::classifiers::ClassifyScratch,
         protocol_parsers: &mut Box<Vec<Box<dyn ProtocolParserTrait>>>,
-        pkt: &mut Box<dyn Packet>,
+        pkt: &mut dyn Packet,
         ses_data: &mut SessionData,
     ) -> Result<()> {
         self.classifier.classify(pkt, scratch)?;
@@ -115,11 +115,11 @@ impl PktThread {
             let key = PacketHashKey::from(pkt.as_ref());
             match session_table.get_mut(&key) {
                 Some(mut ses) => {
-                    ses.info.update(&pkt);
+                    ses.info.update(pkt.as_ref());
                     self.parse_pkt(
                         &mut classify_scratch,
                         &mut protocol_parsers,
-                        &mut pkt,
+                        pkt.as_mut(),
                         ses.as_mut(),
                     )
                     .unwrap();
@@ -128,11 +128,11 @@ impl PktThread {
                     let mut ses = Box::new(SessionData::default());
                     ses.info.start_time = TimeVal::new(*pkt.ts());
                     ses.info.save_time = pkt.ts().tv_sec as u64 + cfg.ses_save_timeout as u64;
-                    ses.info.update(&pkt);
+                    ses.info.update(pkt.as_ref());
                     self.parse_pkt(
                         &mut classify_scratch,
                         &mut protocol_parsers,
-                        &mut pkt,
+                        pkt.as_mut(),
                         ses.as_mut(),
                     )
                     .unwrap();

@@ -22,7 +22,7 @@ pub fn register_classify_rules(
     Ok(())
 }
 
-fn classify(ses: &mut Session, pkt: &Box<dyn Packet>) {
+fn classify(ses: &mut Session, pkt: &dyn Packet) {
     unsafe {
         if pkt.src_port() != 123 && pkt.dst_port() != 123 {
             return;
@@ -64,12 +64,14 @@ mod test {
         pkt.layers.trans.protocol = Protocol::UDP;
         pkt.layers.app.offset = 8;
         let mut pkt: Box<dyn api::packet::Packet> = pkt;
-        manager.classify(&mut pkt, &mut scratch).unwrap();
+        manager.classify(pkt.as_mut(), &mut scratch).unwrap();
         assert_eq!(pkt.rules().len(), 1);
 
         let mut ses = Session::new();
         for rule in pkt.rules() {
-            parser.parse_pkt(&pkt, Some(rule), &mut ses).unwrap();
+            parser
+                .parse_pkt(pkt.as_ref(), Some(rule), &mut ses)
+                .unwrap();
         }
         assert!(ses.has_protocol(&"ntp"));
     }

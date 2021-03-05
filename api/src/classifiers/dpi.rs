@@ -123,7 +123,7 @@ impl super::Classifier for Classifier {
 impl Classifier {
     pub fn classify(
         &self,
-        pkt: &mut Box<dyn packet::Packet>,
+        pkt: &mut dyn packet::Packet,
         scratch: &mut ClassifyScratch,
     ) -> Result<()> {
         match (&self.hs_db, &scratch.hs_scratch) {
@@ -236,7 +236,7 @@ mod test {
         let buf = b"a sentence contains word regex";
         pkt.raw = Box::new(buf.iter().cloned().collect());
         let mut pkt: Box<dyn PacketTrait> = pkt;
-        classifier.classify(&mut pkt, &mut scratch).unwrap();
+        classifier.classify(pkt.as_mut(), &mut scratch).unwrap();
         assert_eq!(pkt.rules().len(), 1);
         assert_eq!(pkt.rules()[0].id(), 10);
         assert_eq!(pkt.rules()[0].priority, 100);
@@ -248,7 +248,7 @@ mod test {
         let buf = b"a sentence does not contains the word";
         pkt.raw = Box::new(buf.iter().cloned().collect());
         let mut pkt: Box<dyn PacketTrait> = pkt;
-        classifier.classify(&mut pkt, &mut scratch).unwrap();
+        classifier.classify(pkt.as_mut(), &mut scratch).unwrap();
         assert_eq!(pkt.rules().len(), 0);
     }
 
@@ -276,7 +276,7 @@ mod test {
         pkt.raw = Box::new(buf.iter().cloned().collect());
         pkt.layers_mut().trans.protocol = packet::Protocol::TCP;
         let mut pkt: Box<dyn PacketTrait> = pkt;
-        classifier.classify(&mut pkt, &mut scratch).unwrap();
+        classifier.classify(pkt.as_mut(), &mut scratch).unwrap();
         assert_eq!(pkt.rules().len(), 0);
     }
 }

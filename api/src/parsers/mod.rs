@@ -70,7 +70,7 @@ pub trait ProtocolParserTrait: Send + Sync {
     /// Parse a single packet and maybe update session information
     fn parse_pkt(
         &mut self,
-        _pkt: &Box<dyn packet::Packet>,
+        _pkt: &dyn packet::Packet,
         _rule: Option<&super::classifiers::matched::Rule>,
         ses: &mut session::Session,
     ) -> Result<()> {

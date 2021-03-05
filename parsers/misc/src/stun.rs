@@ -47,12 +47,12 @@ mod test {
         pkt.raw = Box::new(b"RSP/   STUN".to_vec());
         pkt.layers.trans.protocol = Protocol::TCP;
         let mut pkt: Box<dyn api::packet::Packet> = pkt;
-        manager.classify(&mut pkt, &mut scratch).unwrap();
+        manager.classify(pkt.as_mut(), &mut scratch).unwrap();
         assert_eq!(pkt.rules().len(), 1);
 
         let mut ses = Session::new();
         parser
-            .parse_pkt(&pkt, Some(&pkt.rules()[0]), &mut ses)
+            .parse_pkt(pkt.as_ref(), Some(&pkt.rules()[0]), &mut ses)
             .unwrap();
         assert!(ses.has_protocol(&"stun"));
 
@@ -61,12 +61,12 @@ mod test {
         pkt.raw = Box::new(b"\x00\x01\x00".to_vec());
         pkt.layers.trans.protocol = Protocol::UDP;
         let mut pkt: Box<dyn api::packet::Packet> = pkt;
-        manager.classify(&mut pkt, &mut scratch).unwrap();
+        manager.classify(pkt.as_mut(), &mut scratch).unwrap();
         assert_eq!(pkt.rules().len(), 1);
 
         let mut ses = Session::new();
         parser
-            .parse_pkt(&pkt, Some(&pkt.rules()[0]), &mut ses)
+            .parse_pkt(pkt.as_ref(), Some(&pkt.rules()[0]), &mut ses)
             .unwrap();
         assert!(ses.has_protocol(&"stun"));
 
@@ -75,12 +75,12 @@ mod test {
         pkt.raw = Box::new(b"\x00\x03\x00".to_vec());
         pkt.layers.trans.protocol = Protocol::UDP;
         let mut pkt: Box<dyn api::packet::Packet> = pkt;
-        manager.classify(&mut pkt, &mut scratch).unwrap();
+        manager.classify(pkt.as_mut(), &mut scratch).unwrap();
         assert_eq!(pkt.rules().len(), 1);
 
         let mut ses = Session::new();
         parser
-            .parse_pkt(&pkt, Some(&pkt.rules()[0]), &mut ses)
+            .parse_pkt(pkt.as_ref(), Some(&pkt.rules()[0]), &mut ses)
             .unwrap();
         assert!(ses.has_protocol(&"stun"));
 
@@ -89,12 +89,12 @@ mod test {
         pkt.raw = Box::new(b"\x01\x01\x00".to_vec());
         pkt.layers.trans.protocol = Protocol::UDP;
         let mut pkt: Box<dyn api::packet::Packet> = pkt;
-        manager.classify(&mut pkt, &mut scratch).unwrap();
+        manager.classify(pkt.as_mut(), &mut scratch).unwrap();
         assert_eq!(pkt.rules().len(), 1);
 
         let mut ses = Session::new();
         parser
-            .parse_pkt(&pkt, Some(&pkt.rules()[0]), &mut ses)
+            .parse_pkt(pkt.as_ref(), Some(&pkt.rules()[0]), &mut ses)
             .unwrap();
         assert!(ses.has_protocol(&"stun"));
     }

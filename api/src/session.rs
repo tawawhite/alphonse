@@ -106,7 +106,7 @@ impl Session {
 
     #[inline]
     /// update session information
-    pub fn update(&mut self, pkt: &Box<dyn packet::Packet>) {
+    pub fn update(&mut self, pkt: &dyn packet::Packet) {
         match pkt.direction() {
             packet::Direction::LEFT => {
                 self.pkt_count[0] += 1;

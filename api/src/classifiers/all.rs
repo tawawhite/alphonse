@@ -53,7 +53,7 @@ impl super::Classifier for Classifier {
 
 impl Classifier {
     #[inline]
-    pub fn classify(&self, pkt: &mut Box<dyn packet::Packet>) {
+    pub fn classify(&self, pkt: &mut dyn packet::Packet) {
         if self.rule.parsers.len() > 0 {
             pkt.rules_mut().push(self.rule.clone())
         }
@@ -109,7 +109,7 @@ mod test {
         assert!(matches!(classifier.add_rule(&rule), Ok(_)));
 
         let mut pkt: Box<dyn PacketTrait> = Box::new(utils::packet::Packet::default());
-        classifier.classify(&mut pkt);
+        classifier.classify(pkt.as_mut());
         assert_eq!(pkt.rules().len(), 1);
     }
 
@@ -117,7 +117,7 @@ mod test {
     fn classify_without_any_parser() {
         let classifier = Classifier::default();
         let mut pkt: Box<dyn PacketTrait> = Box::new(utils::packet::Packet::default());
-        classifier.classify(&mut pkt);
+        classifier.classify(pkt.as_mut());
         assert_eq!(pkt.rules().len(), 0);
     }
 }
