@@ -1,5 +1,12 @@
-sudo: required
 dist: bionic
+os: linux
+language: rust
+cache:
+  cargo: true
+  directories:
+    - build
+rust:
+  - stable
 
 addons:
   apt:
@@ -17,25 +24,16 @@ addons:
       - libnuma-dev
       - llvm
       - clang
+      - libunwind-dev
 
 branches:
   only:
-    - dev
+    - master
 
-matrix:
-  include:
-    - language: rust
-      rust:
-        - stable
-        - beta
-        - nightly
-      jobs:
-        allow_failures:
-          - rust: nightly
-        fast_finish: true
-      cache: cargo
+jobs:
+  fast_finish: true
 
-      before_script:
-        - pip3 install meson
-      script:
-        - bash ./build.sh
+before_script:
+  - pip3 install meson
+script:
+  - bash ./build.sh
