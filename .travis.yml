@@ -36,6 +36,7 @@ before_install:
   - wget https://github.com/Kitware/CMake/releases/download/v3.19.6/cmake-3.19.6-Linux-x86_64.sh
 install:
   - chmod +x cmake-3.19.6-Linux-x86_64.sh
+  - mkdir -p build/install
   - ./cmake-3.19.6-Linux-x86_64.sh --skip-license --prefix=${PWD}/build/install --exclude-subdir
   - export PATH="${PWD}/build/install/bin:${PATH}"
 
