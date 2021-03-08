@@ -1,5 +1,8 @@
 dist: bionic
 os: linux
+arch:
+  - amd64
+  - arm64
 language: rust
 cache:
   cargo: true
