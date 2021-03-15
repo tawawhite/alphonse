@@ -420,6 +420,7 @@ pub enum Protocol {
 
     // Tunnel protocols
     GRE,
+    L2TP,
 
     // Network layer protocols
     IPV4,
