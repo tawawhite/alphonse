@@ -1,12 +1,19 @@
 #[cfg(feature = "heuristic-mpls")]
-use super::{link, network};
+use super::{link, network, ppp, pppoe};
 use super::{Error, Layer, Protocol, SimpleProtocolParser};
 
-pub struct Parser;
+#[derive(Default)]
+pub struct Parser {
+    ethernet: link::ethernet::Parser,
+    ipv4: network::ipv4::Parser,
+    ipv6: network::ipv6::Parser,
+    ppp: ppp::Parser,
+    pppoe: pppoe::Parser,
+}
 
 impl SimpleProtocolParser for Parser {
     #[inline]
-    fn parse(buf: &[u8], offset: u16) -> Result<Option<Layer>, Error> {
+    fn parse(&self, buf: &[u8], offset: u16) -> Result<Option<Layer>, Error> {
         if buf.len() < 4 {
             // 如果报文内容长度小于IP报文最短长度(IP协议头长度)
             // 数据包有错误
@@ -31,7 +38,7 @@ impl SimpleProtocolParser for Parser {
             {
                 // Try to decode it as an Ethernet protocol first
                 // If failed, then try to decode it other ways
-                let layer = match link::ethernet::Parser::parse(&buf[pos..], offset + pos as u16) {
+                let layer = match self.ethernet.parse(&buf[pos..], offset + pos as u16) {
                     Err(_) => None, // If can't detect next layer
                     Ok(l) => l,
                 };
@@ -41,10 +48,7 @@ impl SimpleProtocolParser for Parser {
                     Some(l) => {
                         match l.protocol {
                             Protocol::IPV4 => {
-                                match network::ipv4::Parser::parse(
-                                    &buf[l.offset as usize..],
-                                    l.offset,
-                                ) {
+                                match self.ipv4.parse(&buf[l.offset as usize..], l.offset) {
                                     Ok(_) => {
                                         let layer = Layer {
                                             protocol: Protocol::ETHERNET,
@@ -56,10 +60,7 @@ impl SimpleProtocolParser for Parser {
                                 }
                             }
                             Protocol::IPV6 => {
-                                match network::ipv6::Parser::parse(
-                                    &buf[l.offset as usize..],
-                                    l.offset,
-                                ) {
+                                match self.ipv6.parse(&buf[l.offset as usize..], l.offset) {
                                     Ok(_) => {
                                         let layer = Layer {
                                             protocol: Protocol::ETHERNET,
@@ -71,13 +72,31 @@ impl SimpleProtocolParser for Parser {
                                 }
                             }
                             Protocol::PPP => {
-                                todo! {"too much tunnel layers to handle"}
+                                match self.ppp.parse(&buf[l.offset as usize..], l.offset) {
+                                    Ok(_) => {
+                                        let layer = Layer {
+                                            protocol: Protocol::ETHERNET,
+                                            offset: offset + pos as u16,
+                                        };
+                                        return Ok(Some(layer));
+                                    }
+                                    Err(_) => {}
+                                }
                             }
                             Protocol::MPLS => {
                                 todo! {"too much tunnel layers to handle"}
                             }
                             Protocol::PPPOE => {
-                                todo! {"too much tunnel layers to handle"}
+                                match self.pppoe.parse(&buf[l.offset as usize..], l.offset) {
+                                    Ok(_) => {
+                                        let layer = Layer {
+                                            protocol: Protocol::ETHERNET,
+                                            offset: offset + pos as u16,
+                                        };
+                                        return Ok(Some(layer));
+                                    }
+                                    Err(_) => {}
+                                }
                             }
                             Protocol::VLAN => {
                                 todo! {"too much tunnel layers to handle"}
@@ -124,6 +143,13 @@ impl SimpleProtocolParser for Parser {
 #[cfg(test)]
 mod tests {
     use super::*;
+    const PARSER: Parser = Parser {
+        ethernet: link::ethernet::Parser {},
+        ipv4: network::ipv4::Parser {},
+        ipv6: network::ipv6::Parser {},
+        ppp: ppp::Parser {},
+        pppoe: pppoe::Parser {},
+    };
 
     #[test]
     fn single_layer_mpls_with_ipv4() {
@@ -139,7 +165,7 @@ mod tests {
             0xab, 0xcd, 0xab, 0xcd, 0xab, 0xcd, 0xab, 0xcd, 0xab, 0xcd, // icmp
         ];
 
-        match Parser::parse(&buffer, 0) {
+        match PARSER.parse(&buffer, 0) {
             Ok(l) => {
                 assert_eq!(l.unwrap().protocol, Protocol::IPV4);
                 assert_eq!(l.unwrap().offset, 4);
@@ -161,7 +187,7 @@ mod tests {
             0x02, 0x61, 0x74, 0x00, 0x00, 0x01, 0x00, 0x01, // dns,
         ];
 
-        match Parser::parse(&buffer, 0) {
+        match PARSER.parse(&buffer, 0) {
             Ok(l) => {
                 assert_eq!(l.unwrap().protocol, Protocol::IPV6);
                 assert_eq!(l.unwrap().offset, 4);
@@ -185,7 +211,7 @@ mod tests {
             0x00, // Spanning Tree Protocol
         ];
 
-        match Parser::parse(&buffer, 0) {
+        match PARSER.parse(&buffer, 0) {
             Ok(l) => {
                 assert_eq!(l.unwrap().protocol, Protocol::ETHERNET);
                 assert_eq!(l.unwrap().offset, 8);
@@ -209,7 +235,7 @@ mod tests {
             0x00, // Spanning Tree Protocol
         ];
 
-        match Parser::parse(&buffer, 0) {
+        match PARSER.parse(&buffer, 0) {
             Ok(l) => {
                 assert_eq!(l.unwrap().protocol, Protocol::ETHERNET);
                 assert_eq!(l.unwrap().offset, 8);
@@ -235,7 +261,7 @@ mod tests {
             0xab, 0xcd, 0xab, 0xcd, 0xab, 0xcd, 0xab, 0xcd, 0xab, 0xcd, // icmp
         ];
 
-        match Parser::parse(&buffer, 0) {
+        match PARSER.parse(&buffer, 0) {
             Ok(l) => {
                 assert_eq!(l.unwrap().protocol, Protocol::ETHERNET);
                 assert_eq!(l.unwrap().offset, 4);

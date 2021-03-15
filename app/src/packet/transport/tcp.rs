@@ -1,9 +1,11 @@
 use super::{Error, Layer, Protocol, SimpleProtocolParser};
 
+#[derive(Default)]
 pub struct Parser {}
+
 impl SimpleProtocolParser for Parser {
     #[inline]
-    fn parse(buf: &[u8], offset: u16) -> Result<Option<Layer>, Error> {
+    fn parse(&self, buf: &[u8], offset: u16) -> Result<Option<Layer>, Error> {
         if buf.len() < 20 {
             // 如果报文内容长度小于IP报文最短长度(IP协议头长度)
             // 数据包有错误
@@ -33,6 +35,7 @@ impl SimpleProtocolParser for Parser {
 #[cfg(test)]
 mod tests {
     use super::*;
+    const PARSER: Parser = Parser {};
 
     #[test]
     fn test_ok() {
@@ -42,13 +45,13 @@ mod tests {
             0x01, 0x01, 0x08, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x01,
             0x04, 0x02,
         ];
-        assert!(matches!(Parser::parse(&buf, 0), Ok(_)));
+        assert!(matches!(PARSER.parse(&buf, 0), Ok(_)));
     }
 
     #[test]
     fn test_err_packet_too_short() {
         let buf = [0x04];
-        let result = Parser::parse(&buf, 0);
+        let result = PARSER.parse(&buf, 0);
         assert!(matches!(result, Err(_)));
         let err = result.unwrap_err();
         assert!(matches!(err, Error::CorruptPacket(_)));
@@ -62,7 +65,7 @@ mod tests {
             0x01, 0x01, 0x08, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x01,
             0x04, 0x02,
         ];
-        let result = Parser::parse(&buf, 0);
+        let result = PARSER.parse(&buf, 0);
         assert!(matches!(result, Err(_)));
         let err = result.unwrap_err();
         assert!(matches!(err, Error::CorruptPacket(_)));

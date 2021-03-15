@@ -3,9 +3,11 @@ use super::{Error, Layer, SimpleProtocolParser};
 use super::super::link;
 use super::Protocol;
 
+#[derive(Default)]
 pub struct Parser {}
+
 impl SimpleProtocolParser for Parser {
-    fn parse(buf: &[u8], offset: u16) -> Result<Option<Layer>, Error> {
+    fn parse(&self, buf: &[u8], offset: u16) -> Result<Option<Layer>, Error> {
         let mut layer = Layer {
             protocol: Protocol::default(),
             offset: offset + 4 + 2,
@@ -34,17 +36,18 @@ impl SimpleProtocolParser for Parser {
 #[cfg(test)]
 mod tests {
     use super::*;
+    const PARSER: Parser = Parser {};
 
     #[test]
     fn test_ok() {
         let buf = [0x08, 0x00, 0xc2, 0x00, 0x00, 0x00];
-        assert!(matches!(Parser::parse(&buf, 0), Ok(_)));
+        assert!(matches!(PARSER.parse(&buf, 0), Ok(_)));
     }
 
     #[test]
     fn test_err_unsupport_protocol() {
         let buf = [0x08, 0x01, 0xc2, 0x00, 0x00, 0x00];
-        let result = Parser::parse(&buf, 0);
+        let result = PARSER.parse(&buf, 0);
         let err = result.unwrap_err();
         assert!(matches!(err, Error::UnsupportProtocol(_)));
     }

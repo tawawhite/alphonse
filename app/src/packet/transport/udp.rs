@@ -1,9 +1,11 @@
 use super::{Error, Layer, Protocol, SimpleProtocolParser};
 
-pub struct Parser {}
+#[derive(Default)]
+pub struct Parser;
+
 impl SimpleProtocolParser for Parser {
     #[inline]
-    fn parse(buf: &[u8], offset: u16) -> Result<Option<Layer>, Error> {
+    fn parse(&self, buf: &[u8], offset: u16) -> Result<Option<Layer>, Error> {
         if buf.len() < 8 {
             // 如果报文内容长度小于IP报文最短长度(IP协议头长度)
             // 数据包有错误
@@ -11,6 +13,16 @@ impl SimpleProtocolParser for Parser {
                 "Corrupted UDP packet, packet too short ({} bytes)",
                 buf.len()
             )));
+        }
+
+        let src_port = ((buf[0] as u16) << 8) + buf[1] as u16;
+        let dst_port = ((buf[2] as u16) << 8) + buf[3] as u16;
+        if src_port == 1701 && dst_port == 1701 {
+            let layer = Layer {
+                protocol: Protocol::L2TP,
+                offset: offset + 8,
+            };
+            return Ok(Some(layer));
         }
 
         let layer = Layer {
@@ -23,8 +35,9 @@ impl SimpleProtocolParser for Parser {
 }
 
 #[cfg(test)]
-mod tests {
+mod test {
     use super::*;
+    const PARSER: Parser = Parser {};
 
     #[test]
     fn test_ok() {
@@ -33,7 +46,7 @@ mod tests {
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x77, 0x77, 0x77, 0x06, 0x67, 0x69, 0x74,
             0x68, 0x75, 0x62, 0x03, 0x63, 0x6f, 0x6d, 0x00, 0x00, 0x01, 0x00, 0x01,
         ];
-        let result = Parser::parse(&buf, 0);
+        let result = PARSER.parse(&buf, 0);
         assert!(matches!(result, Ok(_)));
 
         let layer = result.unwrap();
@@ -45,10 +58,22 @@ mod tests {
     #[test]
     fn test_pkt_too_short() {
         let buf = [0xf4];
-        let result = Parser::parse(&buf, 0);
+        let result = PARSER.parse(&buf, 0);
         assert!(matches!(result, Err(_)));
 
         let err = result.unwrap_err();
         assert!(matches!(err, Error::CorruptPacket(_)));
+    }
+
+    #[test]
+    fn l2tp() {
+        let buf = [0x06, 0xa5, 0x06, 0xa5, 0x00, 0x54, 0x00, 0x00];
+        let result = PARSER.parse(&buf, 0);
+        assert!(matches!(result, Ok(_)));
+
+        let layer = result.unwrap();
+        assert!(matches!(layer, Some(_)));
+        assert!(matches!(layer.unwrap().protocol, Protocol::L2TP));
+        assert_eq!(layer.unwrap().offset, 8);
     }
 }

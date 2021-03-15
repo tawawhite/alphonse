@@ -1,4 +1,5 @@
-use alphonse_api::packet::{Layer, Packet, Protocol};
+use alphonse_api as api;
+use api::packet::{Layer, Packet, Protocol};
 
 pub mod link;
 pub mod network;
