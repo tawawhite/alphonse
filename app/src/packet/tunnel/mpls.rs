@@ -4,10 +4,15 @@ use super::{Error, Layer, Protocol, SimpleProtocolParser};
 
 #[derive(Default)]
 pub struct Parser {
+    #[cfg(feature = "heuristic-mpls")]
     ethernet: link::ethernet::Parser,
+    #[cfg(feature = "heuristic-mpls")]
     ipv4: network::ipv4::Parser,
+    #[cfg(feature = "heuristic-mpls")]
     ipv6: network::ipv6::Parser,
+    #[cfg(feature = "heuristic-mpls")]
     ppp: ppp::Parser,
+    #[cfg(feature = "heuristic-mpls")]
     pppoe: pppoe::Parser,
 }
 
