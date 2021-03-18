@@ -20,6 +20,8 @@ mod packet;
 mod rx;
 mod stats;
 mod threadings;
+#[cfg(feature = "arkime")]
+mod writer;
 
 fn start_rx<'a>(
     exit: Arc<AtomicBool>,
