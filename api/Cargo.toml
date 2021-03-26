@@ -9,7 +9,7 @@ anyhow = "1.0"
 bitflags = "1.2"
 chrono = "0.4"
 enum-primitive-derive = "0.2"
-hyperscan = "0.2.0"
+hyperscan = "0.2"
 libc = "0.2"
 num-traits = "0.2"
 serde = { version = "1.0", features = ["derive"] }
