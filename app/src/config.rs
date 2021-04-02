@@ -1,11 +1,31 @@
-use std::fs::File;
 use std::io::Read;
 use std::path::Path;
+use std::{fs::File, str::FromStr};
 
 use anyhow::{anyhow, Result};
-use yaml_rust::{Yaml, YamlLoader};
 
 use super::commands::CliArg;
+
+#[derive(Clone, Debug)]
+pub struct Toml(toml::Value);
+
+impl Default for Toml {
+    fn default() -> Self {
+        Self(toml::Value::from_str("{}").unwrap())
+    }
+}
+
+impl AsRef<toml::Value> for Toml {
+    fn as_ref(&self) -> &toml::Value {
+        &self.0
+    }
+}
+
+impl AsMut<toml::Value> for Toml {
+    fn as_mut(&mut self) -> &mut toml::Value {
+        &mut self.0
+    }
+}
 
 #[derive(Default, Clone)]
 pub struct Config {
@@ -36,94 +56,95 @@ pub struct Config {
     pub tcp_timeout: u16,
     pub timeout_interval: u64,
     pub udp_timeout: u16,
-    pub docs: Vec<Yaml>,
+    pub doc: Toml,
 }
 
-fn get_str(doc: &Yaml, key: &str, default: &str) -> String {
-    match &doc[key] {
-        Yaml::String(s) => s.clone(),
-        Yaml::BadValue => {
-            println!(
-                "Option {} not found or bad string value, set {} to {}",
-                key, key, default
-            );
-            default.to_string()
-        }
-        _ => {
-            println!(
-                "Wrong value type for {}, expecting string, set {} to {}",
-                key, key, default
-            );
-            default.to_string()
-        }
-    }
-}
-
-fn get_integer(doc: &Yaml, key: &str, default: i64, min: i64, max: i64) -> i64 {
-    match doc[key] {
-        Yaml::Integer(i) => {
-            if i < min || i > max {
+fn get_str(doc: &toml::Value, key: &str, default: &str) -> String {
+    match doc.get(key) {
+        Some(v) => match v {
+            toml::Value::String(s) => s.clone(),
+            _ => {
                 println!(
-                    "Option {} is less/greater than min/max value {}/{}, set {} to {}",
-                    key, min, max, key, default
+                    "Wrong value type for {}, expecting string, set {} to {}",
+                    key, key, default
                 );
-                default
-            } else {
-                i
+                default.to_string()
             }
-        }
-        Yaml::BadValue => {
-            println!(
-                "Option {} not found or bad integer value, set {} to {}",
-                key, key, default
-            );
-            default
-        }
-        _ => {
-            println!(
-                "Wrong value type for {}, expecting string, set {} to {}",
-                key, key, default
-            );
-            default
+        },
+        None => {
+            println!("Option {} not found, set {} to {}", key, key, default);
+            default.to_string()
         }
     }
 }
 
-fn get_str_arr(doc: &Yaml, key: &str) -> Vec<String> {
-    let mut result = vec![];
-    match &doc[key] {
-        Yaml::Array(a) => {
-            for parser in a {
-                match parser {
-                    Yaml::String(s) => result.push(String::from(s)),
-                    Yaml::BadValue => println!("Bad string value for {}'s element", key),
-                    _ => println!("Wrong value type for {}' element, expecting string", key),
+fn get_integer(doc: &toml::Value, key: &str, default: i64, min: i64, max: i64) -> i64 {
+    match doc.get(key) {
+        Some(v) => match v {
+            toml::Value::Integer(i) => {
+                if *i < min || *i > max {
+                    println!(
+                        "Option {} is less/greater than min/max value {}/{}, set {} to {}",
+                        key, min, max, key, default
+                    );
+                    default
+                } else {
+                    *i
                 }
             }
+            _ => {
+                println!(
+                    "Wrong value type for {}, expecting integer, set {} to {}",
+                    key, key, default
+                );
+                default
+            }
+        },
+        None => {
+            println!("Option {} not found, set {} to {}", key, key, default);
+            default
         }
-        Yaml::BadValue => println!(
-            "Option {} not found or bad array value, set {} to empty array",
-            key, key
-        ),
-        _ => println!(
-            "Wrong value type for {}, expecting array, set {} to empty array",
-            key, key
-        ),
+    }
+}
+
+fn get_str_arr(doc: &toml::Value, key: &str) -> Vec<String> {
+    let mut result = vec![];
+    match doc.get(key) {
+        Some(v) => match v {
+            toml::Value::Array(arr) => {
+                for el in arr {
+                    match el {
+                        toml::Value::String(s) => result.push(s.clone()),
+                        e => println!(
+                            "Wrong value type for {}'s element, expecting string, skip {}",
+                            key, e
+                        ),
+                    }
+                }
+            }
+            _ => println!(
+                "Wrong value type for {}, expecting array, set {} to empty array",
+                key, key
+            ),
+        },
+        None => {
+            println!("Option {} not found, set {} to empty array", key, key);
+        }
     }
     result
 }
 
 impl Config {
     pub fn get_integer(&self, key: &str, default: i64, min: i64, max: i64) -> i64 {
-        get_integer(&self.docs[0], key, default, min, max)
+        get_integer(&self.doc.as_ref(), key, default, min, max)
     }
 
     pub fn get_str(&self, key: &str, default: &str) -> String {
-        get_str(&self.docs[0], key, default)
+        get_str(&self.doc.as_ref(), key, default)
     }
 
     pub fn get_str_arr(&self, key: &str) -> Vec<String> {
-        get_str_arr(&self.docs[0], key)
+        get_str_arr(&self.doc.as_ref(), key)
     }
 }
 
@@ -159,28 +180,27 @@ fn parse_config_file(config_file: &str, config: &mut Config) -> Result<()> {
     let mut s = String::new();
     File::open(cfg_path)?.read_to_string(&mut s)?;
 
-    let docs = YamlLoader::load_from_str(&s)?;
-    let doc = &docs[0];
-    config.docs = docs.clone();
+    let doc: toml::Value = toml::from_str(&s)?;
+    config.doc = Toml(doc.clone());
 
     config.pkt_channel_size =
-        get_integer(doc, "channel.pkt.size", 1000000, 100000, 10000000) as u32;
-    config.timeout_interval = get_integer(doc, "timeout.interval", 1, 1, 10) as u64;
-    config.default_timeout = get_integer(doc, "timeout.default", 60, 10, 180) as u16;
-    config.tcp_timeout = get_integer(doc, "timeout.tcp", 60, 10, 180) as u16;
-    config.udp_timeout = get_integer(doc, "timeout.udp", 60, 10, 180) as u16;
-    config.sctp_timeout = get_integer(doc, "timeout.sctp", 60, 10, 180) as u16;
-    config.ses_save_timeout = get_integer(doc, "timeout.ses.save", 180, 60, 360) as u16;
+        get_integer(&doc, "channel.pkt.size", 1000000, 100000, 10000000) as u32;
+    config.timeout_interval = get_integer(&doc, "timeout.interval", 1, 1, 10) as u64;
+    config.default_timeout = get_integer(&doc, "timeout.default", 60, 10, 180) as u16;
+    config.tcp_timeout = get_integer(&doc, "timeout.tcp", 60, 10, 180) as u16;
+    config.udp_timeout = get_integer(&doc, "timeout.udp", 60, 10, 180) as u16;
+    config.sctp_timeout = get_integer(&doc, "timeout.sctp", 60, 10, 180) as u16;
+    config.ses_save_timeout = get_integer(&doc, "timeout.ses.save", 180, 60, 360) as u16;
 
     config.ses_max_packets =
-        get_integer(doc, "ses.max.packets", 10000, 1000, u16::MAX as i64) as u16;
+        get_integer(&doc, "ses.max.packets", 10000, 1000, u16::MAX as i64) as u16;
 
-    config.pkt_threads = get_integer(doc, "threads.pkt", 1, 1, 24) as u8;
-    config.rx_threads = get_integer(doc, "threads.rx", 1, 1, 24) as u8;
-    config.ses_threads = get_integer(doc, "threads.session", 1, 1, 24) as u8;
-    config.output_threads = get_integer(doc, "threads.output", 1, 1, 24) as u8;
+    config.pkt_threads = get_integer(&doc, "threads.pkt", 1, 1, 24) as u8;
+    config.rx_threads = get_integer(&doc, "threads.rx", 1, 1, 24) as u8;
+    config.ses_threads = get_integer(&doc, "threads.session", 1, 1, 24) as u8;
+    config.output_threads = get_integer(&doc, "threads.output", 1, 1, 24) as u8;
 
-    let backend = get_str(doc, "rx.backend", "libpcap");
+    let backend = get_str(&doc, "rx.backend", "libpcap");
     match backend.as_str() {
         "dpdk" | "libpcap" => {
             config.rx_backend = backend;
@@ -193,11 +213,11 @@ fn parse_config_file(config_file: &str, config: &mut Config) -> Result<()> {
         }
     };
 
-    config.parsers = get_str_arr(doc, "parsers");
-    config.interfaces = get_str_arr(doc, "interfaces");
+    config.parsers = get_str_arr(&doc, "parsers");
+    config.interfaces = get_str_arr(&doc, "interfaces");
 
     config.rx_stat_log_interval =
-        get_integer(doc, "rx.stats.log.interval", 10000, 10000, i64::MAX) as u64;
+        get_integer(&doc, "rx.stats.log.interval", 10000, 10000, i64::MAX) as u64;
 
     #[cfg(all(target_os = "linux", feature = "dpdk"))]
     {
