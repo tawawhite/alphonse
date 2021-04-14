@@ -3,6 +3,7 @@ use std::ops::{Deref, DerefMut};
 use anyhow::Result;
 
 use crate::classifiers::ClassifierManager;
+use crate::config::Config;
 use crate::{packet, session};
 
 pub type ParserID = u8;
@@ -55,7 +56,11 @@ pub trait ProtocolParserTrait: Send + Sync {
     fn name(&self) -> &str;
 
     /// Initialize parser required global resources
-    fn init(&mut self) -> Result<()> {
+    ///
+    /// # Arguments
+    ///
+    /// `_cfg` - alphonse configuration yaml file location
+    fn init(&mut self, _cfg: &Config) -> Result<()> {
         Ok(())
     }
 
