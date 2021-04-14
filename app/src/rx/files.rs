@@ -7,7 +7,6 @@ use std::thread::JoinHandle;
 use anyhow::{anyhow, Result};
 use crossbeam_channel::Sender;
 use path_absolutize::Absolutize;
-use signal_hook::low_level::raise;
 
 use alphonse_api as api;
 use api::packet::Packet as PacketTrait;
@@ -131,8 +130,9 @@ impl RxThread {
             }
         }
 
-        // terminate alphonse
-        raise(signal_hook::consts::SIGTERM)?;
+        // terminate alphonse after all packets are send to packet processing thread
+        while self.sender.len() != 0 {}
+        self.exit.swap(true, Ordering::Relaxed);
 
         println!("{} exit", self.name());
 
