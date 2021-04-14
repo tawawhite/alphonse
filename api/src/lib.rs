@@ -16,6 +16,7 @@ pub static RUSTC_VERSION: &str = env!("RUSTC_VERSION");
 #[cfg(feature = "arkime")]
 pub mod arkime;
 pub mod classifiers;
+pub mod config;
 pub mod packet;
 pub mod parsers;
 pub mod session;
