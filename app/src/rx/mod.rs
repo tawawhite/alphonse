@@ -7,11 +7,10 @@ use dashmap::DashMap;
 use fnv::{FnvBuildHasher, FnvHashMap};
 
 use alphonse_api as api;
+use api::config::Config;
 use api::packet::{Packet, PacketHashKey};
 use api::parsers::{ParserID, ProtocolParserTrait};
 use api::session::Session;
-
-use crate::config::Config;
 
 #[cfg(all(target_os = "linux", feature = "dpdk"))]
 pub mod dpdk;

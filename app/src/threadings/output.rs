@@ -7,10 +7,9 @@ use crossbeam_channel::Receiver;
 use elasticsearch::{http::transport::Transport, Elasticsearch};
 
 use alphonse_api as api;
+use api::config::Config;
 use api::session::Session;
 use api::utils::timeval::{precision::Millisecond, TimeVal};
-
-use crate::config::Config;
 
 enum Rotate {
     Hourly(u32),

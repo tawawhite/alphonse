@@ -6,11 +6,11 @@ use crossbeam_channel::Receiver;
 
 use alphonse_api as api;
 use api::classifiers::ClassifierManager;
+use api::config::Config;
 use api::packet::{Packet, PacketHashKey};
 use api::parsers::ProtocolParserTrait;
 use api::utils::timeval::TimeVal;
 
-use crate::config::Config;
 use crate::rx::{SessionData, SessionTable};
 
 pub struct PktThread {

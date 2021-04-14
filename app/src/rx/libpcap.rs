@@ -7,10 +7,10 @@ use crossbeam_channel::Sender;
 
 use alphonse_api as api;
 use api::classifiers::matched::Rule;
+use api::config::Config;
 use api::packet::Packet as PacketTrait;
 use api::packet::{Layers, Rules, Tunnel};
 
-use crate::config::Config;
 use crate::rx::RxUtility;
 use crate::stats::CaptureStat;
 

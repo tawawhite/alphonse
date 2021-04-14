@@ -10,6 +10,7 @@ use anyhow::Result;
 use crossbeam_channel::{bounded, Sender};
 
 use alphonse_api as api;
+use api::config::Config;
 use api::packet::Packet;
 use api::parsers::NewProtocolParserFunc;
 use api::{classifiers, parsers::ParserID};
@@ -25,7 +26,7 @@ mod writer;
 
 fn start_rx<'a>(
     exit: Arc<AtomicBool>,
-    cfg: Arc<config::Config>,
+    cfg: Arc<Config>,
     sender: Sender<Box<dyn Packet>>,
 ) -> Result<Vec<JoinHandle<Result<()>>>> {
     if !cfg.pcap_file.is_empty() {

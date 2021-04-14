@@ -8,10 +8,10 @@ use crossbeam_channel::Sender;
 use rayon::iter::{ParallelBridge, ParallelIterator};
 
 use alphonse_api as api;
+use api::config::Config;
 use api::packet::Protocol;
 use api::session::Session;
 
-use crate::config::Config;
 use crate::rx::SessionTable;
 
 /// Session table timeout thread

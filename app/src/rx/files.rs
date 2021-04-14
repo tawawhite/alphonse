@@ -9,9 +9,9 @@ use crossbeam_channel::Sender;
 use path_absolutize::Absolutize;
 
 use alphonse_api as api;
+use api::config::Config;
 use api::packet::Packet as PacketTrait;
 
-use crate::config::Config;
 use crate::rx::libpcap::Packet;
 use crate::rx::RxUtility;
 use crate::stats::CaptureStat;
