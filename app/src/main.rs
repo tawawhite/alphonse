@@ -21,8 +21,6 @@ mod packet;
 mod rx;
 mod stats;
 mod threadings;
-#[cfg(feature = "arkime")]
-mod writer;
 
 fn start_rx<'a>(
     exit: Arc<AtomicBool>,
@@ -95,7 +93,7 @@ fn main() -> Result<()> {
     let mut classifier_manager = classifiers::ClassifierManager::new();
     for parser in &mut protocol_parsers {
         parser.register_classify_rules(&mut classifier_manager)?;
-        parser.init()?;
+        parser.init(&cfg)?;
     }
 
     classifier_manager.prepare()?;
@@ -163,6 +161,10 @@ fn main() -> Result<()> {
             Ok(_) => {}
             Err(e) => println!("{:?}", e),
         };
+    }
+
+    for parser in &mut protocol_parsers {
+        parser.exit()?;
     }
 
     match cfg.rx_backend.as_str() {
