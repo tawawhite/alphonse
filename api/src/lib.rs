@@ -13,8 +13,6 @@ static GLOBAL: TCMalloc = TCMalloc;
 pub static API_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub static RUSTC_VERSION: &str = env!("RUSTC_VERSION");
 
-#[cfg(feature = "arkime")]
-pub mod arkime;
 pub mod classifiers;
 pub mod config;
 pub mod packet;

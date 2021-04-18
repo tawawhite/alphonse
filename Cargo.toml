@@ -1,2 +1,3 @@
 [workspace]
-members = ["app", "api", "parsers/http", "parsers/misc"]
+members = ["app", "api", "parsers/http", "parsers/misc", "parsers/simple-writer"]
+resolver = "2"

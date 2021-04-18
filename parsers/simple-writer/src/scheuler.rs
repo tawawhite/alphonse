@@ -1,0 +1,203 @@
+use std::cell::{Cell, RefCell};
+use std::path::PathBuf;
+use std::sync::{Arc, RwLock};
+
+use anyhow::Result;
+use chrono::{Datelike, TimeZone};
+use crossbeam_channel::Sender;
+use pcap::PacketHeader;
+
+use alphonse_api as api;
+use api::packet::Packet;
+
+use crate::{Mode, PacketInfo, PcapDirAlgorithm};
+
+#[derive(Clone, Debug)]
+/// Packet writing schedular
+pub struct Scheduler {
+    id: u8,
+    /// Current opened pcap file name
+    fname: Arc<RwLock<PathBuf>>,
+    /// Pcap file size
+    fsize: Cell<usize>,
+    /// Writing mode
+    mode: Mode,
+    /// Write info sender
+    sender: Sender<Box<PacketInfo>>,
+    /// Packet wirte buffer size
+    write_size: usize,
+    /// Maxium single pcap file size
+    pub max_file_size: usize,
+    /// All avaliable pcap write directoreis
+    pub pcap_dirs: Vec<PathBuf>,
+    /// Current using pcap file directory
+    pcap_dir: RefCell<PathBuf>,
+    /// Pcap directory selecting algorithm
+    dir_algorithm: PcapDirAlgorithm,
+    /// Alphonse node name
+    node: String,
+}
+
+unsafe impl Send for Scheduler {}
+unsafe impl Sync for Scheduler {}
+
+impl Scheduler {
+    pub fn new(id: u8, sender: Sender<Box<PacketInfo>>) -> Self {
+        Self {
+            id,
+            fname: Arc::new(RwLock::new(PathBuf::from("test"))),
+            fsize: Cell::new(0),
+            mode: Mode::Normal,
+            sender,
+            write_size: 0,
+            max_file_size: 1,
+            pcap_dirs: vec![],
+            pcap_dir: RefCell::new(PathBuf::from("test")),
+            dir_algorithm: PcapDirAlgorithm::RoundRobin,
+            node: "node".to_string(),
+        }
+    }
+
+    /// Generate packet write information of a packet
+    pub fn gen(&self, pkt: &dyn Packet) -> Box<PacketInfo> {
+        let mut fsize = self.fsize.get();
+        fsize += std::mem::size_of::<PacketHeader>() + pkt.data_len() as usize;
+        self.fsize.set(fsize);
+
+        let closing = self.fsize.get() >= self.max_file_size;
+        if closing {
+            // if current pcap file is gonna close, send a new name to the pcap writer
+            let name = match self.mode {
+                Mode::Normal => self.gen_fname(pkt.ts().tv_sec as u64, 0),
+                Mode::XOR2048 => unimplemented!(),
+                Mode::AES256CTR => unimplemented!(),
+            };
+            while let Ok(mut path) = self.fname.try_write() {
+                *path = name.clone();
+                break;
+            }
+        };
+
+        // construct a pcap packet from a raw packet
+        // TODO: in the future we may need to support pcapng format
+        let hdr_len = std::mem::size_of::<PacketHeader>();
+        let buf_len = hdr_len + pkt.raw().len();
+        let mut buf = vec![0; buf_len];
+
+        let hdr = PacketHeader {
+            ts: pkt.ts().clone(),
+            caplen: pkt.caplen(),
+            len: pkt.data_len() as u32,
+        };
+        let hdr = &hdr as *const PacketHeader as *const u8;
+        let hdr = unsafe { std::slice::from_raw_parts(hdr, hdr_len) };
+        buf[0..hdr_len].copy_from_slice(hdr);
+
+        buf[hdr_len..].copy_from_slice(pkt.raw());
+
+        Box::new(PacketInfo {
+            thread: self.id,
+            closing,
+            buf,
+            fname: self.fname.clone(),
+        })
+    }
+
+    /// Send packet info to info channel
+    pub fn send(&self, info: Box<PacketInfo>) -> Result<()> {
+        println!("chl len: {}", self.sender.len());
+        // match self.sender.try_send(info) {
+        //     Ok(_) => {}
+        //     Err(e) => eprintln!("{}", e),
+        // };
+        self.sender.try_send(info)?;
+        Ok(())
+    }
+
+    /// Generate file name to write packets
+    fn gen_fname(&self, ts: u64, id: u64) -> PathBuf {
+        match self.dir_algorithm {
+            PcapDirAlgorithm::MaxFreeBytes => {
+                let mut max_free_space_bytes = 0;
+                for dir in &self.pcap_dirs {
+                    // TODO: We may need a windows platform implementation in the future
+                    let stat = nix::sys::statvfs::statvfs(dir.as_path()).unwrap();
+                    if (stat.blocks_available() * stat.blocks_free()) >= max_free_space_bytes {
+                        max_free_space_bytes = stat.blocks_available() * stat.blocks_free();
+                        self.pcap_dir.replace(dir.clone());
+                    }
+                }
+            }
+            PcapDirAlgorithm::MaxFreePercent => {
+                let mut max_free_space_percent = 0.0;
+                for dir in &self.pcap_dirs {
+                    // TODO: We may need a windows platform implementation in the future
+                    let stat = nix::sys::statvfs::statvfs(dir.as_path()).unwrap();
+                    if (stat.blocks_available() / stat.blocks()) as f64 >= max_free_space_percent {
+                        max_free_space_percent = (stat.blocks_available() / stat.blocks()) as f64;
+                        self.pcap_dir.replace(dir.clone());
+                    }
+                }
+            }
+            PcapDirAlgorithm::RoundRobin => {
+                for (i, dir) in self.pcap_dirs.iter().enumerate() {
+                    let cmp = match self.pcap_dir.borrow().cmp(dir) {
+                        std::cmp::Ordering::Equal => true,
+                        _ => false,
+                    };
+                    if cmp {
+                        match self.pcap_dirs.get(i + 1) {
+                            Some(dir) => self.pcap_dir.replace(dir.clone()),
+                            None => self.pcap_dir.replace(self.pcap_dirs[0].clone()),
+                        };
+                        break;
+                    }
+                }
+                // ! Panic if pcap_dirs is empty, in real application this is very unlikely to happen
+                self.pcap_dir.replace(self.pcap_dirs[0].clone());
+            }
+        };
+
+        let datetime = chrono::Local.timestamp(ts as i64, 0);
+        let fname = format!(
+            "{}-{:2}{:0>2}{:0>2}-{:0>8}.pcap",
+            self.node,
+            datetime.year() % 100,
+            datetime.month(),
+            datetime.day(),
+            id
+        );
+        self.pcap_dir.borrow().join(fname.as_str())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::str::FromStr;
+
+    use super::*;
+
+    #[test]
+    fn gen_fname() {
+        let (sender, _) = crossbeam_channel::bounded(1);
+        let mut scheduler = Scheduler::new(0, sender);
+
+        scheduler.pcap_dirs = vec![PathBuf::from_str("/test-dir").unwrap()];
+        scheduler.pcap_dir = RefCell::new(PathBuf::from_str("/test-dir").unwrap());
+        scheduler.node = "node".to_string();
+        let fname = scheduler.gen_fname(0, 1);
+        assert_eq!(
+            fname,
+            PathBuf::from_str("/test-dir/node-700101-00000001.pcap").unwrap()
+        );
+
+        scheduler.pcap_dirs = vec![PathBuf::from_str("/abc").unwrap()];
+        scheduler.pcap_dir = RefCell::new(PathBuf::from_str("/abc").unwrap());
+        scheduler.node = "node1".to_string();
+        let fname = scheduler.gen_fname(1615295648, 2);
+        assert_eq!(
+            fname,
+            PathBuf::from_str("/abc/node1-210309-00000002.pcap").unwrap()
+        );
+    }
+}
