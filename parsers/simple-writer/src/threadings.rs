@@ -21,9 +21,11 @@ impl Thread {
                     _ => continue,
                 },
             };
-            println!("info: {:?}", info);
 
-            self.writer.write(info.buf.as_slice(), &info)?;
+            match self.writer.write(info.buf.as_slice(), &info) {
+                Ok(_) => {}
+                Err(e) => eprintln!("{}", e),
+            };
         }
 
         println!("alphonse-writer thread exit");
