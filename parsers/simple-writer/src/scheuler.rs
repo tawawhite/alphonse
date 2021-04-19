@@ -105,13 +105,7 @@ impl Scheduler {
 
     /// Send packet info to info channel
     pub fn send(&self, info: Box<PacketInfo>) -> Result<()> {
-        println!("chl len: {}", self.sender.len());
-        // match self.sender.try_send(info) {
-        //     Ok(_) => {}
-        //     Err(e) => eprintln!("{}", e),
-        // };
-        self.sender.try_send(info)?;
-        Ok(())
+        Ok(self.sender.try_send(info)?)
     }
 
     /// Generate file name to write packets

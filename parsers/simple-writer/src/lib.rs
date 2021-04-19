@@ -6,6 +6,7 @@ use std::sync::{Arc, RwLock};
 use std::thread::JoinHandle;
 
 use anyhow::{anyhow, Result};
+use crossbeam_channel::{Receiver, Sender};
 use once_cell::sync::OnceCell;
 use serde::Deserialize;
 use yaml_rust::YamlEmitter;
@@ -25,6 +26,8 @@ use scheuler::Scheduler;
 const PKG_NAME: &'static str = env!("CARGO_PKG_NAME");
 static mut HANDLES: OnceCell<Vec<JoinHandle<Result<()>>>> = OnceCell::new();
 static mut SCHEDULERS: OnceCell<Vec<Scheduler>> = OnceCell::new();
+static mut CHANNEL: OnceCell<(Sender<Box<PacketInfo>>, Receiver<Box<PacketInfo>>)> =
+    OnceCell::new();
 
 #[derive(Clone, Debug, Default, Deserialize)]
 struct Config {
@@ -170,15 +173,6 @@ impl Clone for Processor {
 
 impl ProtocolParserTrait for Processor {
     fn box_clone(&self) -> Box<dyn ProtocolParserTrait> {
-        println!("shit");
-        let info = Box::new(PacketInfo::default());
-        let schedulers = unsafe {
-            SCHEDULERS
-                .get()
-                .ok_or(anyhow!("{}: SCHEDULERS is not initialized", self.name()))
-                .unwrap()
-        };
-        schedulers[0].send(info);
         Box::new(self.clone())
     }
 
@@ -234,7 +228,7 @@ impl ProtocolParserTrait for Processor {
                 .iter()
                 .map(|path| PathBuf::from(path))
                 .collect();
-            // scheduler.max_file_size = cfg.max_file_size;
+            scheduler.max_file_size = cfg.max_file_size;
             schedulers.push(scheduler);
         }
         unsafe {
@@ -248,7 +242,7 @@ impl ProtocolParserTrait for Processor {
         // Prepare packet info writer and spawn a writer thread
         let mut thread = threadings::Thread {
             writer: SimpleWriter::default(),
-            receiver,
+            receiver: receiver.clone(),
         };
         let builder = std::thread::Builder::new().name(self.name().to_string());
         let handle = builder.spawn(move || thread.spawn()).unwrap();
@@ -258,6 +252,9 @@ impl ProtocolParserTrait for Processor {
             HANDLES
                 .set(handles)
                 .expect("Writer thread handles are already setted");
+            CHANNEL
+                .set((sender, receiver))
+                .expect("Packet info channel is already setted");
         }
 
         Ok(())
@@ -269,6 +266,10 @@ impl ProtocolParserTrait for Processor {
         // would be closed, so the packet writing thread would be closed too.
         let mut schedulers = unsafe { SCHEDULERS.take().ok_or(anyhow!(""))? };
         schedulers.clear();
+
+        let (sender, receiver) = unsafe { CHANNEL.take().ok_or(anyhow!(""))? };
+        drop(sender);
+        drop(receiver);
 
         let handles = unsafe { HANDLES.take().ok_or(anyhow!(""))? };
         for hdl in handles {
