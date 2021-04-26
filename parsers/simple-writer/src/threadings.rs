@@ -1,4 +1,5 @@
 use std::sync::atomic::Ordering;
+use std::sync::Arc;
 
 use anyhow::Result;
 use crossbeam_channel::Receiver;
@@ -14,18 +15,25 @@ pub struct Thread {
 }
 
 impl Thread {
-    pub fn spawn(&mut self, cfg: Config) -> Result<()> {
+    pub fn spawn(&mut self, mut cfg: Config) -> Result<()> {
         let rt = tokio::runtime::Builder::new_current_thread()
             .thread_name("alphonse-simple")
             .enable_all()
-            .build()
-            .unwrap();
+            .build()?;
         let mut writer = SimpleWriter::default();
 
         println!("alphonse-writer thread started");
 
         rt.block_on(async {
-            let es = Elasticsearch::new(Transport::single_node(cfg.es_host.as_str()).unwrap());
+            let es = match Transport::single_node(cfg.es_host.as_str()) {
+                Ok(t) => Elasticsearch::new(t),
+                Err(e) => {
+                    eprintln!("{}", e);
+                    let exit = Arc::get_mut(&mut cfg.exit).unwrap();
+                    exit.store(true, Ordering::SeqCst);
+                    return;
+                }
+            };
             loop {
                 if FILE_ID.load(Ordering::Relaxed) == 0 {
                     #[cfg(feature = "arkime")]

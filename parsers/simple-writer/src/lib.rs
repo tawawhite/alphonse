@@ -1,7 +1,8 @@
 use std::hash::Hasher;
 use std::hash::{BuildHasher, Hash};
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::Arc;
 use std::thread::JoinHandle;
 
 use anyhow::{anyhow, Result};
@@ -56,6 +57,10 @@ pub struct Config {
     /// Original yaml config
     #[serde(skip_deserializing)]
     pub doc: Yaml,
+
+    /// Alphonse exit flag
+    #[serde(skip_deserializing)]
+    pub exit: Arc<AtomicBool>,
 
     /// Arkime Elasticsearch host name
     #[serde(skip_deserializing)]
@@ -173,6 +178,7 @@ impl ProtocolParserTrait for Processor {
 
         let mut cfg: Config = serde_yaml::from_str(&yaml)?;
         cfg.doc = alcfg.doc.clone();
+        cfg.exit = alcfg.exit.clone();
         #[cfg(feature = "arkime")]
         {
             cfg.es_host = alcfg.get_str("elasticsearch", "http://localhost:9200");
@@ -205,7 +211,7 @@ impl ProtocolParserTrait for Processor {
             receiver: receiver.clone(),
         };
         let builder = std::thread::Builder::new().name(self.name().to_string());
-        let handle = builder.spawn(move || thread.spawn(cfg.clone())).unwrap();
+        let handle = builder.spawn(move || thread.spawn(cfg.clone()))?;
         let handles = vec![handle];
 
         unsafe {
