@@ -1,23 +1,23 @@
 use std::cell::{Cell, RefCell};
 use std::path::PathBuf;
-use std::sync::{Arc, RwLock};
 
 use anyhow::Result;
 use chrono::{Datelike, TimeZone};
 use crossbeam_channel::Sender;
-use pcap::PacketHeader;
 
 use alphonse_api as api;
 use api::packet::Packet;
 
-use crate::{Mode, PacketInfo, PcapDirAlgorithm};
+use crate::{writer::PacketHeader, File, Mode, PacketInfo, PcapDirAlgorithm};
 
 #[derive(Clone, Debug)]
 /// Packet writing schedular
 pub struct Scheduler {
     id: u8,
     /// Current opened pcap file name
-    fname: Arc<RwLock<PathBuf>>,
+    fname: RefCell<PathBuf>,
+    /// Current pcap file id
+    fid: Cell<u32>,
     /// Pcap file size
     fsize: Cell<usize>,
     /// Writing mode
@@ -45,37 +45,40 @@ impl Scheduler {
     pub fn new(id: u8, sender: Sender<Box<PacketInfo>>) -> Self {
         Self {
             id,
-            fname: Arc::new(RwLock::new(PathBuf::from("test"))),
+            fname: RefCell::new(PathBuf::from("")),
+            fid: Cell::new(0),
             fsize: Cell::new(0),
             mode: Mode::Normal,
             sender,
             write_size: 0,
             max_file_size: 1,
             pcap_dirs: vec![],
-            pcap_dir: RefCell::new(PathBuf::from("test")),
+            pcap_dir: RefCell::new(PathBuf::from("")),
             dir_algorithm: PcapDirAlgorithm::RoundRobin,
             node: "node".to_string(),
         }
     }
 
     /// Generate packet write information of a packet
-    pub fn gen(&self, pkt: &dyn Packet) -> Box<PacketInfo> {
+    pub fn gen(&self, pkt: &dyn Packet, fid: u32) -> Box<PacketInfo> {
         let mut fsize = self.fsize.get();
         fsize += std::mem::size_of::<PacketHeader>() + pkt.data_len() as usize;
         self.fsize.set(fsize);
 
         let closing = self.fsize.get() >= self.max_file_size;
-        if closing {
+        let file_info;
+        if closing || self.fname.borrow().to_string_lossy().is_empty() {
             // if current pcap file is gonna close, send a new name to the pcap writer
+            self.fid.set(fid);
             let name = match self.mode {
-                Mode::Normal => self.gen_fname(pkt.ts().tv_sec as u64, 0),
+                Mode::Normal => self.gen_fname(pkt.ts().tv_sec as u64, self.fid.get() as u64),
                 Mode::XOR2048 => unimplemented!(),
                 Mode::AES256CTR => unimplemented!(),
             };
-            while let Ok(mut path) = self.fname.try_write() {
-                *path = name.clone();
-                break;
-            }
+            self.fname.replace(name.clone());
+            file_info = File::Name(self.fname.borrow().clone());
+        } else {
+            file_info = File::ID(self.fid.get());
         };
 
         // construct a pcap packet from a raw packet
@@ -84,11 +87,7 @@ impl Scheduler {
         let buf_len = hdr_len + pkt.raw().len();
         let mut buf = vec![0; buf_len];
 
-        let hdr = PacketHeader {
-            ts: pkt.ts().clone(),
-            caplen: pkt.caplen(),
-            len: pkt.data_len() as u32,
-        };
+        let hdr = PacketHeader::from(pkt);
         let hdr = &hdr as *const PacketHeader as *const u8;
         let hdr = unsafe { std::slice::from_raw_parts(hdr, hdr_len) };
         buf[0..hdr_len].copy_from_slice(hdr);
@@ -99,7 +98,7 @@ impl Scheduler {
             thread: self.id,
             closing,
             buf,
-            fname: self.fname.clone(),
+            file_info,
         })
     }
 

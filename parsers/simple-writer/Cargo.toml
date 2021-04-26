@@ -13,6 +13,8 @@ anyhow = "1.0"
 alphonse-api = { path = "../../api", optional = false }
 chrono = "0.4"
 crossbeam-channel = "0.5"
+elasticsearch = { version = "7.12.0-alpha.1", optional = true }
+tokio = { version = "1", optional = true, features = ["net", "time"] }
 fnv = "1.0"
 linked-hash-map = { version = "0.5", features = ["serde_impl"] }
 nix = "0.20"
@@ -22,3 +24,7 @@ serde = "1.0"
 serde_json = "1.0"
 serde_yaml = "0.8"
 yaml-rust = ">=0.4.1"
+
+[features]
+arkime = ["alphonse-api/arkime", "elasticsearch", "tokio"]
+default = ["arkime"]

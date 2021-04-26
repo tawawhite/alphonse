@@ -1,8 +1,7 @@
 use std::hash::Hasher;
 use std::hash::{BuildHasher, Hash};
-use std::io::Write;
 use std::path::PathBuf;
-use std::sync::{Arc, RwLock};
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::thread::JoinHandle;
 
 use anyhow::{anyhow, Result};
@@ -20,17 +19,24 @@ use api::utils::yaml::Yaml;
 
 mod scheuler;
 mod threadings;
+mod writer;
 
 use scheuler::Scheduler;
+use writer::SimpleWriter;
 
 const PKG_NAME: &'static str = env!("CARGO_PKG_NAME");
+static FILE_ID: AtomicU32 = AtomicU32::new(0);
 static mut HANDLES: OnceCell<Vec<JoinHandle<Result<()>>>> = OnceCell::new();
 static mut SCHEDULERS: OnceCell<Vec<Scheduler>> = OnceCell::new();
 static mut CHANNEL: OnceCell<(Sender<Box<PacketInfo>>, Receiver<Box<PacketInfo>>)> =
     OnceCell::new();
 
 #[derive(Clone, Debug, Default, Deserialize)]
-struct Config {
+pub struct Config {
+    /// Whether save packets to disk or not
+    #[serde(skip_deserializing)]
+    pub dryrun: bool,
+
     /// Output pcap directory
     #[serde(rename = "pcap.dirs")]
     pub pcap_dirs: Vec<String>,
@@ -50,16 +56,11 @@ struct Config {
     /// Original yaml config
     #[serde(skip_deserializing)]
     pub doc: Yaml,
-}
 
-#[derive(Debug)]
-enum WriteError {
-    /// Disk is overloading
-    Overload,
-    /// Could not open file on disk
-    FileOpenError,
-    /// Could write packet to disk
-    FileWriteError,
+    /// Arkime Elasticsearch host name
+    #[serde(skip_deserializing)]
+    #[cfg(feature = "arkime")]
+    pub es_host: String,
 }
 
 /// Writing pcap file encryption mode
@@ -70,13 +71,6 @@ pub enum Mode {
     AES256CTR,
 }
 
-/// Writing pcap file format
-#[derive(Clone, Copy, Debug)]
-pub enum Format {
-    Pcap,
-    Pcapng,
-}
-
 /// Pcap directory selecting algorithm
 #[derive(Clone, Copy, Debug)]
 pub enum PcapDirAlgorithm {
@@ -85,67 +79,29 @@ pub enum PcapDirAlgorithm {
     RoundRobin,
 }
 
+/// The structure contains the file information
+#[derive(Clone, Debug)]
+enum File {
+    ID(u32),
+    Name(PathBuf),
+}
+
+impl Default for File {
+    fn default() -> Self {
+        File::ID(0)
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct PacketInfo {
-    /// Packet thread id
+    /// Packet thread id, which is also the scheduler thread ID
     thread: u8,
     /// Indicate whether a PacketWriter should close current pcap file after this pkt
     closing: bool,
     /// Formatted pcap/pcapng packet buffer
     buf: Vec<u8>,
     /// Current writing file name
-    fname: Arc<RwLock<PathBuf>>,
-}
-
-/// Pcap writer, write pacp to disk or remote filesystem or whatever
-#[derive(Debug)]
-pub struct SimpleWriter {
-    /// Current opened pcap file handle
-    file: Option<std::fs::File>,
-}
-
-impl Default for SimpleWriter {
-    fn default() -> Self {
-        Self { file: None }
-    }
-}
-
-impl Clone for SimpleWriter {
-    fn clone(&self) -> Self {
-        todo!("implement clone method for SimpleWriter")
-    }
-}
-
-impl SimpleWriter {
-    /// Wirte packet to disk
-    fn write(&mut self, pkt: &[u8], info: &PacketInfo) -> Result<()> {
-        let file = match &mut self.file {
-            Some(f) => f,
-            // None => todo!("handle file is None"),
-            None => return Err(anyhow!("{:?}", WriteError::FileOpenError)),
-        };
-
-        match file.write(pkt) {
-            Ok(_) => {}
-            // Err(_) => {
-            //     todo!("handle file write error")
-            // }
-            Err(e) => return Err(anyhow!("{}", e)),
-        };
-
-        if info.closing {
-            // Open new pcap file for writing
-            while let Ok(fname) = info.fname.read() {
-                let file = std::fs::OpenOptions::new()
-                    .read(true)
-                    .write(true)
-                    .open(fname.as_path())?;
-                self.file = Some(file);
-            }
-        }
-
-        Ok(())
-    }
+    file_info: File,
 }
 
 #[derive(Default)]
@@ -217,6 +173,10 @@ impl ProtocolParserTrait for Processor {
 
         let mut cfg: Config = serde_yaml::from_str(&yaml)?;
         cfg.doc = alcfg.doc.clone();
+        #[cfg(feature = "arkime")]
+        {
+            cfg.es_host = alcfg.get_str("elasticsearch", "http://localhost:9200");
+        }
 
         // Prepare global packet write info writer
         let (sender, receiver) = crossbeam_channel::bounded(100000);
@@ -245,7 +205,7 @@ impl ProtocolParserTrait for Processor {
             receiver: receiver.clone(),
         };
         let builder = std::thread::Builder::new().name(self.name().to_string());
-        let handle = builder.spawn(move || thread.spawn()).unwrap();
+        let handle = builder.spawn(move || thread.spawn(cfg.clone())).unwrap();
         let handles = vec![handle];
 
         unsafe {
@@ -305,7 +265,7 @@ impl ProtocolParserTrait for Processor {
                 .ok_or(anyhow!("{}: SCHEDULERS is not initialized", self.name()))?
         };
         let hash = self.hasher.finish() as usize % schedulers.len();
-        let info = schedulers[hash].gen(pkt);
+        let info = schedulers[hash].gen(pkt, FILE_ID.load(Ordering::Relaxed));
         schedulers[hash].send(info)?;
         Ok(())
     }
@@ -339,17 +299,6 @@ pub extern "C" fn al_new_protocol_parser() -> Box<Box<dyn api::parsers::Protocol
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn parse_pkt() -> Result<()> {
-        let cfg = api::config::Config::default();
-        let mut processor = Processor::default();
-        processor.init(&cfg)?;
-        let pkt = api::utils::packet::Packet::default();
-        let mut ses = Session::default();
-        processor.parse_pkt(&pkt, None, &mut ses)?;
-        Ok(())
-    }
 
     #[test]
     fn finish() {
