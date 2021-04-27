@@ -1,12 +1,12 @@
 if(OFFLINE_ENVIRONMENT)
-    set(libpcap_url ${CMAKE_CURRENT_SOURCE_DIR}/third_party/libpcap-1.9.1.tar.gz)
+    set(libpcap_url ${CMAKE_CURRENT_SOURCE_DIR}/third_party/libpcap-1.10.0.tar.gz)
 else()
-    set(libpcap_url https://github.com/the-tcpdump-group/libpcap/archive/libpcap-1.9.1.tar.gz)
+    set(libpcap_url https://github.com/the-tcpdump-group/libpcap/archive/libpcap-1.10.0.tar.gz)
 endif()
 
 ExternalProject_Add(libpcap
     URL ${libpcap_url}
-    URL_MD5 9feb4d1ccc5ea8c8b3e1558aa0c2be6f
+    URL_MD5 b653f488578e663f3b2ac4dc10c58952
     EXCLUDE_FROM_ALL ON
     PREFIX libpcap
     INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR}/install
