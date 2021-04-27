@@ -1,8 +1,7 @@
-use std::sync::Arc;
-
 use anyhow::{anyhow, Result};
 
-use crate::config::Config;
+use alphonse_api as api;
+use api::config::Config;
 
 fn is_power_of_two<T: Into<u64>>(x: T) -> bool {
     let x: u64 = x.into();

@@ -4,12 +4,12 @@ use std::thread::JoinHandle;
 
 use anyhow::Result;
 use crossbeam_channel::Sender;
-
-use alphonse_api as api;
-use api::packet::Packet as PacketTrait;
 use rte::ethdev::EthDevice;
 
-use crate::config::Config;
+use alphonse_api as api;
+use api::config::Config;
+use api::packet::Packet as PacketTrait;
+
 use crate::rx::RxUtility;
 
 mod device;

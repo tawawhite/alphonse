@@ -8,10 +8,10 @@ use yaml_rust::Yaml;
 
 use alphonse_api as api;
 use api::classifiers::matched::Rule;
+use api::config::Config;
 use api::packet::{Layers, Packet as PacketTrait, Rules, Tunnel};
 use api::utils::timeval::{precision, TimeVal};
 
-use crate::config::Config;
 use crate::stats::CaptureStat;
 
 /// Minimium DPDK rx unit
@@ -69,7 +69,7 @@ pub fn devices(cfg: &Config) -> Result<Vec<(rte::lcore::Id, Device)>> {
         })
         .collect();
 
-    let doc = &cfg.docs[0];
+    let doc = &cfg.doc.as_ref();
     let rx_ports = doc["dpdk.rx.ports"]
         .as_hash()
         .ok_or(anyhow!("dpdk.rx.ports is not hash"))?;
