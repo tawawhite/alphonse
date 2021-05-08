@@ -4,10 +4,9 @@ use once_cell::sync::OnceCell;
 
 use alphonse_api as api;
 use api::classifiers;
-use api::classifiers::{dpi, Rule, RuleID, RuleType};
+use api::classifiers::dpi;
 use api::parsers::ParserID;
 use api::session::Session;
-use api::{add_simple_dpi_rule, add_simple_dpi_tcp_rule};
 
 static SETTINGS: OnceCell<llhttp::Settings> = OnceCell::new();
 
@@ -176,7 +175,7 @@ impl<'a> api::parsers::ProtocolParserTrait for ProtocolParser<'static> {
             };
             let http = Box::into_raw(Box::new(HTTP::default()));
             for parser in &mut self.parsers {
-                parser.init(settings, llhttp::Type::BOTH);
+                parser.init(settings, llhttp::Type::HTTP_BOTH);
                 parser.set_data(http);
             }
         }
@@ -184,8 +183,10 @@ impl<'a> api::parsers::ProtocolParserTrait for ProtocolParser<'static> {
         let direction = pkt.direction() as u8 as usize;
 
         match self.parsers[direction].parse(pkt.payload()) {
-            llhttp::Error::Ok => {}
-            llhttp::Error::Paused | llhttp::Error::PausedUpgrade => {}
+            llhttp::Error::HPE_OK => {}
+            llhttp::Error::HPE_PAUSED
+            | llhttp::Error::HPE_PAUSED_UPGRADE
+            | llhttp::Error::HPE_PAUSED_H2_UPGRADE => {}
             _ => {
                 let data = self.parsers[direction].set_data::<HTTP>(std::ptr::null_mut());
                 let settings = match SETTINGS.get() {
@@ -196,7 +197,7 @@ impl<'a> api::parsers::ProtocolParserTrait for ProtocolParser<'static> {
                         ))
                     }
                 };
-                self.parsers[direction].init(settings, llhttp::Type::BOTH);
+                self.parsers[direction].init(settings, llhttp::Type::HTTP_BOTH);
                 self.parsers[direction].set_data(data);
             }
         };
