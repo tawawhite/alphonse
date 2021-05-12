@@ -160,10 +160,18 @@ impl Parser {
                     p.parse(buf, offset)
                 }
                 None => {
-                    return Err(Error::UnsupportProtocol(format!(
-                        "Unsupport protocol {:?}",
-                        layer.protocol
-                    )));
+                    match layer.protocol {
+                        Protocol::APPLICATION => {
+                            pkt.layers_mut().app = layer;
+                            return Ok(());
+                        }
+                        _ => {
+                            return Err(Error::UnsupportProtocol(format!(
+                                "Unsupport protocol {:?}",
+                                layer.protocol
+                            )))
+                        }
+                    };
                 }
             };
 
