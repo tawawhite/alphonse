@@ -119,18 +119,24 @@ impl api::parsers::ProtocolParserTrait for Processor {
         let mut remained: usize = pkt.data_len() as usize;
         while remained >= 13 {
             remained -= 13;
-            let len = ((pkt.payload()[10] as u16) << 8) & (pkt.payload()[11] as u16);
+            let len = ((pkt.payload()[10] as u16) << 8) | (pkt.payload()[11] as u16);
             if len as usize > remained {
                 // remained unprocessed payload is not long enough
                 return Ok(());
             }
 
-            let offset = pkt.data_len() as usize - remained - 1;
+            let offset = pkt.data_len() as usize - remained;
             let consumed = self.parse_handshake(&pkt.payload()[offset..], ses);
             remained -= consumed;
         }
 
         Ok(())
+    }
+
+    fn finish(&mut self, _: &mut Session) {
+        for cert in &self.certs {
+            println!("{:?}", cert);
+        }
     }
 }
 
@@ -148,9 +154,9 @@ impl Processor {
     fn parse_handshake(&mut self, payload: &[u8], ses: &mut Session) -> usize {
         let handshake_type = payload[0];
         let handshake_len =
-            ((payload[1] as u32) << 16) & ((payload[2] as u32) << 8) & (payload[3] as u32);
+            ((payload[1] as u32) << 16) | ((payload[2] as u32) << 8) | (payload[3] as u32);
         let frame_offset =
-            ((payload[6] as u32) << 16) & ((payload[7] as u32) << 8) & (payload[8] as u32);
+            ((payload[6] as u32) << 16) | ((payload[7] as u32) << 8) | (payload[8] as u32);
 
         if handshake_len as usize > payload.len() || frame_offset != 0 {
             // if payload is not enough, return
@@ -282,4 +288,9 @@ mod test {
         manager.classify(pkt.as_mut(), &mut scratch).unwrap();
         assert_eq!(pkt.rules().len(), 1);
     }
+}
+
+#[no_mangle]
+pub extern "C" fn al_new_protocol_parser() -> Box<Box<dyn api::parsers::ProtocolParserTrait>> {
+    Box::new(Box::new(Processor::new()))
 }
