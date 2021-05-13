@@ -167,7 +167,8 @@ impl Processor {
         let mut remained = payload.len();
         while remained > 3 {
             let mut cert = Cert::default();
-            match parse_x509_certificate(&payload[3..]) {
+            let offset = payload.len() - remained + 3;
+            match parse_x509_certificate(&payload[offset..]) {
                 Err(_) => return payload.len(),
                 Ok((remain, cer)) => {
                     // get cert serial number
