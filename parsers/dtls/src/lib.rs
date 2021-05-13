@@ -75,14 +75,7 @@ impl api::parsers::ProtocolParserTrait for Processor {
         &mut self,
         manager: &mut classifiers::ClassifierManager,
     ) -> Result<()> {
-        let mut dpi_rule =
-            classifiers::dpi::Rule::new(pattern! {r"^\x16(\x01\x00|\xfe[\xff\xfe\xfd])"});
-        dpi_rule.protocol = classifiers::dpi::Protocol::UDP;
-
         add_simple_dpi_udp_rule!(r"^\x16(\x01\x00|\xfe[\xff\xfe\xfd])", self.id, manager);
-        let mut rule = classifiers::Rule::new(self.id());
-        rule.rule_type = classifiers::RuleType::DPI(dpi_rule);
-        manager.add_rule(&mut rule)?;
 
         Ok(())
     }
