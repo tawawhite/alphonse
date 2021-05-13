@@ -1,19 +1,20 @@
 [package]
-name = "dtls"
+name = "tls"
 version = "0.1.0"
 authors = ["Jack"]
 edition = "2018"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
-name = "dtls"
+name = "tls"
 
 [dependencies]
 alphonse-api = { path = "../../api", optional = false }
 anyhow = "1.0"
+hex = "0.4"
 hyperscan = "0.2"
 libc = "0.2"
-num-traits = "0.2"
 once_cell = "1.6"
 serde_json = "1.0"
+tls-parser = "0.10"
 x509-parser = "0.9"
