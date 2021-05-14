@@ -15,23 +15,20 @@ const GREASE: [u16; 16] = [
 
 #[derive(Clone, Debug, Default, Hash, PartialEq, Eq)]
 pub struct Ja3 {
-    string: String,
-    exts: String,
-    supported_groups: String,
-    ec_points: String,
+    ver: u16,
+    ciphers: Vec<u16>,
+    exts: Vec<u16>,
+    supported_groups: Vec<u16>,
+    ec_points: Vec<u8>,
 }
 
 impl Ja3 {
     pub fn set_tls_version(&mut self, ver: u16) {
-        self.string.push_str(&format!("{},", ver));
+        self.ver = ver;
     }
 
     pub fn set_ciphers(&mut self, ciphers: &[TlsCipherSuiteID]) {
-        for cipher in ciphers {
-            self.string.push_str(&format!("{}-", cipher));
-        }
-        self.string.pop();
-        self.string.push(',');
+        self.ciphers = ciphers.iter().map(|x| u16::from(*x)).collect();
     }
 
     pub fn set_extension_type(&mut self, ext: &TlsExtension) {
@@ -40,35 +37,51 @@ impl Ja3 {
             return;
         }
 
-        self.exts.push_str(&format!("{}-", ext_val));
+        self.exts.push(ext_val);
     }
 
     pub fn set_supported_groups(&mut self, curves: &[NamedGroup]) {
         for curve in curves {
             if !GREASE.contains(&curve.0) {
-                self.supported_groups.push_str(&format!("{}-", curve.0));
+                self.supported_groups.push(curve.0)
             }
         }
     }
 
     pub fn set_ec_points(&mut self, points: &[u8]) {
         for point in points {
-            self.ec_points.push_str(&format!("{}-", point));
+            self.ec_points.push(*point);
         }
     }
 
-    pub fn hash(&mut self) -> Option<md5::Digest> {
-        self.exts.pop();
-        self.supported_groups.pop();
-        self.ec_points.pop();
-        self.string = format!(
-            "{}{},{},{}",
-            self.string, self.exts, self.supported_groups, self.ec_points
-        );
-        if self.string.is_empty() {
-            None
-        } else {
-            Some(md5::compute(self.string.as_bytes()))
+    pub fn string(&mut self) -> String {
+        let mut str = String::new();
+
+        str.push_str(&format!("{},", self.ver));
+
+        for cipher in &self.ciphers {
+            str.push_str(&format!("{}-", cipher));
         }
+        str.pop();
+        str.push(',');
+
+        for ext in &self.exts {
+            str.push_str(&format!("{}-", ext));
+        }
+        str.pop();
+        str.push(',');
+
+        for group in &self.supported_groups {
+            str.push_str(&format!("{}-", group));
+        }
+        str.pop();
+        str.push(',');
+
+        for point in &self.ec_points {
+            str.push_str(&format!("{}-", point));
+        }
+        str.pop();
+
+        str
     }
 }
