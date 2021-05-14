@@ -16,14 +16,15 @@ use serde::{Serialize, Serializer};
 use super::classifiers::matched::Rule;
 
 #[repr(u8)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq)]
 pub enum Direction {
-    LEFT = 0,
-    RIGHT = 1,
+    Right = 0,
+    Left = 1,
 }
 
 impl Default for Direction {
     fn default() -> Self {
-        Direction::LEFT
+        Direction::Right
     }
 }
 
@@ -39,6 +40,15 @@ impl Hash for Layer {
     #[inline]
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.protocol.hash(state);
+    }
+}
+
+impl Layer {
+    /// Get this layer's raw packet data
+    pub fn data<'a>(&self, pkt: &'a dyn Packet) -> &'a [u8] {
+        let payload = pkt.payload();
+        let data = &payload[self.offset as usize..0];
+        data
     }
 }
 
@@ -357,9 +367,9 @@ pub trait Packet: Send {
         match self.layers().trans.protocol {
             Protocol::TCP | Protocol::UDP | Protocol::SCTP => {
                 if unsafe { self.src_port() > self.dst_port() } {
-                    return Direction::LEFT;
+                    return Direction::Right;
                 } else {
-                    return Direction::RIGHT;
+                    return Direction::Left;
                 }
             }
             _ => {}
@@ -367,23 +377,23 @@ pub trait Packet: Send {
 
         match self.layers().network.protocol {
             Protocol::IPV4 => {
-                if unsafe { self.src_ipv4() > self.src_ipv4() } {
-                    return Direction::LEFT;
+                if unsafe { self.src_ipv4() > self.dst_ipv4() } {
+                    return Direction::Right;
                 } else {
-                    return Direction::RIGHT;
+                    return Direction::Left;
                 }
             }
             Protocol::IPV6 => {
-                if unsafe { *self.src_ipv6() > *self.src_ipv6() } {
-                    return Direction::LEFT;
+                if unsafe { *self.src_ipv6() > *self.dst_ipv6() } {
+                    return Direction::Right;
                 } else {
-                    return Direction::RIGHT;
+                    return Direction::Left;
                 }
             }
             _ => {}
         }
 
-        Direction::LEFT
+        Direction::Right
     }
 }
 
