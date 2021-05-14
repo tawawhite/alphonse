@@ -4,7 +4,7 @@ use crate::packet;
 
 use super::matched;
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct Rule {
     /// Port number
     pub port: u16,
