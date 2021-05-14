@@ -1,3 +1,10 @@
 [workspace]
-members = ["app", "api", "parsers/http", "parsers/misc", "parsers/simple-writer"]
+members = [
+    "app",
+    "api",
+    "parsers/http",
+    "parsers/misc",
+    "parsers/simple-writer",
+    "parsers/tls",
+]
 resolver = "2"
