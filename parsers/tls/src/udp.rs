@@ -5,55 +5,44 @@ use tls_parser::{
 };
 
 use alphonse_api as api;
-use api::packet::Packet;
+use api::packet::{Direction, Packet};
 use api::parsers::ProtocolParserTrait;
 use api::session::Session;
 
 use crate::ja3::Ja3;
 use crate::Processor;
 
-impl<'a> Processor<'static> {
+impl Processor {
     pub fn parse_udp_pkt(&mut self, pkt: &dyn Packet, ses: &mut Session) -> Result<()> {
         if !self.is_classified() {
-            let (buf, results) = match parse_dtls_plaintext_records(pkt.payload()) {
-                Ok(r) => r,
-                Err(_) => return Ok(()),
-            };
-
             // If this session is already classified as this protocol, skip
             self.classified_as_this_protocol()?;
             ses.add_protocol(&self.name());
-
-            self.handle_dtls_parse_result(buf, &results);
-            return Ok(());
         }
 
-        let (buf, results) = match parse_dtls_plaintext_records(pkt.payload()) {
+        let (_, results) = match parse_dtls_plaintext_records(pkt.payload()) {
             Ok(r) => r,
             Err(_) => return Ok(()),
         };
 
-        self.handle_dtls_parse_result(buf, &results);
+        self.handle_dtls_parse_result(pkt.direction(), &results);
 
         Ok(())
     }
 
-    fn handle_dtls_parse_result(&mut self, buf: &[u8], result: &Vec<DTLSPlaintext>) {
-        let mut cnt = 0;
+    fn handle_dtls_parse_result(&mut self, dir: Direction, result: &Vec<DTLSPlaintext>) {
         for plaintext in result {
-            cnt += 1;
-            println!("cnt: {}", cnt);
             for msg in &plaintext.messages {
                 match msg {
                     DTLSMessage::Handshake(handshake) => match &handshake.body {
                         DTLSMessageHandshakeBody::ClientHello(hello) => {
-                            self.handle_dtls_client_hello(hello)
+                            self.handle_dtls_client_hello(dir, hello)
                         }
                         DTLSMessageHandshakeBody::Certificate(cert) => {
                             self.handle_certificate(cert)
                         }
                         DTLSMessageHandshakeBody::ServerHello(hello) => {
-                            self.handle_server_hello(hello)
+                            self.handle_server_hello(dir, hello)
                         }
                         _ => {}
                     },
@@ -63,11 +52,12 @@ impl<'a> Processor<'static> {
         }
     }
 
-    fn handle_dtls_client_hello(&mut self, hello: &DTLSClientHello) {
+    fn handle_dtls_client_hello(&mut self, dir: Direction, hello: &DTLSClientHello) {
+        let dir = dir as u8 as usize;
         let mut ja3 = Ja3::default();
         match hello.session_id {
             Some(id) => {
-                self.client_session_ids.insert(hex::encode(id));
+                self.side_data[dir].session_ids.insert(hex::encode(id));
             }
             None => {}
         };
@@ -100,6 +90,6 @@ impl<'a> Processor<'static> {
                 _ => {}
             }
         }
-        self.client_ja3s.insert(ja3);
+        self.side_data[dir].ja3s.insert(ja3);
     }
 }

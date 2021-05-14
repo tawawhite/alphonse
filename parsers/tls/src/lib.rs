@@ -2,12 +2,14 @@ use std::collections::HashSet;
 
 use anyhow::Result;
 use hyperscan::pattern;
-use tls_parser::{TlsPlaintext, TlsServerHelloContents};
+use serde::Serialize;
+use serde_json::json;
+use tls_parser::TlsServerHelloContents;
 
 use alphonse_api as api;
 use api::classifiers;
 use api::classifiers::{dpi, matched, Rule, RuleID, RuleType};
-use api::packet::{Packet, Protocol};
+use api::packet::{Direction, Packet, Protocol};
 use api::parsers::ParserID;
 use api::session::Session;
 use api::{add_simple_dpi_rule, add_simple_dpi_tcp_rule, add_simple_dpi_udp_rule};
@@ -17,56 +19,58 @@ mod ja3;
 mod tcp;
 mod udp;
 
-#[derive(Debug, Default, Clone)]
-struct CertInfo {
-    common_name: HashSet<String>,
-    org_name: HashSet<String>,
+use cert::Cert;
+
+#[repr(u8)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq)]
+enum Side {
+    Client = 0,
+    Server = 1,
 }
 
-#[derive(Debug, Default, Clone)]
-struct Cert {
-    pub hash: u32,
-    pub not_before: u64,
-    pub not_after: u64,
-    pub issuer: CertInfo,
-    pub subject: CertInfo,
-    pub alt: HashSet<String>,
-    pub serial_number: String,
-    pub bucket: usize,
-    pub hash_str: String,
-    pub is_ca: bool,
-    pub algorithm: String,
-    pub curv: String,
+impl Default for Side {
+    fn default() -> Self {
+        Side::Client
+    }
+}
+
+#[derive(Clone, Default, Serialize)]
+struct SideInfo {
+    #[serde(skip_serializing)]
+    side: Side,
+    /// Session ID
+    session_ids: HashSet<String>,
+    /// ja3
+    #[serde(skip_serializing)]
+    ja3s: HashSet<ja3::Ja3>,
+    /// Last time unprocessed payload
+    #[serde(skip_serializing)]
+    remained: Vec<u8>,
 }
 
 #[derive(Clone, Default)]
-struct Processor<'a> {
+struct Processor {
     id: ParserID,
     name: String,
     classified: bool,
-    certs: Vec<Cert>,
+
     tcp_rule_id: RuleID,
     udp_rule_id: RuleID,
-    client_data: Option<TlsPlaintext<'a>>,
-    server_data: Option<TlsPlaintext<'a>>,
-    client_session_ids: HashSet<String>,
-    server_session_ids: HashSet<String>,
-    client_ja3s: HashSet<ja3::Ja3>,
-    server_ja3s: HashSet<ja3::Ja3>,
+
+    side_data: [SideInfo; 2],
+    certs: Vec<Cert>,
     hostnames: HashSet<String>,
-    supported_groups: HashSet<u16>,
-    ec_point_formats: HashSet<u8>,
 }
 
-impl<'a> Processor<'a> {
+impl Processor {
     fn new() -> Self {
         let mut p = Self::default();
-        p.name = String::from("dtls");
+        p.name = String::from("tls");
         p
     }
 }
 
-impl<'a> api::parsers::ProtocolParserTrait for Processor<'static> {
+impl api::parsers::ProtocolParserTrait for Processor {
     fn box_clone(&self) -> Box<dyn api::parsers::ProtocolParserTrait> {
         Box::new(self.clone())
     }
@@ -120,18 +124,25 @@ impl<'a> api::parsers::ProtocolParserTrait for Processor<'static> {
         }
     }
 
-    fn finish(&mut self, _: &mut Session) {
-        for cert in &self.certs {
-            println!("{:?}", cert);
+    fn finish(&mut self, ses: &mut Session) {
+        ses.add_field(&"cert", &json!(self.certs));
+        for side in &self.side_data {
+            match side.side {
+                Side::Client => {}
+                Side::Server => {}
+            };
         }
+        println!("{}", serde_json::to_string_pretty(ses).unwrap());
     }
 }
 
-impl<'a> Processor<'static> {
-    fn handle_server_hello(&mut self, hello: &TlsServerHelloContents) {
+impl Processor {
+    fn handle_server_hello(&mut self, dir: Direction, hello: &TlsServerHelloContents) {
+        let dir = dir as u8 as usize;
+        self.side_data[dir].side = Side::Server;
         match hello.session_id {
             Some(id) => {
-                self.server_session_ids.insert(hex::encode(id));
+                self.side_data[dir].session_ids.insert(hex::encode(id));
             }
             None => {}
         };
