@@ -16,14 +16,18 @@ impl<'a> Processor<'static> {
                     // get issuer information
                     for cn in cer.issuer().iter_common_name() {
                         match cn.as_str() {
-                            Ok(cn) => cert.issuer.common_name.push(cn.to_string()),
+                            Ok(cn) => {
+                                cert.issuer.common_name.insert(cn.to_string());
+                            }
                             Err(_) => continue,
                         }
                     }
 
                     for org in cer.issuer().iter_organization() {
                         match org.as_str() {
-                            Ok(org) => cert.issuer.org_name.push(org.to_string()),
+                            Ok(org) => {
+                                cert.issuer.org_name.insert(org.to_string());
+                            }
                             Err(_) => continue,
                         }
                     }
@@ -35,14 +39,18 @@ impl<'a> Processor<'static> {
                     // get subject information
                     for cn in cer.subject().iter_common_name() {
                         match cn.as_str() {
-                            Ok(cn) => cert.issuer.common_name.push(cn.to_string()),
+                            Ok(cn) => {
+                                cert.issuer.common_name.insert(cn.to_string());
+                            }
                             Err(_) => continue,
                         }
                     }
 
                     for org in cer.subject().iter_organization() {
                         match org.as_str() {
-                            Ok(org) => cert.issuer.org_name.push(org.to_string()),
+                            Ok(org) => {
+                                cert.issuer.org_name.insert(org.to_string());
+                            }
                             Err(_) => continue,
                         }
                     }
@@ -54,7 +62,9 @@ impl<'a> Processor<'static> {
                             ParsedExtension::SubjectAlternativeName(an) => {
                                 for gn in &an.general_names {
                                     match gn {
-                                        GeneralName::DNSName(n) => cert.alt.push(n.to_string()),
+                                        GeneralName::DNSName(n) => {
+                                            cert.alt.insert(n.to_string());
+                                        }
                                         _ => continue,
                                     }
                                 }

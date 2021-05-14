@@ -19,8 +19,8 @@ mod udp;
 
 #[derive(Debug, Default, Clone)]
 struct CertInfo {
-    common_name: Vec<String>,
-    org_name: Vec<String>,
+    common_name: HashSet<String>,
+    org_name: HashSet<String>,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -30,7 +30,7 @@ struct Cert {
     pub not_after: u64,
     pub issuer: CertInfo,
     pub subject: CertInfo,
-    pub alt: Vec<String>,
+    pub alt: HashSet<String>,
     pub serial_number: String,
     pub bucket: usize,
     pub hash_str: String,
@@ -51,8 +51,8 @@ struct Processor<'a> {
     server_data: Option<TlsPlaintext<'a>>,
     client_session_ids: HashSet<String>,
     server_session_ids: HashSet<String>,
-    client_ja3: ja3::Ja3,
-    server_ja3: ja3::Ja3,
+    client_ja3s: HashSet<ja3::Ja3>,
+    server_ja3s: HashSet<ja3::Ja3>,
     hostnames: HashSet<String>,
     supported_groups: HashSet<u16>,
     ec_point_formats: HashSet<u8>,
