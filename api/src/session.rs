@@ -108,12 +108,12 @@ impl Session {
     /// update session information
     pub fn update(&mut self, pkt: &dyn packet::Packet) {
         match pkt.direction() {
-            packet::Direction::LEFT => {
+            packet::Direction::Left => {
                 self.pkt_count[0] += 1;
                 self.bytes[0] += pkt.caplen() as u64;
                 self.data_bytes[0] += pkt.data_len() as u64;
             }
-            packet::Direction::RIGHT => {
+            packet::Direction::Right => {
                 self.pkt_count[1] += 1;
                 self.bytes[1] += pkt.caplen() as u64;
                 self.data_bytes[1] += pkt.data_len() as u64;
