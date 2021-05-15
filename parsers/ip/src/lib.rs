@@ -121,13 +121,20 @@ impl api::parsers::ProtocolParserTrait for Processor {
             return Ok(());
         };
 
+        if !self.is_classified() {
+            self.classified_as_this_protocol()?;
+            match pkt.layers().network.protocol {
+                Protocol::IPV4 => ses.add_protocol(&"ipv4"),
+                Protocol::IPV6 => ses.add_protocol(&"ipv6"),
+                _ => unreachable!(),
+            }
+        }
+
         let src_ip = unsafe {
             match pkt.layers().network.protocol {
                 Protocol::IPV4 => IpAddr::V4(Ipv4Addr::from(pkt.src_ipv4())),
                 Protocol::IPV6 => IpAddr::V6(Ipv6Addr::from(*pkt.src_ipv6())),
-                _ => {
-                    unreachable!()
-                }
+                _ => unreachable!(),
             }
         };
 
