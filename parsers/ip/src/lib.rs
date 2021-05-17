@@ -1,4 +1,5 @@
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use std::path::PathBuf;
 
 use anyhow::{anyhow, Result};
 use maxminddb::{geoip2, Reader as GeoLiteReader};
@@ -81,18 +82,22 @@ impl api::parsers::ProtocolParserTrait for Processor {
     }
 
     fn init(&mut self, alcfg: &api::config::Config) -> Result<()> {
+        let db_dir = PathBuf::from(alcfg.get_str(&"ip.db.directory", "etc"));
+        let db_path = db_dir.join("GeoLite2-ASN.mmdb");
         ASN_DB
-            .set(GeoLiteReader::open_mmap("./etc/GeoLite2-ASN.mmdb")?)
+            .set(GeoLiteReader::open_mmap(db_path)?)
             .ok()
             .ok_or(anyhow!("{} ASN_DBS are already set", self.name()))?;
 
+        let db_path = db_dir.join("GeoLite2-Country.mmdb");
         COUNTRY_DB
-            .set(GeoLiteReader::open_mmap("./etc/GeoLite2-Country.mmdb")?)
+            .set(GeoLiteReader::open_mmap(db_path)?)
             .ok()
             .ok_or(anyhow!("{} COUNTRY_DBS are already set", self.name()))?;
 
+        let db_path = db_dir.join("GeoLite2-City.mmdb");
         CITY_DB
-            .set(GeoLiteReader::open_mmap("./etc/GeoLite2-City.mmdb")?)
+            .set(GeoLiteReader::open_mmap(db_path)?)
             .ok()
             .ok_or(anyhow!("{} CITY_DBS are already set", self.name()))?;
 
