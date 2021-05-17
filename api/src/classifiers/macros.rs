@@ -95,3 +95,14 @@ macro_rules! add_simple_dpi_tcp_udp_rule {
         )
     };
 }
+
+/// Add a simple Protocol rule
+#[macro_export]
+macro_rules! add_protocol_rule {
+    ($protocol: expr, $id: expr, $manager: expr) => {{
+        let mut port_rule = protocol::Rule($protocol);
+        let mut rule = Rule::new($id);
+        rule.rule_type = RuleType::Protocol(port_rule);
+        $manager.add_rule(&mut rule)?
+    }};
+}
