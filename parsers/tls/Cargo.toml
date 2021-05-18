@@ -13,7 +13,6 @@ alphonse-api = { path = "../../api", optional = false }
 anyhow = "1.0"
 chrono = "0.4"
 hex = "0.4"
-hyperscan = { version = "0.2", features = ["static"] }
 libc = "0.2"
 md5 = "0.7"
 once_cell = "1.6"
