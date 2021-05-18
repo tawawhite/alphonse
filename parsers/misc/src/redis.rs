@@ -1,8 +1,7 @@
 use anyhow::Result;
-use hyperscan::pattern;
 
 use alphonse_api as api;
-use api::classifiers::{dpi, ClassifierManager, Rule, RuleType};
+use api::classifiers::{dpi, ClassifierManager};
 
 use crate::{
     add_simple_dpi_rule, add_simple_dpi_tcp_rule, add_simple_dpi_udp_rule, MatchCallBack,

@@ -1,9 +1,8 @@
 use anyhow::Result;
-use hyperscan::pattern;
 use serde_json::json;
 
 use alphonse_api as api;
-use api::classifiers::{dpi, ClassifierManager, Rule, RuleType};
+use api::classifiers::{dpi, ClassifierManager};
 use api::packet::Packet;
 use api::session::Session;
 
