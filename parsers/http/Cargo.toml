@@ -10,7 +10,7 @@ name = "http"
 
 [dependencies]
 anyhow = "1.0"
-hyperscan = { verison = "0.2", features = ["static"] }
+hyperscan = { version = "0.2", features = ["static"] }
 libc = "0.2"
 llhttp = { git = "https://github.com/JackLiar/rust-llhttp.git", branch = "dev", features = ["static"] }
 once_cell = "1.6"
