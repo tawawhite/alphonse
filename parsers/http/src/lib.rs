@@ -136,16 +136,10 @@ impl<'a> api::parsers::ProtocolParserTrait for ProtocolParser<'static> {
                 ext: hyperscan::ExprExt::default(),
                 som: None,
             };
-            let dpi_rule = dpi::Rule::new(pattern);
-            let mut rule = classifiers::Rule::new(self.id());
-            rule.rule_type = classifiers::RuleType::DPI(dpi_rule);
-            manager.add_rule(&mut rule)?;
+            manager.add_dpi_rule(self.id(), &pattern, dpi::Protocol::all())?;
         }
 
-        let dpi_rule = classifiers::dpi::Rule::new(pattern! {"^HTTP"});
-        let mut rule = classifiers::Rule::new(self.id());
-        rule.rule_type = classifiers::RuleType::DPI(dpi_rule);
-        manager.add_rule(&mut rule)?;
+        manager.add_simple_dpi_rule(self.id(), "^HTTP", dpi::Protocol::all())?;
 
         Ok(())
     }

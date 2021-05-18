@@ -7,7 +7,6 @@ use crate::parsers::ParserID;
 pub mod all;
 pub mod dpi;
 pub mod ethertype;
-pub mod macros;
 pub mod port;
 pub mod protocol;
 
@@ -220,6 +219,100 @@ impl ClassifierManager {
     #[inline]
     pub fn get_rule(&self, id: RuleID) -> Option<&Rule> {
         self.rules.get(id as usize)
+    }
+
+    /// Add a port rule
+    pub fn add_port_rule(
+        &mut self,
+        id: ParserID,
+        port: u16,
+        protocol: packet::Protocol,
+    ) -> Result<RuleID> {
+        let mut port_rule = port::Rule::default();
+        port_rule.port = port;
+        port_rule.protocol = protocol;
+        let mut rule = Rule::new(id);
+        rule.rule_type = RuleType::Port(port_rule);
+        Ok(self.add_rule(&mut rule)?)
+    }
+
+    pub fn add_tcp_port_rule(&mut self, id: ParserID, port: u16) -> Result<RuleID> {
+        self.add_port_rule(id, port, packet::Protocol::TCP)
+    }
+
+    pub fn add_udp_port_rule(&mut self, id: ParserID, port: u16) -> Result<RuleID> {
+        self.add_port_rule(id, port, packet::Protocol::UDP)
+    }
+
+    pub fn add_sctp_port_rule(&mut self, id: ParserID, port: u16) -> Result<RuleID> {
+        self.add_port_rule(id, port, packet::Protocol::SCTP)
+    }
+
+    pub fn add_dpi_rule(
+        &mut self,
+        id: ParserID,
+        pattern: &hyperscan::Pattern,
+        protocol: dpi::Protocol,
+    ) -> Result<RuleID> {
+        let mut dpi_rule = dpi::Rule::new(pattern.clone());
+        dpi_rule.protocol = protocol;
+        let mut rule = Rule::new(id);
+        rule.rule_type = RuleType::DPI(dpi_rule);
+        Ok(self.add_rule(&mut rule)?)
+    }
+
+    pub fn add_simple_dpi_rule<S: AsRef<str>>(
+        &mut self,
+        id: ParserID,
+        pattern: S,
+        protocol: dpi::Protocol,
+    ) -> Result<RuleID> {
+        let pattern = hyperscan::Pattern {
+            expression: pattern.as_ref().to_string(),
+            flags: hyperscan::CompileFlags::default(),
+            id: None,
+            ext: hyperscan::ExpressionExt::default(),
+            som: None,
+        };
+        let mut dpi_rule = dpi::Rule::new(pattern);
+        dpi_rule.protocol = protocol;
+        let mut rule = Rule::new(id);
+        rule.rule_type = RuleType::DPI(dpi_rule);
+        Ok(self.add_rule(&mut rule)?)
+    }
+
+    pub fn add_tcp_dpi_rule<S: AsRef<str>>(&mut self, id: ParserID, pattern: S) -> Result<RuleID> {
+        self.add_simple_dpi_rule(id, pattern, dpi::Protocol::TCP)
+    }
+
+    pub fn add_udp_dpi_rule<S: AsRef<str>>(&mut self, id: ParserID, pattern: S) -> Result<RuleID> {
+        self.add_simple_dpi_rule(id, pattern, dpi::Protocol::UDP)
+    }
+
+    pub fn add_tcp_udp_dpi_rule<S: AsRef<str>>(
+        &mut self,
+        id: ParserID,
+        pattern: S,
+    ) -> Result<RuleID> {
+        self.add_simple_dpi_rule(id, pattern, dpi::Protocol::TCP | dpi::Protocol::UDP)
+    }
+
+    pub fn add_protocol_rule(
+        &mut self,
+        id: ParserID,
+        protocol: packet::Protocol,
+    ) -> Result<RuleID> {
+        let protocol_rule = protocol::Rule(protocol);
+        let mut rule = Rule::new(id);
+        rule.rule_type = RuleType::Protocol(protocol_rule);
+        Ok(self.add_rule(&mut rule)?)
+    }
+
+    pub fn add_etype_rule(&mut self, id: ParserID, ethertype: u16) -> Result<RuleID> {
+        let etype_rule = ethertype::Rule { ethertype };
+        let mut rule = Rule::new(id);
+        rule.rule_type = RuleType::EtherType(etype_rule);
+        Ok(self.add_rule(&mut rule)?)
     }
 
     /// Add a classify rule

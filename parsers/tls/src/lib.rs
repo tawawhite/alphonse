@@ -1,18 +1,16 @@
 use std::collections::HashSet;
 
 use anyhow::Result;
-use hyperscan::pattern;
 use serde::Serialize;
 use serde_json::json;
 use tls_parser::TlsServerHelloContents;
 
 use alphonse_api as api;
 use api::classifiers;
-use api::classifiers::{dpi, matched, Rule, RuleID, RuleType};
+use api::classifiers::{matched, RuleID};
 use api::packet::{Direction, Packet, Protocol};
 use api::parsers::ParserID;
 use api::session::Session;
-use api::{add_simple_dpi_rule, add_simple_dpi_tcp_rule, add_simple_dpi_udp_rule};
 
 mod cert;
 mod ja3;
@@ -94,10 +92,10 @@ impl api::parsers::ProtocolParserTrait for Processor {
         &mut self,
         manager: &mut classifiers::ClassifierManager,
     ) -> Result<()> {
-        self.tcp_rule_id = add_simple_dpi_tcp_rule!(r"^\x16\x03", self.id, manager);
+        self.tcp_rule_id = manager.add_tcp_dpi_rule(self.id, r"^\x16\x03")?;
 
         self.udp_rule_id =
-            add_simple_dpi_udp_rule!(r"^\x16(\x01\x00|\xfe[\xff\xfe\xfd])", self.id, manager);
+            manager.add_udp_dpi_rule(self.id, r"^\x16(\x01\x00|\xfe[\xff\xfe\xfd])")?;
 
         Ok(())
     }

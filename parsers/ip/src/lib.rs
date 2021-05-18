@@ -9,8 +9,7 @@ use serde::Serialize;
 use serde_json::json;
 
 use alphonse_api as api;
-use api::add_protocol_rule;
-use api::classifiers::{self, protocol, Rule, RuleType};
+use api::classifiers;
 use api::packet::Protocol;
 use api::parsers::ParserID;
 use api::session::Session;
@@ -108,8 +107,8 @@ impl api::parsers::ProtocolParserTrait for Processor {
         &mut self,
         manager: &mut classifiers::ClassifierManager,
     ) -> Result<()> {
-        add_protocol_rule!(Protocol::IPV4, self.id(), manager);
-        add_protocol_rule!(Protocol::IPV6, self.id(), manager);
+        manager.add_etype_rule(self.id(), 0x0800)?;
+        manager.add_etype_rule(self.id(), 0x86dd)?;
         Ok(())
     }
 
