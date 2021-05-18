@@ -13,7 +13,7 @@ chrono = "0.4"
 dashmap = { version = "4.0", features = ["raw-api"] }
 elasticsearch = "7.12.0-alpha.1"
 fnv = "1.0"
-hyperscan = "0.2"
+hyperscan = { version = "0.2", features = ["static"] }
 libc = "0.2"
 libloading = "0.7"
 path-absolutize = "3.0"
