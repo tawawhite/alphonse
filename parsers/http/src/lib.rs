@@ -1,5 +1,4 @@
 use anyhow::{anyhow, Result};
-use hyperscan::pattern;
 use once_cell::sync::OnceCell;
 
 use alphonse_api as api;
