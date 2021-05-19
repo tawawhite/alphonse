@@ -31,7 +31,15 @@ threads.pkt: 1
 threads.rx: 1
 threads.session: 1
 threads.output: 1
-parsers: [
-    "target/debug/libhttp.so",
-    "target/debug/libmisc.so"
-]
+parsers:
+    - "target/debug/libhttp.dylib"
+    - "target/debug/libip.dylib"
+    - "target/debug/libmisc.dylib"
+    - "target/debug/libsimplewriter.dylib"
+    - "target/debug/libtls.dylib"
+
+# Configuration for simple writer
+simple-writer:
+    pcap.dirs: ["./raw"]
+    max.file.size: 10737418240 # bytes, default 10GB
+ip.db.directory: "./etc"
