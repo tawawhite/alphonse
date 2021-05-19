@@ -54,10 +54,6 @@ impl Classifier {
                 if self.rules[i].parsers.len() > 0 {
                     pkt.rules_mut().push(self.rules[i].clone());
                 }
-                match pkt.layers().$layer.protocol {
-                    packet::Protocol::UNKNOWN => return,
-                    _ => {}
-                };
             };
         }
 
