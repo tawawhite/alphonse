@@ -56,7 +56,7 @@ impl From<&dyn Packet> for PacketHeader {
                 tv_usec: pkt.ts().tv_usec as u32,
             },
             cap_len: pkt.caplen(),
-            org_len: pkt.data_len() as u32,
+            org_len: pkt.raw().len() as u32,
         }
     }
 }

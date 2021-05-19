@@ -62,7 +62,7 @@ impl Scheduler {
     /// Generate packet write information of a packet
     pub fn gen(&self, pkt: &dyn Packet, fid: u32) -> Box<PacketInfo> {
         let mut fsize = self.fsize.get();
-        fsize += std::mem::size_of::<PacketHeader>() + pkt.data_len() as usize;
+        fsize += std::mem::size_of::<PacketHeader>() + pkt.raw().len() as usize;
         self.fsize.set(fsize);
 
         let closing = self.fsize.get() >= self.max_file_size;
