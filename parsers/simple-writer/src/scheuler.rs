@@ -77,6 +77,7 @@ impl Scheduler {
             };
             self.fname.replace(name.clone());
             file_info = File::Name(self.fname.borrow().clone());
+            self.fsize.set(0);
         } else {
             file_info = File::ID(self.fid.get());
         };
