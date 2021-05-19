@@ -162,6 +162,14 @@ impl Scheduler {
         );
         self.pcap_dir.borrow().join(fname.as_str())
     }
+
+    pub fn current_pos(&self) -> usize {
+        self.fsize.get()
+    }
+
+    pub fn current_fid(&self) -> u32 {
+        self.fid.get()
+    }
 }
 
 #[cfg(test)]

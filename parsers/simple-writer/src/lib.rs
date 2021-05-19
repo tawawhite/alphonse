@@ -119,6 +119,8 @@ struct Processor {
     packet_pos: Vec<isize>,
     /// Hasher to decide which scheduler to use
     hasher: fnv::FnvHasher,
+    /// Current file ID
+    fid: u32,
 }
 
 impl Clone for Processor {
@@ -128,6 +130,7 @@ impl Clone for Processor {
             classified: self.classified,
             packet_pos: self.packet_pos.clone(),
             hasher: fnv::FnvBuildHasher::default().build_hasher(),
+            fid: self.fid,
         }
     }
 }
@@ -272,6 +275,14 @@ impl ProtocolParserTrait for Processor {
         };
         let hash = self.hasher.finish() as usize % schedulers.len();
         let info = schedulers[hash].gen(pkt, FILE_ID.load(Ordering::Relaxed));
+        if schedulers[hash].current_fid() != self.fid {
+            self.fid = schedulers[hash].current_fid();
+            self.packet_pos
+                .push(-(schedulers[hash].current_fid() as isize));
+        }
+        self.packet_pos
+            .push(schedulers[hash].current_pos() as isize);
+
         schedulers[hash].send(info)?;
         Ok(())
     }
