@@ -52,6 +52,10 @@ pub struct Session {
     /// but network problems could cause single direction
     pub single_direction: bool,
 
+    /// Store which direction is src to dst
+    #[serde(skip_serializing)]
+    pub src_direction: packet::Direction,
+
     /// session total packets
     #[cfg_attr(feature = "arkime", serde(flatten))]
     #[cfg_attr(feature = "arkime", serde(serialize_with = "packets_serialize"))]
@@ -107,18 +111,16 @@ impl Session {
     #[inline]
     /// update session information
     pub fn update(&mut self, pkt: &dyn packet::Packet) {
-        match pkt.direction() {
-            packet::Direction::Left => {
-                self.pkt_count[0] += 1;
-                self.bytes[0] += pkt.caplen() as u64;
-                self.data_bytes[0] += pkt.data_len() as u64;
-            }
-            packet::Direction::Right => {
-                self.pkt_count[1] += 1;
-                self.bytes[1] += pkt.caplen() as u64;
-                self.data_bytes[1] += pkt.data_len() as u64;
-            }
+        if pkt.direction() == self.src_direction {
+            self.pkt_count[0] += 1;
+            self.bytes[0] += pkt.caplen() as u64;
+            self.data_bytes[0] += pkt.data_len() as u64;
+        } else {
+            self.pkt_count[1] += 1;
+            self.bytes[1] += pkt.caplen() as u64;
+            self.data_bytes[1] += pkt.data_len() as u64;
         }
+
         self.end_time = TimeVal::new(*pkt.ts());
     }
 
