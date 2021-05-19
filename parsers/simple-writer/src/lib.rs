@@ -1,7 +1,7 @@
 use std::hash::Hasher;
 use std::hash::{BuildHasher, Hash};
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32};
 use std::sync::Arc;
 use std::thread::JoinHandle;
 
@@ -274,7 +274,7 @@ impl ProtocolParserTrait for Processor {
                 .ok_or(anyhow!("{}: SCHEDULERS is not initialized", self.name()))?
         };
         let hash = self.hasher.finish() as usize % schedulers.len();
-        let info = schedulers[hash].gen(pkt, FILE_ID.load(Ordering::Relaxed));
+        let info = schedulers[hash].gen(pkt);
         if schedulers[hash].current_fid() != self.fid {
             self.fid = schedulers[hash].current_fid();
             self.packet_pos

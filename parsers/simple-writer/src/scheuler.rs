@@ -1,5 +1,6 @@
 use std::cell::{Cell, RefCell};
 use std::path::PathBuf;
+use std::sync::atomic::Ordering;
 
 use anyhow::Result;
 use chrono::{Datelike, TimeZone};
@@ -8,7 +9,7 @@ use crossbeam_channel::Sender;
 use alphonse_api as api;
 use api::packet::Packet;
 
-use crate::{writer::PacketHeader, File, Mode, PacketInfo, PcapDirAlgorithm};
+use crate::{writer::PacketHeader, File, Mode, PacketInfo, PcapDirAlgorithm, FILE_ID};
 
 #[derive(Clone, Debug)]
 /// Packet writing schedular
@@ -60,7 +61,7 @@ impl Scheduler {
     }
 
     /// Generate packet write information of a packet
-    pub fn gen(&self, pkt: &dyn Packet, fid: u32) -> Box<PacketInfo> {
+    pub fn gen(&self, pkt: &dyn Packet) -> Box<PacketInfo> {
         let mut fsize = self.fsize.get();
         fsize += std::mem::size_of::<PacketHeader>() + pkt.raw().len() as usize;
         self.fsize.set(fsize);
@@ -69,6 +70,15 @@ impl Scheduler {
         let file_info;
         if closing || self.fname.borrow().to_string_lossy().is_empty() {
             // if current pcap file is gonna close, send a new name to the pcap writer
+            let mut fid = FILE_ID.load(Ordering::Relaxed);
+            if !self.fname.borrow().to_string_lossy().is_empty() {
+                // Since the ES query is executed on another thread, it's a 'lazy' operation
+                // and is merely a mechanism to inform the elasticsearch to update the
+                // file sequence, so add scheduler's file id to prevent overwrite the first
+                // pcap file
+                fid += 1;
+            }
+
             self.fid.set(fid);
             let name = match self.mode {
                 Mode::Normal => self.gen_fname(pkt.ts().tv_sec as u64, self.fid.get() as u64),
