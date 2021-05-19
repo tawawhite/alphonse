@@ -68,7 +68,7 @@ impl PktThread {
             let mut matched = false;
             for rule in pkt.rules().iter() {
                 // If parser has bind a rule this packet matches, parse with this rule
-                // otherwise this pkt belongs to the same flow, parse witout rule information
+                // otherwise this pkt just belongs to the same session, parse without rule information
                 for parser_id in rule.parsers.iter() {
                     if *parser_id == parser.id() {
                         parser.parse_pkt(pkt, Some(rule), ses_data.info.as_mut())?;
@@ -128,6 +128,7 @@ impl PktThread {
                     let mut ses = Box::new(SessionData::default());
                     ses.info.start_time = TimeVal::new(*pkt.ts());
                     ses.info.save_time = pkt.ts().tv_sec as u64 + cfg.ses_save_timeout as u64;
+                    ses.info.src_direction = pkt.direction();
                     ses.info.update(pkt.as_ref());
                     self.parse_pkt(
                         &mut classify_scratch,
