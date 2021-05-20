@@ -10,6 +10,7 @@ use api::classifiers;
 use api::classifiers::{matched, RuleID};
 use api::packet::{Direction, Packet, Protocol};
 use api::parsers::ParserID;
+use api::plugins::{Plugin, PluginType};
 use api::session::Session;
 
 mod cert;
@@ -68,6 +69,16 @@ impl Processor {
     }
 }
 
+impl Plugin for Processor {
+    fn plugin_type(&self) -> PluginType {
+        PluginType::PacketProcessor
+    }
+
+    fn name(&self) -> &str {
+        &self.name.as_str()
+    }
+}
+
 impl api::parsers::ProtocolParserTrait for Processor {
     fn box_clone(&self) -> Box<dyn api::parsers::ProtocolParserTrait> {
         Box::new(self.clone())
@@ -81,11 +92,6 @@ impl api::parsers::ProtocolParserTrait for Processor {
     /// Get parser id
     fn set_id(&mut self, id: ParserID) {
         self.id = id
-    }
-
-    /// Get parser name
-    fn name(&self) -> &str {
-        &self.name.as_str()
     }
 
     fn register_classify_rules(

@@ -7,6 +7,7 @@ use tls_parser::{
 use alphonse_api as api;
 use api::packet::{Direction, Packet};
 use api::parsers::ProtocolParserTrait;
+use api::plugins::Plugin;
 use api::session::Session;
 
 use crate::ja3::Ja3;

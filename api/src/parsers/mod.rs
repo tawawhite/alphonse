@@ -4,6 +4,7 @@ use anyhow::Result;
 
 use crate::classifiers::ClassifierManager;
 use crate::config::Config;
+use crate::plugins::Plugin;
 use crate::{packet, session};
 
 pub type ParserID = u8;
@@ -42,7 +43,7 @@ impl DerefMut for ProtocolParser {
     }
 }
 
-pub trait ProtocolParserTrait: Send + Sync {
+pub trait ProtocolParserTrait: Send + Sync + Plugin {
     /// Clone a Protocol Parser
     fn box_clone(&self) -> Box<dyn ProtocolParserTrait>;
 
@@ -51,23 +52,6 @@ pub trait ProtocolParserTrait: Send + Sync {
 
     /// Set parser id
     fn set_id(&mut self, id: ParserID);
-
-    /// Get parser name
-    fn name(&self) -> &str;
-
-    /// Initialize parser required global resources
-    ///
-    /// # Arguments
-    ///
-    /// `_cfg` - alphonse configuration yaml file location
-    fn init(&mut self, _cfg: &Config) -> Result<()> {
-        Ok(())
-    }
-
-    // Release parser required global resources
-    fn exit(&mut self) -> Result<()> {
-        Ok(())
-    }
 
     /// Register protocol classify rules
     fn register_classify_rules(&mut self, manager: &mut ClassifierManager) -> Result<()>;

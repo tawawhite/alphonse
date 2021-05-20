@@ -4,7 +4,9 @@ use once_cell::sync::OnceCell;
 use alphonse_api as api;
 use api::classifiers;
 use api::classifiers::dpi;
+use api::config::Config;
 use api::parsers::ParserID;
+use api::plugins::{Plugin, PluginType};
 use api::session::Session;
 
 static SETTINGS: OnceCell<llhttp::Settings> = OnceCell::new();
@@ -53,6 +55,27 @@ impl<'a> ProtocolParser<'a> {
     }
 }
 
+impl<'a> Plugin for ProtocolParser<'a> {
+    fn plugin_type(&self) -> PluginType {
+        PluginType::PacketProcessor
+    }
+
+    fn name(&self) -> &str {
+        &self.name.as_str()
+    }
+
+    fn init(&self, _: &Config) -> Result<()> {
+        // initialize global llhttp settings
+        let mut settings = llhttp::Settings::default();
+
+        llhttp::data_cb_wrapper!(_on_url, on_url);
+        settings.on_url(Some(_on_url));
+
+        SETTINGS.set(settings).unwrap();
+        Ok(())
+    }
+}
+
 impl<'a> api::parsers::ProtocolParserTrait for ProtocolParser<'static> {
     fn box_clone(&self) -> Box<dyn api::parsers::ProtocolParserTrait> {
         Box::new(self.clone())
@@ -66,11 +89,6 @@ impl<'a> api::parsers::ProtocolParserTrait for ProtocolParser<'static> {
     /// Get parser id
     fn set_id(&mut self, id: ParserID) {
         self.id = id
-    }
-
-    /// Get parser name
-    fn name(&self) -> &str {
-        &self.name.as_str()
     }
 
     fn register_classify_rules(
@@ -213,13 +231,5 @@ impl<'a> api::parsers::ProtocolParserTrait for ProtocolParser<'static> {
 
 #[no_mangle]
 pub extern "C" fn al_new_protocol_parser() -> Box<Box<dyn api::parsers::ProtocolParserTrait>> {
-    // initialize global llhttp settings
-    let mut settings = llhttp::Settings::default();
-
-    llhttp::data_cb_wrapper!(_on_url, on_url);
-    settings.on_url(Some(_on_url));
-
-    SETTINGS.set(settings).unwrap();
-
     Box::new(Box::new(ProtocolParser::new()))
 }

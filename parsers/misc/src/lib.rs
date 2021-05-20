@@ -6,6 +6,7 @@ use api::classifiers::{ClassifierManager, RuleID};
 use api::packet::Packet;
 use api::parsers::ParserID;
 use api::parsers::ProtocolParserTrait;
+use api::plugins::{Plugin, PluginType};
 use api::session::Session;
 
 mod areospike;
@@ -57,6 +58,16 @@ pub enum MatchCallBack {
     None,
 }
 
+impl Plugin for ProtocolParser {
+    fn plugin_type(&self) -> PluginType {
+        PluginType::PacketProcessor
+    }
+
+    fn name(&self) -> &str {
+        &self.name.as_str()
+    }
+}
+
 impl ProtocolParserTrait for ProtocolParser {
     fn box_clone(&self) -> Box<dyn api::parsers::ProtocolParserTrait> {
         Box::new(self.clone())
@@ -70,11 +81,6 @@ impl ProtocolParserTrait for ProtocolParser {
     /// Get parser id
     fn set_id(&mut self, id: ParserID) {
         self.id = id
-    }
-
-    /// Get parser name
-    fn name(&self) -> &str {
-        &self.name.as_str()
     }
 
     fn register_classify_rules(&mut self, manager: &mut ClassifierManager) -> Result<()> {

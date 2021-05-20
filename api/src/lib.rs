@@ -17,5 +17,6 @@ pub mod classifiers;
 pub mod config;
 pub mod packet;
 pub mod parsers;
+pub mod plugins;
 pub mod session;
 pub mod utils;

@@ -12,6 +12,7 @@ use alphonse_api as api;
 use api::classifiers;
 use api::packet::Protocol;
 use api::parsers::ParserID;
+use api::plugins::{Plugin, PluginType};
 use api::session::Session;
 
 static ASN_DB: OnceCell<GeoLiteReader<Mmap>> = OnceCell::new();
@@ -60,19 +61,9 @@ impl Clone for Processor {
     }
 }
 
-impl api::parsers::ProtocolParserTrait for Processor {
-    fn box_clone(&self) -> Box<dyn api::parsers::ProtocolParserTrait> {
-        Box::new(self.clone())
-    }
-
-    /// Get parser id
-    fn id(&self) -> ParserID {
-        self.id
-    }
-
-    /// Get parser id
-    fn set_id(&mut self, id: ParserID) {
-        self.id = id
+impl Plugin for Processor {
+    fn plugin_type(&self) -> PluginType {
+        PluginType::PacketProcessor
     }
 
     /// Get parser name
@@ -80,7 +71,7 @@ impl api::parsers::ProtocolParserTrait for Processor {
         &self.name.as_str()
     }
 
-    fn init(&mut self, alcfg: &api::config::Config) -> Result<()> {
+    fn init(&self, alcfg: &api::config::Config) -> Result<()> {
         let db_dir = PathBuf::from(alcfg.get_str(&"ip.db.directory", "etc"));
         let db_path = db_dir.join("GeoLite2-ASN.mmdb");
         ASN_DB
@@ -101,6 +92,22 @@ impl api::parsers::ProtocolParserTrait for Processor {
             .ok_or(anyhow!("{} CITY_DBS are already set", self.name()))?;
 
         Ok(())
+    }
+}
+
+impl api::parsers::ProtocolParserTrait for Processor {
+    fn box_clone(&self) -> Box<dyn api::parsers::ProtocolParserTrait> {
+        Box::new(self.clone())
+    }
+
+    /// Get parser id
+    fn id(&self) -> ParserID {
+        self.id
+    }
+
+    /// Get parser id
+    fn set_id(&mut self, id: ParserID) {
+        self.id = id
     }
 
     fn register_classify_rules(

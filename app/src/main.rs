@@ -163,8 +163,8 @@ fn main() -> Result<()> {
         };
     }
 
-    for parser in &mut protocol_parsers {
-        parser.exit()?;
+    for parser in &protocol_parsers {
+        parser.cleanup()?;
     }
 
     match cfg.rx_backend.as_str() {
