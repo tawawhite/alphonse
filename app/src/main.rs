@@ -42,7 +42,6 @@ fn start_rx<'a>(
 fn main() -> Result<()> {
     let root_cmd = commands::new_root_command();
     let mut cfg = config::parse_args(root_cmd)?;
-    let exit = Arc::new(AtomicBool::new(false));
 
     let session_table = Arc::new(dashmap::DashMap::with_capacity_and_hasher(
         1000000,
@@ -59,8 +58,8 @@ fn main() -> Result<()> {
         _ => unreachable!(),
     };
 
-    signal_hook::flag::register(signal_hook::consts::SIGTERM, Arc::clone(&exit))?;
-    signal_hook::flag::register(signal_hook::consts::SIGINT, Arc::clone(&exit))?;
+    signal_hook::flag::register(signal_hook::consts::SIGTERM, cfg.exit.clone())?;
+    signal_hook::flag::register(signal_hook::consts::SIGINT, cfg.exit.clone())?;
 
     let cfg = Arc::new(cfg);
 
@@ -109,14 +108,14 @@ fn main() -> Result<()> {
     for i in 0..cfg.pkt_threads {
         let thread = threadings::PktThread::new(
             i,
-            exit.clone(),
+            cfg.exit.clone(),
             classifier_manager.clone(),
             pkt_receiver.clone(),
         );
         pkt_threads.push(thread);
     }
 
-    let timeout_thread = threadings::TimeoutThread::new(exit.clone(), ses_sender.clone());
+    let timeout_thread = threadings::TimeoutThread::new(cfg.exit.clone(), ses_sender.clone());
 
     // start all output threads
     {
@@ -146,7 +145,7 @@ fn main() -> Result<()> {
         handles.push(handle);
     }
 
-    let rx_handles = start_rx(exit.clone(), cfg.clone(), pkt_sender.clone())?;
+    let rx_handles = start_rx(cfg.exit.clone(), cfg.clone(), pkt_sender.clone())?;
     for h in rx_handles {
         handles.push(h);
     }
