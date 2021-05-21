@@ -94,6 +94,7 @@ pub struct Session {
     tags: Box<HashSet<String>>,
 
     /// Protocols
+    #[cfg_attr(feature = "arkime", serde(rename = "protocol"))]
     protocols: Box<HashSet<String>>,
 
     /// Tunnel Protocols
