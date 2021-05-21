@@ -9,7 +9,7 @@ use fnv::{FnvBuildHasher, FnvHashMap};
 use alphonse_api as api;
 use api::config::Config;
 use api::packet::{Packet, PacketHashKey};
-use api::parsers::{ParserID, ProtocolParserTrait};
+use api::plugins::parsers::{ParserID, ProtocolParserTrait};
 use api::session::Session;
 
 #[cfg(all(target_os = "linux", feature = "dpdk"))]

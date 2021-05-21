@@ -2,6 +2,8 @@ use anyhow::Result;
 
 use crate::config::Config;
 
+pub mod parsers;
+
 #[repr(C)]
 pub enum PluginType {
     /// A rx driver
@@ -16,17 +18,13 @@ pub enum PluginType {
 
 /// General Plugin trait
 pub trait Plugin {
-    /// Get the plugin type
-    fn plugin_type(&self) -> PluginType;
-
     /// Plugin name
     fn name(&self) -> &str;
 
+    /// Get the plugin type
+    fn plugin_type(&self) -> PluginType;
+
     /// Initialize plugin required global resources
-    ///
-    /// # Arguments
-    ///
-    /// `_cfg` - alphonse configuration
     fn init(&self, _cfg: &Config) -> Result<()> {
         Ok(())
     }
@@ -36,3 +34,8 @@ pub trait Plugin {
         Ok(())
     }
 }
+
+/// Create a Box of plugin
+pub type NewPluginFunc = extern "C" fn() -> Box<Box<dyn Plugin>>;
+
+pub const NEW_PLUGIN_FUNC_NAME: &str = "al_new_plugin";

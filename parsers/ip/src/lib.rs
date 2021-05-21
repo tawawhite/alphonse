@@ -11,7 +11,7 @@ use serde_json::json;
 use alphonse_api as api;
 use api::classifiers;
 use api::packet::Protocol;
-use api::parsers::ParserID;
+use api::plugins::parsers::{ParserID, ProtocolParserTrait};
 use api::plugins::{Plugin, PluginType};
 use api::session::Session;
 
@@ -95,8 +95,8 @@ impl Plugin for Processor {
     }
 }
 
-impl api::parsers::ProtocolParserTrait for Processor {
-    fn box_clone(&self) -> Box<dyn api::parsers::ProtocolParserTrait> {
+impl ProtocolParserTrait for Processor {
+    fn box_clone(&self) -> Box<dyn ProtocolParserTrait> {
         Box::new(self.clone())
     }
 
@@ -264,6 +264,6 @@ fn city_to_string(city: &Option<geoip2::City>) -> String {
 }
 
 #[no_mangle]
-pub extern "C" fn al_new_protocol_parser() -> Box<Box<dyn api::parsers::ProtocolParserTrait>> {
+pub extern "C" fn al_new_protocol_parser() -> Box<Box<dyn ProtocolParserTrait>> {
     Box::new(Box::new(Processor::default()))
 }

@@ -10,14 +10,15 @@ use anyhow::Result;
 use crossbeam_channel::{bounded, Sender};
 
 use alphonse_api as api;
+use api::classifiers;
 use api::config::Config;
 use api::packet::Packet;
-use api::parsers::NewProtocolParserFunc;
-use api::{classifiers, parsers::ParserID};
+use api::plugins::parsers::{NewProtocolParserFunc, ParserID};
 
 mod commands;
 mod config;
 mod packet;
+mod plugins;
 mod rx;
 mod stats;
 mod threadings;
@@ -80,7 +81,7 @@ fn main() -> Result<()> {
                 Ok(func) => {
                     let mut parser = func();
                     parser.set_id(protocol_parsers.len() as ParserID);
-                    let parser = api::parsers::ProtocolParser::new(parser);
+                    let parser = api::plugins::parsers::ProtocolParser::new(parser);
                     protocol_parsers.push(parser);
                 }
                 Err(e) => {

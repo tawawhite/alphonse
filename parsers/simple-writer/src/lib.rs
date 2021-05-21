@@ -14,7 +14,7 @@ use yaml_rust::YamlEmitter;
 use alphonse_api as api;
 use api::classifiers::{matched::Rule, ClassifierManager};
 use api::packet::{Packet, PacketHashKey};
-use api::parsers::{ParserID, ProtocolParserTrait};
+use api::plugins::parsers::{ParserID, ProtocolParserTrait};
 use api::plugins::{Plugin, PluginType};
 use api::session::Session;
 use api::utils::yaml::Yaml;
@@ -316,7 +316,7 @@ impl ProtocolParserTrait for Processor {
 }
 
 #[no_mangle]
-pub extern "C" fn al_new_protocol_parser() -> Box<Box<dyn api::parsers::ProtocolParserTrait>> {
+pub extern "C" fn al_new_protocol_parser() -> Box<Box<dyn ProtocolParserTrait>> {
     Box::new(Box::new(Processor::default()))
 }
 

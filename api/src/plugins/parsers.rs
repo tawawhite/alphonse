@@ -2,8 +2,8 @@ use std::ops::{Deref, DerefMut};
 
 use anyhow::Result;
 
+use crate::classifiers::matched;
 use crate::classifiers::ClassifierManager;
-use crate::config::Config;
 use crate::plugins::Plugin;
 use crate::{packet, session};
 
@@ -60,7 +60,7 @@ pub trait ProtocolParserTrait: Send + Sync + Plugin {
     fn parse_pkt(
         &mut self,
         _pkt: &dyn packet::Packet,
-        _rule: Option<&super::classifiers::matched::Rule>,
+        _rule: Option<&matched::Rule>,
         ses: &mut session::Session,
     ) -> Result<()> {
         if !self.is_classified() {

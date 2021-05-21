@@ -39,8 +39,9 @@ fn classify(ses: &mut Session, pkt: &dyn Packet) {
 mod test {
     use super::*;
     use api::packet::Protocol;
+    use api::plugins::parsers::ProtocolParserTrait;
     use api::session::Session;
-    use api::{parsers::ProtocolParserTrait, utils::packet::Packet as TestPacket};
+    use api::utils::packet::Packet as TestPacket;
 
     use crate::ProtocolParser;
 

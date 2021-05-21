@@ -8,7 +8,7 @@ use alphonse_api as api;
 use api::classifiers::ClassifierManager;
 use api::config::Config;
 use api::packet::{Packet, PacketHashKey};
-use api::parsers::ProtocolParserTrait;
+use api::plugins::parsers::ProtocolParserTrait;
 use api::utils::timeval::TimeVal;
 
 use crate::rx::{SessionData, SessionTable};

@@ -4,8 +4,7 @@ use fnv::FnvHashMap;
 use alphonse_api as api;
 use api::classifiers::{ClassifierManager, RuleID};
 use api::packet::Packet;
-use api::parsers::ParserID;
-use api::parsers::ProtocolParserTrait;
+use api::plugins::parsers::{ParserID, ProtocolParserTrait};
 use api::plugins::{Plugin, PluginType};
 use api::session::Session;
 
@@ -69,7 +68,7 @@ impl Plugin for ProtocolParser {
 }
 
 impl ProtocolParserTrait for ProtocolParser {
-    fn box_clone(&self) -> Box<dyn api::parsers::ProtocolParserTrait> {
+    fn box_clone(&self) -> Box<dyn ProtocolParserTrait> {
         Box::new(self.clone())
     }
 
@@ -155,6 +154,6 @@ impl ProtocolParserTrait for ProtocolParser {
 }
 
 #[no_mangle]
-pub extern "C" fn al_new_protocol_parser() -> Box<Box<dyn api::parsers::ProtocolParserTrait>> {
+pub extern "C" fn al_new_protocol_parser() -> Box<Box<dyn ProtocolParserTrait>> {
     Box::new(Box::new(ProtocolParser::default()))
 }

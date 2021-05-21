@@ -18,7 +18,7 @@ pub fn register_classify_rules(
 mod test {
     use super::*;
     use api::packet::Protocol;
-    use api::parsers::ProtocolParserTrait;
+    use api::plugins::parsers::ProtocolParserTrait;
     use api::session::Session;
     use api::utils::packet::Packet as TestPacket;
 

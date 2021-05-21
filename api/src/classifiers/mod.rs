@@ -2,7 +2,7 @@ use anyhow::Result;
 use tinyvec::TinyVec;
 
 use crate::packet;
-use crate::parsers::ParserID;
+use crate::plugins::parsers::ParserID;
 
 pub mod all;
 pub mod dpi;
