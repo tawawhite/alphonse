@@ -14,7 +14,7 @@ use yaml_rust::YamlEmitter;
 use alphonse_api as api;
 use api::classifiers::{matched::Rule, ClassifierManager};
 use api::packet::{Packet, PacketHashKey};
-use api::plugins::parsers::{ParserID, ProtocolParserTrait};
+use api::plugins::parsers::{ParserID, Processor};
 use api::plugins::{Plugin, PluginType};
 use api::session::Session;
 use api::utils::yaml::Yaml;
@@ -111,7 +111,7 @@ pub struct PacketInfo {
 }
 
 #[derive(Default)]
-struct Processor {
+struct SimpleWriterProcessor {
     /// Processor ID
     id: ParserID,
     /// Whether current packet is registered with this processer
@@ -124,7 +124,7 @@ struct Processor {
     fid: u32,
 }
 
-impl Clone for Processor {
+impl Clone for SimpleWriterProcessor {
     fn clone(&self) -> Self {
         Self {
             id: self.id,
@@ -136,7 +136,7 @@ impl Clone for Processor {
     }
 }
 
-impl Plugin for Processor {
+impl Plugin for SimpleWriterProcessor {
     fn plugin_type(&self) -> PluginType {
         PluginType::PacketProcessor
     }
@@ -246,8 +246,8 @@ impl Plugin for Processor {
     }
 }
 
-impl ProtocolParserTrait for Processor {
-    fn box_clone(&self) -> Box<dyn ProtocolParserTrait> {
+impl Processor for SimpleWriterProcessor {
+    fn box_clone(&self) -> Box<dyn Processor> {
         Box::new(self.clone())
     }
 
@@ -316,8 +316,8 @@ impl ProtocolParserTrait for Processor {
 }
 
 #[no_mangle]
-pub extern "C" fn al_new_protocol_parser() -> Box<Box<dyn ProtocolParserTrait>> {
-    Box::new(Box::new(Processor::default()))
+pub extern "C" fn al_new_protocol_parser() -> Box<Box<dyn Processor>> {
+    Box::new(Box::new(SimpleWriterProcessor::default()))
 }
 
 #[cfg(test)]
@@ -326,7 +326,7 @@ mod tests {
 
     #[test]
     fn finish() {
-        let mut processor = Processor::default();
+        let mut processor = SimpleWriterProcessor::default();
         processor.packet_pos = vec![-1, 1, 2, 3, 4, 5];
 
         let mut ses = Session::new();

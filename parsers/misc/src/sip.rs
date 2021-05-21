@@ -3,12 +3,9 @@ use anyhow::Result;
 use alphonse_api as api;
 use api::classifiers::{dpi, ClassifierManager};
 
-use crate::{add_simple_dpi_rule, add_simple_dpi_tcp_udp_rule, MatchCallBack, ProtocolParser};
+use crate::{add_simple_dpi_rule, add_simple_dpi_tcp_udp_rule, MatchCallBack, Misc};
 
-pub fn register_classify_rules(
-    parser: &mut ProtocolParser,
-    manager: &mut ClassifierManager,
-) -> Result<()> {
+pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManager) -> Result<()> {
     add_simple_dpi_tcp_udp_rule!(r"^SIP/2.0", "sip", parser, manager);
     add_simple_dpi_tcp_udp_rule!(r"^REGISTER sip:", "sip", parser, manager);
     add_simple_dpi_tcp_udp_rule!(r"^NOTIFY sip:", "sip", parser, manager);
@@ -20,16 +17,16 @@ pub fn register_classify_rules(
 mod test {
     use super::*;
     use api::packet::Protocol;
-    use api::plugins::parsers::ProtocolParserTrait;
+    use api::plugins::parsers::Processor;
     use api::session::Session;
     use api::utils::packet::Packet as TestPacket;
 
-    use crate::ProtocolParser;
+    use crate::Misc;
 
     #[test]
     fn sip() {
         let mut manager = ClassifierManager::new();
-        let mut parser = ProtocolParser::default();
+        let mut parser = Misc::default();
         parser.register_classify_rules(&mut manager).unwrap();
         manager.prepare().unwrap();
         let mut scratch = manager.alloc_scratch().unwrap();

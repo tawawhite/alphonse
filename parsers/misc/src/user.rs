@@ -7,13 +7,10 @@ use api::session::Session;
 
 use crate::{
     add_dpi_rule_with_func, add_dpi_tcp_rule_with_func, add_none_dpi_rule, add_none_dpi_tcp_rule,
-    MatchCallBack, ProtocolParser,
+    MatchCallBack, Misc,
 };
 
-pub fn register_classify_rules(
-    parser: &mut ProtocolParser,
-    manager: &mut ClassifierManager,
-) -> Result<()> {
+pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManager) -> Result<()> {
     let user_pattern_id = add_none_dpi_tcp_rule!(r"^USER\s", parser, manager);
     let irc_pattern_id = add_none_dpi_tcp_rule!(r"((\sNICK)|(\+iw))", parser, manager);
     let com_pattern = hyperscan::Pattern {
@@ -57,16 +54,16 @@ fn classify(ses: &mut Session, pkt: &dyn Packet) {
 mod test {
     use super::*;
     use api::packet::Protocol;
-    use api::plugins::parsers::ProtocolParserTrait;
+    use api::plugins::parsers::Processor;
     use api::session::Session;
     use api::utils::packet::Packet as TestPacket;
 
-    use crate::ProtocolParser;
+    use crate::Misc;
 
     #[test]
     fn user() {
         let mut manager = ClassifierManager::new();
-        let mut parser = ProtocolParser::default();
+        let mut parser = Misc::default();
         parser.register_classify_rules(&mut manager).unwrap();
         manager.prepare().unwrap();
         let mut scratch = manager.alloc_scratch().unwrap();

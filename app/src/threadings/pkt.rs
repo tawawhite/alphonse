@@ -8,7 +8,7 @@ use alphonse_api as api;
 use api::classifiers::ClassifierManager;
 use api::config::Config;
 use api::packet::{Packet, PacketHashKey};
-use api::plugins::parsers::ProtocolParserTrait;
+use api::plugins::parsers::Processor;
 use api::utils::timeval::TimeVal;
 
 use crate::rx::{SessionData, SessionTable};
@@ -43,7 +43,7 @@ impl PktThread {
     fn parse_pkt(
         &self,
         scratch: &mut api::classifiers::ClassifyScratch,
-        protocol_parsers: &mut Box<Vec<Box<dyn ProtocolParserTrait>>>,
+        processors: &mut Box<Vec<Box<dyn Processor>>>,
         pkt: &mut dyn Packet,
         ses_data: &mut SessionData,
     ) -> Result<()> {
@@ -51,20 +51,17 @@ impl PktThread {
 
         for rule in pkt.rules().iter() {
             for parser_id in rule.parsers.iter() {
-                match ses_data.parsers.get_mut(parser_id) {
+                match ses_data.processors.get_mut(parser_id) {
                     Some(_) => {}
                     None => {
-                        let parser = protocol_parsers
-                            .get_mut(*parser_id as usize)
-                            .unwrap()
-                            .box_clone();
-                        ses_data.parsers.insert(parser.id(), parser);
+                        let parser = processors.get_mut(*parser_id as usize).unwrap().box_clone();
+                        ses_data.processors.insert(parser.id(), parser);
                     }
                 };
             }
         }
 
-        for (_, parser) in ses_data.parsers.iter_mut() {
+        for (_, parser) in ses_data.processors.iter_mut() {
             let mut matched = false;
             for rule in pkt.rules().iter() {
                 // If parser has bind a rule this packet matches, parse with this rule
@@ -89,7 +86,7 @@ impl PktThread {
         &self,
         cfg: Arc<Config>,
         session_table: Arc<SessionTable>,
-        mut protocol_parsers: Box<Vec<Box<dyn ProtocolParserTrait>>>,
+        mut processors: Box<Vec<Box<dyn Processor>>>,
     ) -> Result<()> {
         let parser = crate::packet::Parser::new(crate::packet::link::ETHERNET);
         let mut classify_scratch = match self.classifier.alloc_scratch() {
@@ -121,7 +118,7 @@ impl PktThread {
                     ses.info.update(pkt.as_ref());
                     self.parse_pkt(
                         &mut classify_scratch,
-                        &mut protocol_parsers,
+                        &mut processors,
                         pkt.as_mut(),
                         ses.as_mut(),
                     )
@@ -135,7 +132,7 @@ impl PktThread {
                     ses.info.update(pkt.as_ref());
                     self.parse_pkt(
                         &mut classify_scratch,
-                        &mut protocol_parsers,
+                        &mut processors,
                         pkt.as_mut(),
                         ses.as_mut(),
                     )

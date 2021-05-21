@@ -4,7 +4,7 @@ use fnv::FnvHashMap;
 use alphonse_api as api;
 use api::classifiers::{ClassifierManager, RuleID};
 use api::packet::Packet;
-use api::plugins::parsers::{ParserID, ProtocolParserTrait};
+use api::plugins::parsers::{ParserID, Processor};
 use api::plugins::{Plugin, PluginType};
 use api::session::Session;
 
@@ -40,7 +40,7 @@ mod vnc;
 mod zabbix;
 
 #[derive(Clone, Default)]
-pub struct ProtocolParser {
+pub struct Misc {
     id: ParserID,
     name: String,
     classified: bool,
@@ -57,7 +57,7 @@ pub enum MatchCallBack {
     None,
 }
 
-impl Plugin for ProtocolParser {
+impl Plugin for Misc {
     fn plugin_type(&self) -> PluginType {
         PluginType::PacketProcessor
     }
@@ -67,8 +67,8 @@ impl Plugin for ProtocolParser {
     }
 }
 
-impl ProtocolParserTrait for ProtocolParser {
-    fn box_clone(&self) -> Box<dyn ProtocolParserTrait> {
+impl Processor for Misc {
+    fn box_clone(&self) -> Box<dyn Processor> {
         Box::new(self.clone())
     }
 
@@ -154,6 +154,6 @@ impl ProtocolParserTrait for ProtocolParser {
 }
 
 #[no_mangle]
-pub extern "C" fn al_new_protocol_parser() -> Box<Box<dyn ProtocolParserTrait>> {
-    Box::new(Box::new(ProtocolParser::default()))
+pub extern "C" fn al_new_protocol_parser() -> Box<Box<dyn Processor>> {
+    Box::new(Box::new(Misc::default()))
 }

@@ -67,7 +67,7 @@ fn main() -> Result<()> {
 
     // keep share library 'alive' so that the vtable of trait object pointer is not pointing to an invalid position
     let mut parser_libraries = HashMap::new();
-    let mut protocol_parsers = Vec::new();
+    let mut processors = Vec::new();
 
     for p in &cfg.as_ref().parsers {
         let lib = unsafe { libloading::Library::new(p)? };
@@ -78,9 +78,8 @@ fn main() -> Result<()> {
             match lib.get::<NewProtocolParserFunc>(b"al_new_protocol_parser\0") {
                 Ok(func) => {
                     let mut parser = func();
-                    parser.set_id(protocol_parsers.len() as ParserID);
-                    let parser = api::plugins::parsers::ProtocolParser::new(parser);
-                    protocol_parsers.push(parser);
+                    parser.set_id(processors.len() as ParserID);
+                    processors.push(*parser);
                 }
                 Err(e) => {
                     eprintln!("{:?}", e);
@@ -90,7 +89,7 @@ fn main() -> Result<()> {
     }
 
     let mut classifier_manager = classifiers::ClassifierManager::new();
-    for parser in &mut protocol_parsers {
+    for parser in &mut processors {
         parser.register_classify_rules(&mut classifier_manager)?;
         parser.init(&cfg)?;
     }
@@ -129,7 +128,7 @@ fn main() -> Result<()> {
     for thread in pkt_threads {
         let cfg = cfg.clone();
         let session_table = session_table.clone();
-        let parsers = Box::new(protocol_parsers.iter().map(|p| p.box_clone()).collect());
+        let parsers = Box::new(processors.iter().map(|p| p.box_clone()).collect());
         let builder = std::thread::Builder::new().name(thread.name());
         let handle = builder.spawn(move || thread.spawn(cfg, session_table, parsers))?;
         handles.push(handle);
@@ -165,7 +164,7 @@ fn main() -> Result<()> {
         };
     }
 
-    for parser in &protocol_parsers {
+    for parser in &processors {
         parser.cleanup()?;
     }
 

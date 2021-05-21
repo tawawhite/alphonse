@@ -9,7 +9,7 @@ use alphonse_api as api;
 use api::classifiers;
 use api::classifiers::{matched, RuleID};
 use api::packet::{Direction, Packet, Protocol};
-use api::plugins::parsers::{ParserID, ProtocolParserTrait};
+use api::plugins::parsers::{ParserID, Processor};
 use api::plugins::{Plugin, PluginType};
 use api::session::Session;
 
@@ -48,7 +48,7 @@ struct SideInfo {
 }
 
 #[derive(Clone, Default)]
-struct Processor {
+struct TlsProcessor {
     id: ParserID,
     name: String,
     classified: bool,
@@ -61,7 +61,7 @@ struct Processor {
     hostnames: HashSet<String>,
 }
 
-impl Processor {
+impl TlsProcessor {
     fn new() -> Self {
         let mut p = Self::default();
         p.name = String::from("tls");
@@ -69,7 +69,7 @@ impl Processor {
     }
 }
 
-impl Plugin for Processor {
+impl Plugin for TlsProcessor {
     fn plugin_type(&self) -> PluginType {
         PluginType::PacketProcessor
     }
@@ -79,8 +79,8 @@ impl Plugin for Processor {
     }
 }
 
-impl ProtocolParserTrait for Processor {
-    fn box_clone(&self) -> Box<dyn ProtocolParserTrait> {
+impl Processor for TlsProcessor {
+    fn box_clone(&self) -> Box<dyn Processor> {
         Box::new(self.clone())
     }
 
@@ -136,11 +136,10 @@ impl ProtocolParserTrait for Processor {
                 Side::Server => {}
             };
         }
-        println!("{}", serde_json::to_string_pretty(ses).unwrap());
     }
 }
 
-impl Processor {
+impl TlsProcessor {
     fn handle_server_hello(&mut self, dir: Direction, hello: &TlsServerHelloContents) {
         let dir = dir as u8 as usize;
         self.side_data[dir].side = Side::Server;
@@ -158,13 +157,13 @@ mod test {
     use super::*;
     use api::classifiers::ClassifierManager;
     use api::packet::Protocol;
-    use api::plugins::parsers::ProtocolParserTrait;
+    use api::plugins::parsers::Processor;
     use api::utils::packet::Packet as TestPacket;
 
     #[test]
     fn classify() {
         let mut manager = ClassifierManager::new();
-        let mut parser = Processor::new();
+        let mut parser = TlsProcessor::new();
         parser.register_classify_rules(&mut manager).unwrap();
         manager.prepare().unwrap();
         let mut scratch = manager.alloc_scratch().unwrap();
@@ -212,6 +211,6 @@ mod test {
 }
 
 #[no_mangle]
-pub extern "C" fn al_new_protocol_parser() -> Box<Box<dyn ProtocolParserTrait>> {
-    Box::new(Box::new(Processor::new()))
+pub extern "C" fn al_new_protocol_parser() -> Box<Box<dyn Processor>> {
+    Box::new(Box::new(TlsProcessor::new()))
 }

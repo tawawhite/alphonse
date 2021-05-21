@@ -9,7 +9,7 @@ use fnv::{FnvBuildHasher, FnvHashMap};
 use alphonse_api as api;
 use api::config::Config;
 use api::packet::{Packet, PacketHashKey};
-use api::plugins::parsers::{ParserID, ProtocolParserTrait};
+use api::plugins::parsers::{ParserID, Processor};
 use api::session::Session;
 
 #[cfg(all(target_os = "linux", feature = "dpdk"))]
@@ -29,7 +29,7 @@ pub struct RxUtility {
 
 pub struct SessionData {
     pub info: Box<Session>,
-    pub parsers: Box<FnvHashMap<ParserID, Box<dyn ProtocolParserTrait>>>,
+    pub processors: Box<FnvHashMap<ParserID, Box<dyn Processor>>>,
 }
 
 impl Default for SessionData {
@@ -37,7 +37,7 @@ impl Default for SessionData {
         SessionData {
             // Here we use Session::new(), since default() doesn't generate the struct we need
             info: Box::new(Session::new()),
-            parsers: Box::new(FnvHashMap::default()),
+            processors: Box::new(FnvHashMap::default()),
         }
     }
 }

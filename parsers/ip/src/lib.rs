@@ -11,7 +11,7 @@ use serde_json::json;
 use alphonse_api as api;
 use api::classifiers;
 use api::packet::Protocol;
-use api::plugins::parsers::{ParserID, ProtocolParserTrait};
+use api::plugins::parsers::{ParserID, Processor};
 use api::plugins::{Plugin, PluginType};
 use api::session::Session;
 
@@ -39,7 +39,7 @@ impl Default for IpInfo {
 }
 
 #[derive(Default)]
-struct Processor {
+struct IPProcessor {
     id: ParserID,
     name: String,
     classified: bool,
@@ -48,7 +48,7 @@ struct Processor {
     dst_ip: IpInfo,
 }
 
-impl Clone for Processor {
+impl Clone for IPProcessor {
     fn clone(&self) -> Self {
         Self {
             id: self.id,
@@ -61,7 +61,7 @@ impl Clone for Processor {
     }
 }
 
-impl Plugin for Processor {
+impl Plugin for IPProcessor {
     fn plugin_type(&self) -> PluginType {
         PluginType::PacketProcessor
     }
@@ -95,8 +95,8 @@ impl Plugin for Processor {
     }
 }
 
-impl ProtocolParserTrait for Processor {
-    fn box_clone(&self) -> Box<dyn ProtocolParserTrait> {
+impl Processor for IPProcessor {
+    fn box_clone(&self) -> Box<dyn Processor> {
         Box::new(self.clone())
     }
 
@@ -264,6 +264,6 @@ fn city_to_string(city: &Option<geoip2::City>) -> String {
 }
 
 #[no_mangle]
-pub extern "C" fn al_new_protocol_parser() -> Box<Box<dyn ProtocolParserTrait>> {
-    Box::new(Box::new(Processor::default()))
+pub extern "C" fn al_new_protocol_parser() -> Box<Box<dyn Processor>> {
+    Box::new(Box::new(IPProcessor::default()))
 }

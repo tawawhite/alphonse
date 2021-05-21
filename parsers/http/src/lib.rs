@@ -5,14 +5,14 @@ use alphonse_api as api;
 use api::classifiers;
 use api::classifiers::dpi;
 use api::config::Config;
-use api::plugins::parsers::{ParserID, ProtocolParserTrait};
+use api::plugins::parsers::{ParserID, Processor};
 use api::plugins::{Plugin, PluginType};
 use api::session::Session;
 
 static SETTINGS: OnceCell<llhttp::Settings> = OnceCell::new();
 
 #[derive(Clone)]
-struct ProtocolParser<'a> {
+struct HttpProcessor<'a> {
     id: ParserID,
     name: String,
     classified: bool,
@@ -41,12 +41,12 @@ struct HTTP {
     checksum: String,
 }
 
-unsafe impl Send for ProtocolParser<'_> {}
-unsafe impl Sync for ProtocolParser<'_> {}
+unsafe impl Send for HttpProcessor<'_> {}
+unsafe impl Sync for HttpProcessor<'_> {}
 
-impl<'a> ProtocolParser<'a> {
+impl<'a> HttpProcessor<'a> {
     fn new() -> Self {
-        ProtocolParser {
+        HttpProcessor {
             id: 0,
             name: String::from("http"),
             classified: false,
@@ -55,7 +55,7 @@ impl<'a> ProtocolParser<'a> {
     }
 }
 
-impl<'a> Plugin for ProtocolParser<'a> {
+impl<'a> Plugin for HttpProcessor<'a> {
     fn plugin_type(&self) -> PluginType {
         PluginType::PacketProcessor
     }
@@ -76,8 +76,8 @@ impl<'a> Plugin for ProtocolParser<'a> {
     }
 }
 
-impl<'a> ProtocolParserTrait for ProtocolParser<'static> {
-    fn box_clone(&self) -> Box<dyn ProtocolParserTrait> {
+impl<'a> Processor for HttpProcessor<'static> {
+    fn box_clone(&self) -> Box<dyn Processor> {
         Box::new(self.clone())
     }
 
@@ -230,6 +230,6 @@ impl<'a> ProtocolParserTrait for ProtocolParser<'static> {
 }
 
 #[no_mangle]
-pub extern "C" fn al_new_protocol_parser() -> Box<Box<dyn ProtocolParserTrait>> {
-    Box::new(Box::new(ProtocolParser::new()))
+pub extern "C" fn al_new_protocol_parser() -> Box<Box<dyn Processor>> {
+    Box::new(Box::new(HttpProcessor::new()))
 }

@@ -5,12 +5,9 @@ use api::classifiers::{dpi, ClassifierManager};
 use api::packet::Packet;
 use api::session::Session;
 
-use super::{add_dpi_rule_with_func, add_dpi_tcp_rule_with_func, MatchCallBack, ProtocolParser};
+use super::{add_dpi_rule_with_func, add_dpi_tcp_rule_with_func, MatchCallBack, Misc};
 
-pub fn register_classify_rules(
-    parser: &mut ProtocolParser,
-    manager: &mut ClassifierManager,
-) -> Result<()> {
+pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManager) -> Result<()> {
     add_dpi_tcp_rule_with_func!(
         r"^[a-zA-z0-9:]{5}..\x00\x00....\x78\x9c",
         classify_windows,
@@ -55,16 +52,16 @@ fn classify_mac(ses: &mut Session, pkt: &dyn Packet) {
 mod test {
     use super::*;
     use api::packet::Protocol;
-    use api::plugins::parsers::ProtocolParserTrait;
+    use api::plugins::parsers::Processor;
     use api::session::Session;
     use api::utils::packet::Packet as TestPacket;
 
-    use crate::ProtocolParser;
+    use crate::Misc;
 
     #[test]
     fn gh0st() {
         let mut manager = ClassifierManager::new();
-        let mut parser = ProtocolParser::default();
+        let mut parser = Misc::default();
         parser.register_classify_rules(&mut manager).unwrap();
         manager.prepare().unwrap();
         let mut scratch = manager.alloc_scratch().unwrap();
