@@ -77,10 +77,14 @@ impl Plugin for TlsProcessor {
     fn name(&self) -> &str {
         &self.name.as_str()
     }
+
+    fn clone_plugin(&self) -> Box<dyn Plugin> {
+        Box::new(self.clone())
+    }
 }
 
 impl Processor for TlsProcessor {
-    fn box_clone(&self) -> Box<dyn Processor> {
+    fn clone_processor(&self) -> Box<dyn Processor> {
         Box::new(self.clone())
     }
 

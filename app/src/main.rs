@@ -128,7 +128,7 @@ fn main() -> Result<()> {
     for thread in pkt_threads {
         let cfg = cfg.clone();
         let session_table = session_table.clone();
-        let parsers = Box::new(processors.iter().map(|p| p.box_clone()).collect());
+        let parsers = Box::new(processors.iter().map(|p| p.clone_processor()).collect());
         let builder = std::thread::Builder::new().name(thread.name());
         let handle = builder.spawn(move || thread.spawn(cfg, session_table, parsers))?;
         handles.push(handle);

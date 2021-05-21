@@ -18,6 +18,8 @@ pub enum PluginType {
 
 /// General Plugin trait
 pub trait Plugin {
+    fn clone_plugin(&self) -> Box<dyn Plugin>;
+
     /// Plugin name
     fn name(&self) -> &str;
 

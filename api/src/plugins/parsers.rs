@@ -14,7 +14,7 @@ pub type NewProcessorBoxesFunc = extern "C" fn() -> Box<Vec<Box<dyn Processor>>>
 
 pub trait Processor: Send + Sync + Plugin {
     /// Clone a Protocol Processor
-    fn box_clone(&self) -> Box<dyn Processor>;
+    fn clone_processor(&self) -> Box<dyn Processor>;
 
     /// Get processor id
     fn id(&self) -> ProcessorID;

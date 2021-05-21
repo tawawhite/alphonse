@@ -55,13 +55,17 @@ impl<'a> HttpProcessor<'a> {
     }
 }
 
-impl<'a> Plugin for HttpProcessor<'a> {
+impl<'a> Plugin for HttpProcessor<'static> {
     fn plugin_type(&self) -> PluginType {
         PluginType::PacketProcessor
     }
 
     fn name(&self) -> &str {
         &self.name.as_str()
+    }
+
+    fn clone_plugin(&self) -> Box<dyn Plugin> {
+        Box::new(self.clone())
     }
 
     fn init(&self, _: &Config) -> Result<()> {
@@ -77,7 +81,7 @@ impl<'a> Plugin for HttpProcessor<'a> {
 }
 
 impl<'a> Processor for HttpProcessor<'static> {
-    fn box_clone(&self) -> Box<dyn Processor> {
+    fn clone_processor(&self) -> Box<dyn Processor> {
         Box::new(self.clone())
     }
 

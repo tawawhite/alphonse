@@ -54,7 +54,7 @@ impl PktThread {
                 match ses_data.processors.get_mut(id) {
                     Some(_) => {}
                     None => {
-                        let processor = processors.get_mut(*id as usize).unwrap().box_clone();
+                        let processor = processors[*id as usize].clone_processor();
                         ses_data.processors.insert(processor.id(), processor);
                     }
                 };
