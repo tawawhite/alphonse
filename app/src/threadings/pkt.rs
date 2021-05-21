@@ -100,7 +100,10 @@ impl PktThread {
 
         while !self.exit.load(Ordering::Relaxed) {
             let mut pkt = match self.receiver.recv() {
-                Err(_) => break,
+                Err(_) => {
+                    self.exit.store(true, Ordering::SeqCst);
+                    break;
+                }
                 Ok(s) => s,
             };
 
