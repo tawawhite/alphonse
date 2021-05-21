@@ -50,13 +50,13 @@ impl super::Classifier for Classifier {
         };
         let index = base_index + port_rule.port as usize;
         self.rules[index].id = rule.id;
-        self.rules[index].parsers.push(rule.parsers[0]);
+        self.rules[index].processors.push(rule.processors[0]);
 
         Ok(super::Rule {
             id: self.rules[index].id(),
             priority: self.rules[index].priority,
             rule_type: rule.rule_type.clone(),
-            parsers: self.rules[index].parsers.clone(),
+            processors: self.rules[index].processors.clone(),
         })
     }
 }
@@ -72,12 +72,12 @@ impl Classifier {
         };
 
         let src_index = unsafe { base_index + pkt.src_port() as usize };
-        if self.rules[src_index].parsers.len() > 0 {
+        if self.rules[src_index].processors.len() > 0 {
             pkt.rules_mut().push(self.rules[src_index].clone());
         }
 
         let dst_index = unsafe { base_index + pkt.dst_port() as usize };
-        if self.rules[dst_index].parsers.len() > 0 {
+        if self.rules[dst_index].processors.len() > 0 {
             pkt.rules_mut().push(self.rules[dst_index].clone());
         }
     }
@@ -102,8 +102,8 @@ mod test {
         assert!(matches!(classifier.add_rule(&mut rule), Ok(_)));
 
         let rule = &classifier.rules[(port_rule.port) as usize];
-        assert_eq!(rule.parsers.len(), 1);
-        assert_eq!(rule.parsers[0], 1);
+        assert_eq!(rule.processors.len(), 1);
+        assert_eq!(rule.processors[0], 1);
 
         let port_rule = Rule {
             port: 80,
@@ -114,8 +114,8 @@ mod test {
         assert!(matches!(classifier.add_rule(&mut rule), Ok(rule) if rule.id == 0));
 
         let rule = &classifier.rules[(port_rule.port) as usize];
-        assert_eq!(rule.parsers.len(), 2);
-        assert_eq!(rule.parsers[1], 12);
+        assert_eq!(rule.processors.len(), 2);
+        assert_eq!(rule.processors[1], 12);
     }
 
     #[test]
@@ -186,8 +186,8 @@ mod test {
         classifier.classify(pkt.as_mut());
         assert_eq!(pkt.rules().len(), 1);
         assert_eq!(pkt.rules()[0].rule_type, matched::RuleType::Port);
-        assert_eq!(pkt.rules()[0].parsers[0], 1);
-        assert_eq!(pkt.rules()[0].parsers.len(), 1);
+        assert_eq!(pkt.rules()[0].processors[0], 1);
+        assert_eq!(pkt.rules()[0].processors.len(), 1);
 
         let port_rule = Rule {
             port: 53,
@@ -216,8 +216,8 @@ mod test {
         classifier.classify(pkt.as_mut());
         assert_eq!(pkt.rules().len(), 1);
         assert_eq!(pkt.rules()[0].rule_type, matched::RuleType::Port);
-        assert_eq!(pkt.rules()[0].parsers[0], 2);
-        assert_eq!(pkt.rules()[0].parsers.len(), 1);
+        assert_eq!(pkt.rules()[0].processors[0], 2);
+        assert_eq!(pkt.rules()[0].processors.len(), 1);
 
         let port_rule = Rule {
             port: 32836,
@@ -273,7 +273,7 @@ mod test {
         classifier.classify(pkt.as_mut());
         assert_eq!(pkt.rules().len(), 1);
         assert_eq!(pkt.rules()[0].rule_type, matched::RuleType::Port);
-        assert_eq!(pkt.rules()[0].parsers[0], 3);
-        assert_eq!(pkt.rules()[0].parsers.len(), 1);
+        assert_eq!(pkt.rules()[0].processors[0], 3);
+        assert_eq!(pkt.rules()[0].processors.len(), 1);
     }
 }

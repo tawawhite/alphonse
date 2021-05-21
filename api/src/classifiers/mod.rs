@@ -2,7 +2,7 @@ use anyhow::Result;
 use tinyvec::TinyVec;
 
 use crate::packet;
-use crate::plugins::parsers::ParserID;
+use crate::plugins::parsers::ProcessorID;
 
 pub mod all;
 pub mod dpi;
@@ -11,7 +11,7 @@ pub mod port;
 pub mod protocol;
 
 pub type RuleID = u32;
-pub type Parsers = TinyVec<[ParserID; 4]>;
+pub type Processors = TinyVec<[ProcessorID; 4]>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RuleType {
@@ -36,8 +36,8 @@ pub struct Rule {
     pub priority: u8,
     /// Rule type, see details in RuleType
     pub rule_type: RuleType,
-    /// Matched protocol parsers
-    parsers: Parsers,
+    /// Matched packet processors
+    processors: Processors,
 }
 
 impl Rule {
@@ -47,14 +47,14 @@ impl Rule {
     }
 
     /// Create a new classify rule
-    pub fn new(parser_id: ParserID) -> Self {
-        let mut parsers = Parsers::default();
-        parsers.push(parser_id);
+    pub fn new(id: ProcessorID) -> Self {
+        let mut processors = Processors::default();
+        processors.push(id);
         Rule {
             id: 0,
             priority: 0,
             rule_type: RuleType::All,
-            parsers,
+            processors,
         }
     }
 }
@@ -71,7 +71,7 @@ impl PartialEq for Rule {
 }
 
 pub mod matched {
-    use super::{Parsers, RuleID};
+    use super::{Processors, RuleID};
     #[repr(u8)]
     #[derive(Debug, Clone, Copy, PartialEq, Primitive)]
     pub enum RuleType {
@@ -114,16 +114,16 @@ pub mod matched {
     ///
     /// For example, we want to process a http stream, we only need to know that one of
     /// the tcp packets of this session matched the HTTP Request rule. But we do not need to know
-    /// which method it matches, just leave it to the http parser.
+    /// which method it matches, just leave it to the http packet processor.
     ///
     /// So for performance reason(reduce bytes to copy and heap allocation),
-    /// we use a simplified `RuleType` & `Rule`. This is enough for parsers to work.
+    /// we use a simplified `RuleType` & `Rule`. This is enough for processors to work.
     ///
     pub struct Rule {
         pub id: RuleID,
         pub priority: u8,
         pub rule_type: RuleType,
-        pub parsers: Parsers,
+        pub processors: Processors,
         pub from_to: Option<(u16, u16)>,
     }
 
@@ -133,7 +133,7 @@ pub mod matched {
                 id: rule.id,
                 priority: rule.priority,
                 rule_type: RuleType::from(&rule.rule_type),
-                parsers: rule.parsers.clone(),
+                processors: rule.processors.clone(),
                 from_to: None,
             }
         }
@@ -192,7 +192,7 @@ impl ClassifierManager {
                 id: 0,
                 priority: 255,
                 rule_type: RuleType::All,
-                parsers: Parsers::default(),
+                processors: Processors::default(),
             }], // first rule is always the receive all pkt rule
             all_pkt_classifier: all::Classifier::default(),
             port_classifier: port::Classifier::default(),
@@ -224,7 +224,7 @@ impl ClassifierManager {
     /// Add a port rule
     pub fn add_port_rule(
         &mut self,
-        id: ParserID,
+        id: ProcessorID,
         port: u16,
         protocol: packet::Protocol,
     ) -> Result<RuleID> {
@@ -236,21 +236,21 @@ impl ClassifierManager {
         Ok(self.add_rule(&mut rule)?)
     }
 
-    pub fn add_tcp_port_rule(&mut self, id: ParserID, port: u16) -> Result<RuleID> {
+    pub fn add_tcp_port_rule(&mut self, id: ProcessorID, port: u16) -> Result<RuleID> {
         self.add_port_rule(id, port, packet::Protocol::TCP)
     }
 
-    pub fn add_udp_port_rule(&mut self, id: ParserID, port: u16) -> Result<RuleID> {
+    pub fn add_udp_port_rule(&mut self, id: ProcessorID, port: u16) -> Result<RuleID> {
         self.add_port_rule(id, port, packet::Protocol::UDP)
     }
 
-    pub fn add_sctp_port_rule(&mut self, id: ParserID, port: u16) -> Result<RuleID> {
+    pub fn add_sctp_port_rule(&mut self, id: ProcessorID, port: u16) -> Result<RuleID> {
         self.add_port_rule(id, port, packet::Protocol::SCTP)
     }
 
     pub fn add_dpi_rule(
         &mut self,
-        id: ParserID,
+        id: ProcessorID,
         pattern: &hyperscan::Pattern,
         protocol: dpi::Protocol,
     ) -> Result<RuleID> {
@@ -263,7 +263,7 @@ impl ClassifierManager {
 
     pub fn add_simple_dpi_rule<S: AsRef<str>>(
         &mut self,
-        id: ParserID,
+        id: ProcessorID,
         pattern: S,
         protocol: dpi::Protocol,
     ) -> Result<RuleID> {
@@ -281,17 +281,25 @@ impl ClassifierManager {
         Ok(self.add_rule(&mut rule)?)
     }
 
-    pub fn add_tcp_dpi_rule<S: AsRef<str>>(&mut self, id: ParserID, pattern: S) -> Result<RuleID> {
+    pub fn add_tcp_dpi_rule<S: AsRef<str>>(
+        &mut self,
+        id: ProcessorID,
+        pattern: S,
+    ) -> Result<RuleID> {
         self.add_simple_dpi_rule(id, pattern, dpi::Protocol::TCP)
     }
 
-    pub fn add_udp_dpi_rule<S: AsRef<str>>(&mut self, id: ParserID, pattern: S) -> Result<RuleID> {
+    pub fn add_udp_dpi_rule<S: AsRef<str>>(
+        &mut self,
+        id: ProcessorID,
+        pattern: S,
+    ) -> Result<RuleID> {
         self.add_simple_dpi_rule(id, pattern, dpi::Protocol::UDP)
     }
 
     pub fn add_tcp_udp_dpi_rule<S: AsRef<str>>(
         &mut self,
-        id: ParserID,
+        id: ProcessorID,
         pattern: S,
     ) -> Result<RuleID> {
         self.add_simple_dpi_rule(id, pattern, dpi::Protocol::TCP | dpi::Protocol::UDP)
@@ -299,7 +307,7 @@ impl ClassifierManager {
 
     pub fn add_protocol_rule(
         &mut self,
-        id: ParserID,
+        id: ProcessorID,
         protocol: packet::Protocol,
     ) -> Result<RuleID> {
         let protocol_rule = protocol::Rule(protocol);
@@ -308,7 +316,7 @@ impl ClassifierManager {
         Ok(self.add_rule(&mut rule)?)
     }
 
-    pub fn add_etype_rule(&mut self, id: ParserID, ethertype: u16) -> Result<RuleID> {
+    pub fn add_etype_rule(&mut self, id: ProcessorID, ethertype: u16) -> Result<RuleID> {
         let etype_rule = ethertype::Rule { ethertype };
         let mut rule = Rule::new(id);
         rule.rule_type = RuleType::EtherType(etype_rule);
@@ -344,7 +352,6 @@ impl ClassifierManager {
         };
 
         self.rules[rule.id() as usize] = rule.clone();
-        // self.rules[rule.id() as usize].parsers = rule.parsers.clone();
 
         Ok(rule.id())
     }
@@ -404,8 +411,8 @@ mod tests {
         assert_eq!(classifier.rules.len(), 1);
         assert_eq!(classifier.rules[0].id(), 0);
         assert_eq!(classifier.rules[0].priority, 0);
-        assert_eq!(classifier.rules[0].parsers.len(), 1);
-        assert_eq!(classifier.rules[0].parsers[0], 1);
+        assert_eq!(classifier.rules[0].processors.len(), 1);
+        assert_eq!(classifier.rules[0].processors[0], 1);
         assert!(matches!(classifier.rules[0].rule_type, RuleType::All));
 
         // add a rule that has different id and priority
@@ -414,9 +421,9 @@ mod tests {
         assert_eq!(classifier.rules.len(), 1);
         assert_eq!(classifier.rules[0].id(), 0);
         assert_eq!(classifier.rules[0].priority, 0);
-        assert_eq!(classifier.rules[0].parsers.len(), 2);
-        assert_eq!(classifier.rules[0].parsers[0], 1);
-        assert_eq!(classifier.rules[0].parsers[1], 2);
+        assert_eq!(classifier.rules[0].processors.len(), 2);
+        assert_eq!(classifier.rules[0].processors[0], 1);
+        assert_eq!(classifier.rules[0].processors[1], 2);
     }
 
     #[test]
@@ -432,8 +439,8 @@ mod tests {
         assert_eq!(classifier.rules.len(), 2);
         assert_eq!(classifier.rules[1].id(), 1);
         assert_eq!(classifier.rules[1].priority, 0);
-        assert_eq!(classifier.rules[1].parsers.len(), 1);
-        assert_eq!(classifier.rules[1].parsers[0], 1);
+        assert_eq!(classifier.rules[1].processors.len(), 1);
+        assert_eq!(classifier.rules[1].processors[0], 1);
         assert!(matches!(classifier.rules[1].rule_type, RuleType::Port(r) if r.port == 80));
         match classifier.rules[1].rule_type {
             RuleType::Port(r) => {

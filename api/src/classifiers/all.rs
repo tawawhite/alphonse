@@ -21,15 +21,15 @@ impl Into<Rule> for matched::Rule {
             id: self.id,
             priority: self.priority,
             rule_type: super::RuleType::All,
-            parsers: self.parsers.clone(),
+            processors: self.processors.clone(),
         }
     }
 }
 
 impl super::Classifier for Classifier {
     fn add_rule(&mut self, rule: &Rule) -> Result<Rule> {
-        let parser_id = match rule.rule_type {
-            RuleType::All => rule.parsers[0],
+        let processor_id = match rule.rule_type {
+            RuleType::All => rule.processors[0],
             _ => {
                 return Err(anyhow!(
                     "Mismatched rule type, expecting Port Rule, get {:?}",
@@ -38,15 +38,15 @@ impl super::Classifier for Classifier {
             }
         };
 
-        // Prevent add same parser again, unlikely happen
-        if self.rule.parsers.len() > 0 {
-            match self.rule.parsers.iter().find(|id| **id == parser_id) {
+        // Prevent add same processor again, unlikely happen
+        if self.rule.processors.len() > 0 {
+            match self.rule.processors.iter().find(|id| **id == processor_id) {
                 Some(_) => return Ok(self.rule.clone().into()),
                 None => {}
             };
         }
 
-        self.rule.parsers.push(parser_id);
+        self.rule.processors.push(processor_id);
         Ok(self.rule.clone().into())
     }
 }
@@ -54,7 +54,7 @@ impl super::Classifier for Classifier {
 impl Classifier {
     #[inline]
     pub fn classify(&self, pkt: &mut dyn packet::Packet) {
-        if self.rule.parsers.len() > 0 {
+        if self.rule.processors.len() > 0 {
             pkt.rules_mut().push(self.rule.clone())
         }
     }
@@ -69,7 +69,7 @@ mod test {
     use crate::utils;
 
     #[test]
-    fn add_rule_with_same_parser_id() {
+    fn add_rule_with_same_processor_id() {
         let mut classifier = Classifier::default();
         let rule = super::super::Rule::new(1);
 
@@ -77,7 +77,7 @@ mod test {
 
         let rule = super::super::Rule::new(1);
         assert!(matches!(classifier.add_rule(&rule), Ok(_)));
-        assert_eq!(classifier.rule.parsers.len(), 1);
+        assert_eq!(classifier.rule.processors.len(), 1);
     }
 
     #[test]
@@ -91,14 +91,14 @@ mod test {
     }
 
     #[test]
-    fn rule_exceed_max_parser_num() {
+    fn rule_exceed_max_processor_num() {
         let mut classifier = Box::new(Classifier::default());
         for i in 0..8 {
-            let mut rule = super::super::Rule::new(i as super::super::ParserID);
+            let mut rule = super::super::Rule::new(i as super::super::ProcessorID);
             rule.id = i as RuleID;
             assert!(matches!(classifier.add_rule(&rule), Ok(_)));
         }
-        assert_eq!(classifier.rule.parsers.len(), 8);
+        assert_eq!(classifier.rule.processors.len(), 8);
     }
 
     #[test]
@@ -114,7 +114,7 @@ mod test {
     }
 
     #[test]
-    fn classify_without_any_parser() {
+    fn classify_without_any_processors() {
         let classifier = Classifier::default();
         let mut pkt: Box<dyn PacketTrait> = Box::new(utils::packet::Packet::default());
         classifier.classify(pkt.as_mut());

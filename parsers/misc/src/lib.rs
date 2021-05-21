@@ -4,7 +4,7 @@ use fnv::FnvHashMap;
 use alphonse_api as api;
 use api::classifiers::{ClassifierManager, RuleID};
 use api::packet::Packet;
-use api::plugins::parsers::{ParserID, Processor};
+use api::plugins::parsers::{Processor, ProcessorID};
 use api::plugins::{Plugin, PluginType};
 use api::session::Session;
 
@@ -41,7 +41,7 @@ mod zabbix;
 
 #[derive(Clone, Default)]
 pub struct Misc {
-    id: ParserID,
+    id: ProcessorID,
     name: String,
     classified: bool,
     match_cbs: FnvHashMap<RuleID, MatchCallBack>,
@@ -73,12 +73,12 @@ impl Processor for Misc {
     }
 
     /// Get parser id
-    fn id(&self) -> ParserID {
+    fn id(&self) -> ProcessorID {
         self.id
     }
 
     /// Get parser id
-    fn set_id(&mut self, id: ParserID) {
+    fn set_id(&mut self, id: ProcessorID) {
         self.id = id
     }
 

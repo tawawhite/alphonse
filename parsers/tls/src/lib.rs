@@ -9,7 +9,7 @@ use alphonse_api as api;
 use api::classifiers;
 use api::classifiers::{matched, RuleID};
 use api::packet::{Direction, Packet, Protocol};
-use api::plugins::parsers::{ParserID, Processor};
+use api::plugins::parsers::{Processor, ProcessorID};
 use api::plugins::{Plugin, PluginType};
 use api::session::Session;
 
@@ -49,7 +49,7 @@ struct SideInfo {
 
 #[derive(Clone, Default)]
 struct TlsProcessor {
-    id: ParserID,
+    id: ProcessorID,
     name: String,
     classified: bool,
 
@@ -85,12 +85,12 @@ impl Processor for TlsProcessor {
     }
 
     /// Get parser id
-    fn id(&self) -> ParserID {
+    fn id(&self) -> ProcessorID {
         self.id
     }
 
     /// Get parser id
-    fn set_id(&mut self, id: ParserID) {
+    fn set_id(&mut self, id: ProcessorID) {
         self.id = id
     }
 

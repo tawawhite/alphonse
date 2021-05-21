@@ -5,7 +5,7 @@ use alphonse_api as api;
 use api::classifiers;
 use api::classifiers::dpi;
 use api::config::Config;
-use api::plugins::parsers::{ParserID, Processor};
+use api::plugins::parsers::{Processor, ProcessorID};
 use api::plugins::{Plugin, PluginType};
 use api::session::Session;
 
@@ -13,7 +13,7 @@ static SETTINGS: OnceCell<llhttp::Settings> = OnceCell::new();
 
 #[derive(Clone)]
 struct HttpProcessor<'a> {
-    id: ParserID,
+    id: ProcessorID,
     name: String,
     classified: bool,
     parsers: [llhttp::Parser<'a>; 2],
@@ -82,12 +82,12 @@ impl<'a> Processor for HttpProcessor<'static> {
     }
 
     /// Get parser id
-    fn id(&self) -> ParserID {
+    fn id(&self) -> ProcessorID {
         self.id
     }
 
     /// Get parser id
-    fn set_id(&mut self, id: ParserID) {
+    fn set_id(&mut self, id: ProcessorID) {
         self.id = id
     }
 

@@ -14,7 +14,7 @@ use yaml_rust::YamlEmitter;
 use alphonse_api as api;
 use api::classifiers::{matched::Rule, ClassifierManager};
 use api::packet::{Packet, PacketHashKey};
-use api::plugins::parsers::{ParserID, Processor};
+use api::plugins::parsers::{Processor, ProcessorID};
 use api::plugins::{Plugin, PluginType};
 use api::session::Session;
 use api::utils::yaml::Yaml;
@@ -113,7 +113,7 @@ pub struct PacketInfo {
 #[derive(Default)]
 struct SimpleWriterProcessor {
     /// Processor ID
-    id: ParserID,
+    id: ProcessorID,
     /// Whether current packet is registered with this processer
     classified: bool,
     /// Actual packet disk position
@@ -251,11 +251,11 @@ impl Processor for SimpleWriterProcessor {
         Box::new(self.clone())
     }
 
-    fn id(&self) -> ParserID {
+    fn id(&self) -> ProcessorID {
         self.id
     }
 
-    fn set_id(&mut self, id: ParserID) {
+    fn set_id(&mut self, id: ProcessorID) {
         self.id = id
     }
 

@@ -50,32 +50,32 @@ impl PktThread {
         self.classifier.classify(pkt, scratch)?;
 
         for rule in pkt.rules().iter() {
-            for parser_id in rule.parsers.iter() {
-                match ses_data.processors.get_mut(parser_id) {
+            for id in rule.processors.iter() {
+                match ses_data.processors.get_mut(id) {
                     Some(_) => {}
                     None => {
-                        let parser = processors.get_mut(*parser_id as usize).unwrap().box_clone();
-                        ses_data.processors.insert(parser.id(), parser);
+                        let processor = processors.get_mut(*id as usize).unwrap().box_clone();
+                        ses_data.processors.insert(processor.id(), processor);
                     }
                 };
             }
         }
 
-        for (_, parser) in ses_data.processors.iter_mut() {
+        for (_, processor) in ses_data.processors.iter_mut() {
             let mut matched = false;
             for rule in pkt.rules().iter() {
-                // If parser has bind a rule this packet matches, parse with this rule
+                // If processor has bind a rule this packet matches, parse with this rule
                 // otherwise this pkt just belongs to the same session, parse without rule information
-                for parser_id in rule.parsers.iter() {
-                    if *parser_id == parser.id() {
-                        parser.parse_pkt(pkt, Some(rule), ses_data.info.as_mut())?;
+                for id in rule.processors.iter() {
+                    if *id == processor.id() {
+                        processor.parse_pkt(pkt, Some(rule), ses_data.info.as_mut())?;
                         matched = true;
                     }
                 }
             }
 
             if !matched {
-                parser.parse_pkt(pkt, None, ses_data.info.as_mut())?;
+                processor.parse_pkt(pkt, None, ses_data.info.as_mut())?;
             }
         }
 

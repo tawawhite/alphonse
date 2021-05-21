@@ -13,7 +13,7 @@ use alphonse_api as api;
 use api::classifiers;
 use api::config::Config;
 use api::packet::Packet;
-use api::plugins::parsers::{NewProtocolParserFunc, ParserID};
+use api::plugins::parsers::{NewProcessorFunc, ProcessorID};
 
 mod commands;
 mod config;
@@ -75,10 +75,10 @@ fn main() -> Result<()> {
         let lib = parser_libraries.get(p).unwrap();
 
         unsafe {
-            match lib.get::<NewProtocolParserFunc>(b"al_new_protocol_parser\0") {
+            match lib.get::<NewProcessorFunc>(b"al_new_protocol_parser\0") {
                 Ok(func) => {
                     let mut parser = func();
-                    parser.set_id(processors.len() as ParserID);
+                    parser.set_id(processors.len() as ProcessorID);
                     processors.push(*parser);
                 }
                 Err(e) => {
