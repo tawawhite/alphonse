@@ -2,7 +2,7 @@
 extern crate clap;
 
 use std::collections::HashMap;
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread::JoinHandle;
 
@@ -158,7 +158,10 @@ fn main() -> Result<()> {
     for handle in handles {
         match handle.join() {
             Ok(_) => {}
-            Err(e) => println!("{:?}", e),
+            Err(e) => {
+                cfg.exit.store(true, Ordering::SeqCst);
+                println!("{:?}", e)
+            }
         };
     }
 
