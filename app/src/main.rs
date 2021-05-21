@@ -18,7 +18,6 @@ use api::plugins::parsers::{NewProtocolParserFunc, ParserID};
 mod commands;
 mod config;
 mod packet;
-mod plugins;
 mod rx;
 mod stats;
 mod threadings;
