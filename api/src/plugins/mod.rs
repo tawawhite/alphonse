@@ -3,7 +3,6 @@ use anyhow::Result;
 use crate::config::Config;
 
 pub mod parsers;
-pub mod rx;
 
 #[repr(C)]
 pub enum PluginType {
