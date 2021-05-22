@@ -65,10 +65,6 @@ impl Plugin for Misc {
     fn name(&self) -> &str {
         &self.name.as_str()
     }
-
-    fn clone_plugin(&self) -> Box<dyn Plugin> {
-        Box::new(self.clone())
-    }
 }
 
 impl Processor for Misc {

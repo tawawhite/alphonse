@@ -71,10 +71,6 @@ impl Plugin for IPProcessor {
         &self.name.as_str()
     }
 
-    fn clone_plugin(&self) -> Box<dyn Plugin> {
-        Box::new(self.clone())
-    }
-
     fn init(&self, alcfg: &api::config::Config) -> Result<()> {
         let db_dir = PathBuf::from(alcfg.get_str(&"ip.db.directory", "etc"));
         let db_path = db_dir.join("GeoLite2-ASN.mmdb");

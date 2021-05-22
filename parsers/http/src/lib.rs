@@ -64,10 +64,6 @@ impl<'a> Plugin for HttpProcessor<'static> {
         &self.name.as_str()
     }
 
-    fn clone_plugin(&self) -> Box<dyn Plugin> {
-        Box::new(self.clone())
-    }
-
     fn init(&self, _: &Config) -> Result<()> {
         // initialize global llhttp settings
         let mut settings = llhttp::Settings::default();

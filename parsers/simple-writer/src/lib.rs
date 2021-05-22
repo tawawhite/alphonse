@@ -137,10 +137,6 @@ impl Clone for SimpleWriterProcessor {
 }
 
 impl Plugin for SimpleWriterProcessor {
-    fn clone_plugin(&self) -> Box<dyn Plugin> {
-        Box::new(self.clone())
-    }
-
     fn plugin_type(&self) -> PluginType {
         PluginType::PacketProcessor
     }

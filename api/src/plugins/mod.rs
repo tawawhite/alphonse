@@ -3,6 +3,7 @@ use anyhow::Result;
 use crate::config::Config;
 
 pub mod parsers;
+pub mod rx;
 
 #[repr(C)]
 pub enum PluginType {
@@ -18,8 +19,6 @@ pub enum PluginType {
 
 /// General Plugin trait
 pub trait Plugin {
-    fn clone_plugin(&self) -> Box<dyn Plugin>;
-
     /// Plugin name
     fn name(&self) -> &str;
 
