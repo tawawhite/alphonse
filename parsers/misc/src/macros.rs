@@ -135,3 +135,14 @@ macro_rules! add_none_dpi_udp_rule {
         add_none_dpi_rule!($hs_pattern, dpi::Protocol::UDP, $parser, $manager)
     };
 }
+
+#[macro_export]
+macro_rules! add_port_rule_with_func {
+    ($port:literal, $func:ident, $trans_protocol: expr, $parser: expr, $manager: expr) => {
+        // let rule_id = $manager.add_simple_dpi_rule($parser.id, $hs_pattern, $trans_protocol)?;
+        let rule_id = $manager.add_port_rule($parser.id, $port, $trans_protocol)?;
+        $parser
+            .match_cbs
+            .insert(rule_id, MatchCallBack::Func($func));
+    };
+}
