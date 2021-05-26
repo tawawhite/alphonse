@@ -78,7 +78,7 @@ fn parse_config_file(config_file: &str, config: &mut Config) -> Result<()> {
         }
     };
 
-    config.parsers = get_str_arr(doc, "parsers");
+    config.processors = get_str_arr(doc, "processors");
     config.interfaces = get_str_arr(doc, "interfaces");
 
     config.rx_stat_log_interval =

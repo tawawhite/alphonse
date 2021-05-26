@@ -230,6 +230,11 @@ impl<'a> Processor for HttpProcessor<'static> {
 }
 
 #[no_mangle]
-pub extern "C" fn al_new_protocol_parser() -> Box<Box<dyn Processor>> {
+pub extern "C" fn al_new_pkt_processor() -> Box<Box<dyn Processor>> {
     Box::new(Box::new(HttpProcessor::new()))
+}
+
+#[no_mangle]
+pub extern "C" fn al_plugin_type() -> PluginType {
+    PluginType::PacketProcessor
 }

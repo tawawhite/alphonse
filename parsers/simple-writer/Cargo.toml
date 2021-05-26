@@ -13,7 +13,7 @@ anyhow = "1.0"
 alphonse-api = { path = "../../api", optional = false }
 chrono = "0.4"
 crossbeam-channel = "0.5"
-elasticsearch = { version = "7.12.0-alpha.1", optional = true }
+elasticsearch = { version = "7.12.0-alpha.1", features=["rustls-tls"], optional = true }
 tokio = { version = "1", optional = true, features = ["net", "time"] }
 fnv = "1.0"
 nix = "0.20"
