@@ -1,7 +1,7 @@
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use std::thread::JoinHandle;
 
 use anyhow::{anyhow, Result};
@@ -13,31 +13,82 @@ use api::classifiers::matched::Rule;
 use api::config::Config;
 use api::packet::Packet as PacketTrait;
 use api::packet::{Layers, Rules, Tunnel};
+use api::plugins::rx::{RxDriver, RxStat};
+use api::plugins::{Plugin, PluginType};
 
-use crate::rx::RxUtility;
-use crate::stats::CaptureStat;
+#[derive(Clone, Default)]
+struct Driver {
+    handles: Arc<RwLock<Vec<JoinHandle<Result<()>>>>>,
+    stats: RxStat,
+}
 
-pub const UTILITY: RxUtility = RxUtility {
-    init: |_| Ok(()),
-    start,
-    cleanup: |_| Ok(()),
-};
+impl Plugin for Driver {
+    fn plugin_type(&self) -> PluginType {
+        PluginType::RxDriver
+    }
 
-fn start(
-    exit: Arc<AtomicBool>,
-    cfg: Arc<Config>,
-    sender: Sender<Box<dyn PacketTrait>>,
-) -> Result<Vec<JoinHandle<Result<()>>>> {
-    let mut handles = vec![];
-    let mut thread = RxThread {
-        exit: exit.clone(),
-        files: get_pcap_files(cfg.as_ref()),
-        sender: sender.clone(),
-    };
-    let builder = std::thread::Builder::new().name(thread.name());
-    let handle = builder.spawn(move || thread.spawn(cfg))?;
-    handles.push(handle);
-    Ok(handles)
+    fn name(&self) -> &str {
+        "rx-files"
+    }
+
+    fn cleanup(&self) -> Result<()> {
+        let mut handles = match self.handles.write() {
+            Ok(h) => h,
+            Err(e) => return Err(anyhow!("{}", e)),
+        };
+
+        while handles.len() > 0 {
+            let hdl = handles.pop();
+            match hdl {
+                None => continue,
+                Some(hdl) => match hdl.join() {
+                    Ok(_) => {}
+                    Err(e) => eprintln!("{:?}", e),
+                },
+            }
+        }
+
+        Ok(())
+    }
+}
+
+impl RxDriver for Driver {
+    fn start(&self, cfg: Arc<Config>, sender: Sender<Box<dyn PacketTrait>>) -> Result<()> {
+        let mut handles = vec![];
+        let mut thread = RxThread {
+            exit: cfg.exit.clone(),
+            files: get_pcap_files(cfg.as_ref()),
+            sender: sender.clone(),
+        };
+        let builder = std::thread::Builder::new().name(thread.name());
+        let handle = builder.spawn(move || thread.spawn(cfg))?;
+        handles.push(handle);
+        Ok(())
+        // let mut handles = vec![];
+        // for interface in cfg.interfaces.iter() {
+        //     let cfg = cfg.clone();
+        //     let mut thread = RxThread {
+        //         exit: cfg.exit.clone(),
+        //         sender: sender.clone(),
+        //         interface: interface.clone(),
+        //     };
+        //     let builder = std::thread::Builder::new().name(thread.name());
+        //     let handle = builder.spawn(move || thread.spawn(cfg))?;
+        //     handles.push(handle);
+        // }
+
+        // match self.handles.write() {
+        //     Ok(mut h) => {
+        //         *h.as_mut() = handles;
+        //     }
+        //     Err(e) => return Err(anyhow!("{}", e)),
+        // };
+        // Ok(())
+    }
+
+    fn stats(&self) -> RxStat {
+        self.stats
+    }
 }
 
 /// get pcap files according to command line arguments/configuration file
@@ -82,7 +133,7 @@ struct RxThread {
 }
 
 impl RxThread {
-    fn spawn(&mut self, _cfg: Arc<Config>) -> Result<()> {
+    pub fn spawn(&mut self, cfg: Arc<Config>) -> Result<()> {
         if self.files.is_empty() {
             return Ok(());
         }
@@ -140,8 +191,8 @@ impl RxThread {
         Ok(())
     }
 
-    fn name(&self) -> String {
-        String::from("alphonse-replay")
+    pub fn name(&self) -> String {
+        "alphonse-replay".to_string()
     }
 }
 
@@ -150,6 +201,22 @@ struct Offline {
 }
 
 impl Offline {
+    #[inline]
+    fn next(&mut self) -> Result<Box<dyn PacketTrait>> {
+        let raw = self.cap.as_mut().next()?;
+        let pkt = Box::new(Packet::from(&raw));
+        Ok(pkt)
+    }
+
+    fn stats(&mut self) -> Result<RxStat> {
+        let mut stats = RxStat::default();
+        let cap_stats = self.cap.as_mut().stats()?;
+        stats.rx_pkts = cap_stats.received as u64;
+        stats.dropped = cap_stats.dropped as u64;
+        stats.if_dropped = cap_stats.if_dropped as u64;
+        Ok(stats)
+    }
+
     pub fn try_from_path<P: AsRef<Path>>(path: P) -> Result<Offline> {
         if !path.as_ref().exists() {
             return Err(anyhow!("File does not exist"));
@@ -168,24 +235,6 @@ impl Offline {
         Ok(Offline {
             cap: Box::new(pcap_file),
         })
-    }
-}
-
-impl Offline {
-    #[inline]
-    fn next(&mut self) -> Result<Box<dyn PacketTrait>> {
-        let raw = self.cap.as_mut().next()?;
-        let pkt = Box::new(Packet::from(&raw));
-        Ok(pkt)
-    }
-
-    fn stats(&mut self) -> Result<CaptureStat> {
-        let mut stats = CaptureStat::default();
-        let cap_stats = self.cap.as_mut().stats()?;
-        stats.rx_pkts = cap_stats.received as u64;
-        stats.dropped = cap_stats.dropped as u64;
-        stats.if_dropped = cap_stats.if_dropped as u64;
-        Ok(stats)
     }
 }
 
@@ -252,4 +301,14 @@ impl From<&pcap::Packet<'_>> for Packet {
             tunnel: Tunnel::default(),
         }
     }
+}
+
+#[no_mangle]
+pub extern "C" fn al_new_rx_driver() -> Box<Box<dyn RxDriver>> {
+    Box::new(Box::new(Driver::default()))
+}
+
+#[no_mangle]
+pub extern "C" fn al_plugin_type() -> PluginType {
+    PluginType::RxDriver
 }

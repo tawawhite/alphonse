@@ -1,0 +1,18 @@
+[package]
+name = "files"
+version = "0.1.0"
+authors = ["Jack Liar"]
+edition = "2018"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "rxfiles"
+
+[dependencies]
+alphonse-api = { path = "../../api", optional = false }
+anyhow = "*"
+crossbeam-channel = "0.5"
+libc = "0.2"
+path-absolutize = "3.0"
+pcap = "0.8"
+serde = "1.0"

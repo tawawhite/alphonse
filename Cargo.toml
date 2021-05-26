@@ -8,5 +8,6 @@ members = [
     "parsers/tls",
     "parsers/ip",
     "rx-drivers/libpcap",
+    "rx-drivers/files",
 ]
 resolver = "2"
