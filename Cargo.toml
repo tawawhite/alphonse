@@ -7,5 +7,6 @@ members = [
     "parsers/simple-writer",
     "parsers/tls",
     "parsers/ip",
+    "rx-drivers/libpcap",
 ]
 resolver = "2"

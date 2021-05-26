@@ -1,17 +1,14 @@
 #[macro_use]
 extern crate clap;
 
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
-use std::thread::JoinHandle;
 
 use anyhow::Result;
-use crossbeam_channel::{bounded, Sender};
+use crossbeam_channel::bounded;
 
 use alphonse_api as api;
 use api::classifiers;
-use api::config::Config;
-use api::packet::Packet;
 
 mod commands;
 mod config;
@@ -21,48 +18,19 @@ mod rx;
 mod stats;
 mod threadings;
 
-fn start_rx<'a>(
-    exit: Arc<AtomicBool>,
-    cfg: Arc<Config>,
-    sender: Sender<Box<dyn Packet>>,
-) -> Result<Vec<JoinHandle<Result<()>>>> {
-    if !cfg.pcap_file.is_empty() {
-        return (rx::files::UTILITY.start)(exit, cfg, sender);
-    }
-
-    match cfg.rx_backend.as_str() {
-        "libpcap" => return (rx::libpcap::UTILITY.start)(exit, cfg, sender),
-        #[cfg(all(target_os = "linux", feature = "dpdk"))]
-        "dpdk" => return (rx::dpdk::UTILITY.start)(exit, cfg, sender),
-        _ => unreachable!(),
-    };
-}
-
 fn main() -> Result<()> {
     let root_cmd = commands::new_root_command();
-    let mut cfg = config::parse_args(root_cmd)?;
+    let cfg = config::parse_args(root_cmd)?;
 
     let session_table = Arc::new(dashmap::DashMap::with_capacity_and_hasher(
         1000000,
         fnv::FnvBuildHasher::default(),
     ));
-    match cfg.rx_backend.as_str() {
-        "libpcap" => {
-            (rx::libpcap::UTILITY.init)(&mut cfg)?;
-        }
-        #[cfg(all(target_os = "linux", feature = "dpdk"))]
-        "dpdk" => {
-            (rx::dpdk::UTILITY.init)(&mut cfg)?;
-        }
-        _ => unreachable!(),
-    };
 
     signal_hook::flag::register(signal_hook::consts::SIGTERM, cfg.exit.clone())?;
     signal_hook::flag::register(signal_hook::consts::SIGINT, cfg.exit.clone())?;
 
     let cfg = Arc::new(cfg);
-
-    let mut handles = vec![];
 
     let plugins = plugins::load_plugins(&cfg)?;
     let mut warehouse = plugins::PluginWarehouse::default();
@@ -76,12 +44,14 @@ fn main() -> Result<()> {
     classifier_manager.prepare()?;
     let classifier_manager = Arc::new(classifier_manager);
 
+    let mut handles = vec![];
     let (ses_sender, ses_receiver) = bounded(cfg.pkt_channel_size as usize);
     let mut output_thread = threadings::output::Thread::new(ses_receiver.clone());
 
     // initialize pkt threads
     let (pkt_sender, pkt_receiver) = bounded(cfg.pkt_channel_size as usize);
     let mut pkt_threads = Vec::new();
+    warehouse.start_rx(&cfg, &pkt_sender)?;
 
     for i in 0..cfg.pkt_threads {
         let thread = threadings::PktThread::new(
@@ -127,11 +97,6 @@ fn main() -> Result<()> {
             .spawn(move || timeout_thread.spawn(cfg, session_table.clone()))
             .unwrap();
         handles.push(handle);
-    }
-
-    let rx_handles = start_rx(cfg.exit.clone(), cfg.clone(), pkt_sender.clone())?;
-    for h in rx_handles {
-        handles.push(h);
     }
 
     drop(pkt_sender);
