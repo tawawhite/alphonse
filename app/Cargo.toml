@@ -1,22 +1,21 @@
 [package]
 name = "alphonse"
 version = "0.1.0"
-authors = ["Jack Liar <15205739+JackLiar@users.noreply.github.com>"]
+authors = ["Jack Liar"]
 edition = "2018"
 
 [dependencies]
 anyhow = "1.0"
 # arc-swap = "1.1"
-clap = "2.33.3"
+clap = "2.33"
 crossbeam-channel = "0.5"
 chrono = "0.4"
 dashmap = { version = "4.0", features = ["raw-api"] }
 dynamic_reload = "0.4"
-elasticsearch = { version = "7.12.0-alpha.1", features=["rustls-tls"] }
+elasticsearch = { version = "7.12.0-alpha.1", features = ["rustls-tls"] }
 fnv = "1.0"
 hyperscan = { version = "0.2", features = ["static"] }
 libc = "0.2"
-libloading = "0.7"
 path-absolutize = "3.0"
 pcap = "0.8"
 rayon = "1.5"
