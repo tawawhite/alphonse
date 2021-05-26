@@ -15,7 +15,6 @@ use api::session::Session;
 #[cfg(all(target_os = "linux", feature = "dpdk"))]
 pub mod dpdk;
 pub mod files;
-pub mod libpcap;
 
 pub struct RxUtility {
     pub init: fn(cfg: &mut Config) -> Result<()>,

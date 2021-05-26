@@ -118,16 +118,5 @@ fn main() -> Result<()> {
         parser.cleanup()?;
     }
 
-    match cfg.rx_backend.as_str() {
-        "libpcap" => {
-            (rx::libpcap::UTILITY.cleanup)(&cfg)?;
-        }
-        #[cfg(all(target_os = "linux", feature = "dpdk"))]
-        "dpdk" => {
-            (rx::dpdk::UTILITY.cleanup)(&cfg)?;
-        }
-        _ => unreachable!(),
-    };
-
     Ok(())
 }
