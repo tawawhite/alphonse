@@ -14,7 +14,7 @@ pub struct Config {
     pub dry_run: bool,
     pub interfaces: Vec<String>,
     pub output_threads: u8,
-    pub parsers: Vec<String>,
+    pub processors: Vec<String>,
     pub pcap_file: String,
     pub pcap_dir: String,
     pub pkt_threads: u8,

@@ -31,12 +31,8 @@ threads.pkt: 1
 threads.rx: 1
 threads.session: 1
 threads.output: 1
-parsers:
-    - "target/debug/libhttp.dylib"
-    - "target/debug/libip.dylib"
-    - "target/debug/libmisc.dylib"
-    - "target/debug/libsimplewriter.dylib"
-    - "target/debug/libtls.dylib"
+plugins: ["http", "ip", "misc", "tls"]
+plugins.dirs: ["target/debug"]
 
 # Configuration for simple writer
 simple-writer:

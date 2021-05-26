@@ -1,7 +1,6 @@
 #[macro_use]
 extern crate clap;
 
-use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread::JoinHandle;
@@ -13,11 +12,11 @@ use alphonse_api as api;
 use api::classifiers;
 use api::config::Config;
 use api::packet::Packet;
-use api::plugins::parsers::{NewProcessorFunc, ProcessorID};
 
 mod commands;
 mod config;
 mod packet;
+mod plugins;
 mod rx;
 mod stats;
 mod threadings;
@@ -65,33 +64,13 @@ fn main() -> Result<()> {
 
     let mut handles = vec![];
 
-    // keep share library 'alive' so that the vtable of trait object pointer is not pointing to an invalid position
-    let mut parser_libraries = HashMap::new();
-    let mut processors = Vec::new();
-
-    for p in &cfg.as_ref().parsers {
-        let lib = unsafe { libloading::Library::new(p)? };
-        parser_libraries.insert(p.clone(), lib);
-        let lib = parser_libraries.get(p).unwrap();
-
-        unsafe {
-            match lib.get::<NewProcessorFunc>(b"al_new_protocol_parser\0") {
-                Ok(func) => {
-                    let mut parser = func();
-                    parser.set_id(processors.len() as ProcessorID);
-                    processors.push(*parser);
-                }
-                Err(e) => {
-                    eprintln!("{:?}", e);
-                }
-            }
-        }
-    }
+    let plugins = plugins::load_plugins(&cfg)?;
+    let mut warehouse = plugins::PluginWarehouse::default();
+    plugins::init_plugins(&plugins, &mut warehouse, &cfg)?;
 
     let mut classifier_manager = classifiers::ClassifierManager::new();
-    for parser in &mut processors {
+    for parser in &mut warehouse.pkt_processors {
         parser.register_classify_rules(&mut classifier_manager)?;
-        parser.init(&cfg)?;
     }
 
     classifier_manager.prepare()?;
@@ -128,7 +107,13 @@ fn main() -> Result<()> {
     for thread in pkt_threads {
         let cfg = cfg.clone();
         let session_table = session_table.clone();
-        let parsers = Box::new(processors.iter().map(|p| p.clone_processor()).collect());
+        let parsers = Box::new(
+            warehouse
+                .pkt_processors
+                .iter()
+                .map(|p| p.clone_processor())
+                .collect(),
+        );
         let builder = std::thread::Builder::new().name(thread.name());
         let handle = builder.spawn(move || thread.spawn(cfg, session_table, parsers))?;
         handles.push(handle);
@@ -164,7 +149,7 @@ fn main() -> Result<()> {
         };
     }
 
-    for parser in &processors {
+    for parser in &warehouse.pkt_processors {
         parser.cleanup()?;
     }
 

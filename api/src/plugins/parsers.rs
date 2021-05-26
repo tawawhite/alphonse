@@ -7,10 +7,9 @@ use crate::{packet, session};
 
 pub type ProcessorID = u8;
 
-/// Create a Box of the protocol processor
+/// Create a Box of the packet processor
 pub type NewProcessorFunc = extern "C" fn() -> Box<Box<dyn Processor>>;
-/// Create a Vector of Box of the protocol processor
-pub type NewProcessorBoxesFunc = extern "C" fn() -> Box<Vec<Box<dyn Processor>>>;
+pub const NEW_PKT_PROCESSOR_FUNC_NAME: &str = "al_new_pkt_processor";
 
 pub trait Processor: Send + Sync + Plugin {
     /// Clone a Protocol Processor

@@ -11,7 +11,8 @@ clap = "2.33.3"
 crossbeam-channel = "0.5"
 chrono = "0.4"
 dashmap = { version = "4.0", features = ["raw-api"] }
-elasticsearch = "7.12.0-alpha.1"
+dynamic_reload = "0.4"
+elasticsearch = { version = "7.12.0-alpha.1", features=["rustls-tls"] }
 fnv = "1.0"
 hyperscan = { version = "0.2", features = ["static"] }
 libc = "0.2"

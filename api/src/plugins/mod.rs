@@ -3,6 +3,7 @@ use anyhow::Result;
 use crate::config::Config;
 
 pub mod parsers;
+pub mod rx;
 
 #[repr(C)]
 pub enum PluginType {
@@ -35,7 +36,7 @@ pub trait Plugin {
     }
 }
 
-/// Create a Box of plugin
-pub type NewPluginFunc = extern "C" fn() -> Box<Box<dyn Plugin>>;
-
-pub const NEW_PLUGIN_FUNC_NAME: &str = "al_new_plugin";
+/// Create a Box of the packet processor
+pub type PluginTypeFunc = extern "C" fn() -> PluginType;
+/// Get the plugin type of this plugin
+pub const PLUGIN_TYPE_FUNC_NAME: &str = "al_plugin_type";
