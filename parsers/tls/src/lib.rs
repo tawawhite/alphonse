@@ -9,7 +9,7 @@ use alphonse_api as api;
 use api::classifiers;
 use api::classifiers::{matched, RuleID};
 use api::packet::{Direction, Packet, Protocol};
-use api::plugins::parsers::{Processor, ProcessorID};
+use api::plugins::processor::{Processor, ProcessorID};
 use api::plugins::{Plugin, PluginType};
 use api::session::Session;
 
@@ -157,7 +157,7 @@ mod test {
     use super::*;
     use api::classifiers::ClassifierManager;
     use api::packet::Protocol;
-    use api::plugins::parsers::Processor;
+    use api::plugins::processor::Processor;
     use api::utils::packet::Packet as TestPacket;
 
     #[test]

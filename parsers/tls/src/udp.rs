@@ -6,7 +6,7 @@ use tls_parser::{
 
 use alphonse_api as api;
 use api::packet::{Direction, Packet};
-use api::plugins::parsers::Processor;
+use api::plugins::processor::Processor;
 use api::plugins::Plugin;
 use api::session::Session;
 

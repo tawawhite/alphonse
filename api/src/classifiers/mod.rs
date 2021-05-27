@@ -2,7 +2,7 @@ use anyhow::Result;
 use tinyvec::TinyVec;
 
 use crate::packet;
-use crate::plugins::parsers::ProcessorID;
+use crate::plugins::processor::ProcessorID;
 
 pub mod all;
 pub mod dpi;

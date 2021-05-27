@@ -5,7 +5,7 @@ use alphonse_api as api;
 use api::classifiers;
 use api::classifiers::dpi;
 use api::config::Config;
-use api::plugins::parsers::{Processor, ProcessorID};
+use api::plugins::processor::{Processor, ProcessorID};
 use api::plugins::{Plugin, PluginType};
 use api::session::Session;
 

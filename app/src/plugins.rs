@@ -10,7 +10,7 @@ use alphonse_api as api;
 use api::config::Config;
 use api::packet::Packet;
 use api::plugins::{
-    parsers, parsers::Processor, rx, rx::RxDriver, PluginType, PluginTypeFunc,
+    processor, processor::Processor, rx, rx::RxDriver, PluginType, PluginTypeFunc,
     PLUGIN_TYPE_FUNC_NAME,
 };
 
@@ -150,8 +150,8 @@ pub fn init_plugins(
                 PluginType::PacketProcessor => {
                     let func = plugin
                         .lib
-                        .get::<parsers::NewProcessorFunc>(
-                            parsers::NEW_PKT_PROCESSOR_FUNC_NAME.as_bytes(),
+                        .get::<processor::NewProcessorFunc>(
+                            processor::NEW_PKT_PROCESSOR_FUNC_NAME.as_bytes(),
                         )
                         .map_err(|e| anyhow!("{}", e))?;
                     let mut processor = *func();

@@ -21,7 +21,7 @@ pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManage
 mod test {
     use super::*;
     use api::packet::Protocol;
-    use api::plugins::parsers::Processor;
+    use api::plugins::processor::Processor;
     use api::session::Session;
     use api::utils::packet::Packet as TestPacket;
 

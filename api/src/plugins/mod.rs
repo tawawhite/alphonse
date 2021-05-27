@@ -2,7 +2,7 @@ use anyhow::Result;
 
 use crate::config::Config;
 
-pub mod parsers;
+pub mod processor;
 pub mod rx;
 
 #[repr(C)]
