@@ -65,20 +65,8 @@ fn parse_config_file(config_file: &str, config: &mut Config) -> Result<()> {
     config.ses_threads = get_integer(doc, "threads.session", 1, 1, 24) as u8;
     config.output_threads = get_integer(doc, "threads.output", 1, 1, 24) as u8;
 
-    let backend = get_str(doc, "rx.backend", "libpcap");
-    match backend.as_str() {
-        "dpdk" | "libpcap" => {
-            config.rx_backend = backend;
-        }
-        _ => {
-            println!(
-                "Invalid rx.backend option: {}, set rx.backend to {}",
-                s, "libpcap"
-            );
-        }
-    };
-
-    config.processors = get_str_arr(doc, "processors");
+    config.rx_driver = get_str(doc, "plugins.rx-driver", "rxlibpcap");
+    config.processors = get_str_arr(doc, "plugins.processors");
     config.interfaces = get_str_arr(doc, "interfaces");
 
     config.rx_stat_log_interval =

@@ -1,4 +1,3 @@
-rx.backend: libpcap
 rx.stats.log.interval: 1
 channel.pkt.size: 2000000
 
@@ -31,7 +30,8 @@ threads.pkt: 1
 threads.rx: 1
 threads.session: 1
 threads.output: 1
-plugins: ["http", "ip", "misc", "tls", "rxlibpcap"]
+plugins.processors: ["http", "ip", "misc", "tls"]
+plugins.rx-driver: rxfiles
 plugins.dirs: ["target/debug"]
 
 # Configuration for simple writer
