@@ -64,26 +64,6 @@ impl RxDriver for Driver {
         let handle = builder.spawn(move || thread.spawn(cfg))?;
         handles.push(handle);
         Ok(())
-        // let mut handles = vec![];
-        // for interface in cfg.interfaces.iter() {
-        //     let cfg = cfg.clone();
-        //     let mut thread = RxThread {
-        //         exit: cfg.exit.clone(),
-        //         sender: sender.clone(),
-        //         interface: interface.clone(),
-        //     };
-        //     let builder = std::thread::Builder::new().name(thread.name());
-        //     let handle = builder.spawn(move || thread.spawn(cfg))?;
-        //     handles.push(handle);
-        // }
-
-        // match self.handles.write() {
-        //     Ok(mut h) => {
-        //         *h.as_mut() = handles;
-        //     }
-        //     Err(e) => return Err(anyhow!("{}", e)),
-        // };
-        // Ok(())
     }
 
     fn stats(&self) -> RxStat {
