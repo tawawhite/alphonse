@@ -91,10 +91,12 @@ pub struct Session {
     pub fields: Box<serde_json::Value>,
 
     /// Tags
+    #[serde(skip_serializing_if = "HashSet::is_empty")]
     tags: Box<HashSet<String>>,
 
     /// Protocols
     #[cfg_attr(feature = "arkime", serde(rename = "protocol"))]
+    #[serde(skip_serializing_if = "HashSet::is_empty")]
     protocols: Box<HashSet<String>>,
 
     /// Tunnel Protocols
