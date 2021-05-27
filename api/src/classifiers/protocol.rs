@@ -36,12 +36,12 @@ impl super::Classifier for Classifier {
 
         let i = proto_rule.0 as u8 as usize;
         self.rules[i].id = rule.id;
-        self.rules[i].parsers.push(rule.parsers[0]);
+        self.rules[i].processors.push(rule.processors[0]);
         Ok(super::Rule {
             id: self.rules[i].id(),
             priority: self.rules[i].priority,
             rule_type: rule.rule_type.clone(),
-            parsers: self.rules[i].parsers.clone(),
+            processors: self.rules[i].processors.clone(),
         })
     }
 }
@@ -51,7 +51,7 @@ impl Classifier {
         macro_rules! classify_layer {
             ($layer:ident) => {
                 let i = pkt.layers().$layer.protocol as usize;
-                if self.rules[i].parsers.len() > 0 {
+                if self.rules[i].processors.len() > 0 {
                     pkt.rules_mut().push(self.rules[i].clone());
                 }
             };
@@ -80,8 +80,8 @@ mod test {
         assert!(matches!(classifier.add_rule(&mut rule), Ok(_)));
 
         let rule = &classifier.rules[proto_rule.0 as usize];
-        assert_eq!(rule.parsers.len(), 1);
-        assert_eq!(rule.parsers[0], 1);
+        assert_eq!(rule.processors.len(), 1);
+        assert_eq!(rule.processors[0], 1);
 
         // Add a same rule only ID is different, we expected the same
         let proto_rule = Rule(packet::Protocol::TCP);
@@ -90,8 +90,8 @@ mod test {
         assert!(matches!(classifier.add_rule(&mut rule), Ok(rule) if rule.id == 0));
 
         let rule = &classifier.rules[proto_rule.0 as usize];
-        assert_eq!(rule.parsers.len(), 2);
-        assert_eq!(rule.parsers[1], 2);
+        assert_eq!(rule.processors.len(), 2);
+        assert_eq!(rule.processors[1], 2);
     }
 
     #[test]
@@ -128,7 +128,7 @@ mod test {
         classifier.classify(pkt.as_mut());
         assert_eq!(pkt.rules().len(), 1);
         assert_eq!(pkt.rules()[0].rule_type, matched::RuleType::Protocol);
-        assert_eq!(pkt.rules()[0].parsers[0], 1);
-        assert_eq!(pkt.rules()[0].parsers.len(), 1);
+        assert_eq!(pkt.rules()[0].processors[0], 1);
+        assert_eq!(pkt.rules()[0].processors.len(), 1);
     }
 }

@@ -1,6 +1,6 @@
 //! We do not perform serious protocol parsing in this module.
 //! All we do here is figuring out layer's length and protocol type, that's it.
-//! More serious protocol parsing jobs are done by the protocol parsers in another module.
+//! More serious protocol parsing jobs are done by the packet processors in another module.
 //!
 //!
 

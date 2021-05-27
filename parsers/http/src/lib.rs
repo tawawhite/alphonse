@@ -4,14 +4,16 @@ use once_cell::sync::OnceCell;
 use alphonse_api as api;
 use api::classifiers;
 use api::classifiers::dpi;
-use api::parsers::ParserID;
+use api::config::Config;
+use api::plugins::parsers::{Processor, ProcessorID};
+use api::plugins::{Plugin, PluginType};
 use api::session::Session;
 
 static SETTINGS: OnceCell<llhttp::Settings> = OnceCell::new();
 
 #[derive(Clone)]
-struct ProtocolParser<'a> {
-    id: ParserID,
+struct HttpProcessor<'a> {
+    id: ProcessorID,
     name: String,
     classified: bool,
     parsers: [llhttp::Parser<'a>; 2],
@@ -39,12 +41,12 @@ struct HTTP {
     checksum: String,
 }
 
-unsafe impl Send for ProtocolParser<'_> {}
-unsafe impl Sync for ProtocolParser<'_> {}
+unsafe impl Send for HttpProcessor<'_> {}
+unsafe impl Sync for HttpProcessor<'_> {}
 
-impl<'a> ProtocolParser<'a> {
+impl<'a> HttpProcessor<'a> {
     fn new() -> Self {
-        ProtocolParser {
+        HttpProcessor {
             id: 0,
             name: String::from("http"),
             classified: false,
@@ -53,24 +55,40 @@ impl<'a> ProtocolParser<'a> {
     }
 }
 
-impl<'a> api::parsers::ProtocolParserTrait for ProtocolParser<'static> {
-    fn box_clone(&self) -> Box<dyn api::parsers::ProtocolParserTrait> {
+impl<'a> Plugin for HttpProcessor<'static> {
+    fn plugin_type(&self) -> PluginType {
+        PluginType::PacketProcessor
+    }
+
+    fn name(&self) -> &str {
+        &self.name.as_str()
+    }
+
+    fn init(&self, _: &Config) -> Result<()> {
+        // initialize global llhttp settings
+        let mut settings = llhttp::Settings::default();
+
+        llhttp::data_cb_wrapper!(_on_url, on_url);
+        settings.on_url(Some(_on_url));
+
+        SETTINGS.set(settings).unwrap();
+        Ok(())
+    }
+}
+
+impl<'a> Processor for HttpProcessor<'static> {
+    fn clone_processor(&self) -> Box<dyn Processor> {
         Box::new(self.clone())
     }
 
     /// Get parser id
-    fn id(&self) -> ParserID {
+    fn id(&self) -> ProcessorID {
         self.id
     }
 
     /// Get parser id
-    fn set_id(&mut self, id: ParserID) {
+    fn set_id(&mut self, id: ProcessorID) {
         self.id = id
-    }
-
-    /// Get parser name
-    fn name(&self) -> &str {
-        &self.name.as_str()
     }
 
     fn register_classify_rules(
@@ -212,14 +230,11 @@ impl<'a> api::parsers::ProtocolParserTrait for ProtocolParser<'static> {
 }
 
 #[no_mangle]
-pub extern "C" fn al_new_protocol_parser() -> Box<Box<dyn api::parsers::ProtocolParserTrait>> {
-    // initialize global llhttp settings
-    let mut settings = llhttp::Settings::default();
+pub extern "C" fn al_new_pkt_processor() -> Box<Box<dyn Processor>> {
+    Box::new(Box::new(HttpProcessor::new()))
+}
 
-    llhttp::data_cb_wrapper!(_on_url, on_url);
-    settings.on_url(Some(_on_url));
-
-    SETTINGS.set(settings).unwrap();
-
-    Box::new(Box::new(ProtocolParser::new()))
+#[no_mangle]
+pub extern "C" fn al_plugin_type() -> PluginType {
+    PluginType::PacketProcessor
 }

@@ -74,8 +74,8 @@ pub fn get_str_arr(doc: &yaml_rust::Yaml, key: &str) -> Vec<String> {
     let mut result = vec![];
     match &doc[key] {
         yaml_rust::Yaml::Array(a) => {
-            for parser in a {
-                match parser {
+            for element in a {
+                match element {
                     yaml_rust::Yaml::String(s) => result.push(String::from(s)),
                     yaml_rust::Yaml::BadValue => println!("Bad string value for {}'s element", key),
                     _ => println!("Wrong value type for {}' element, expecting string", key),

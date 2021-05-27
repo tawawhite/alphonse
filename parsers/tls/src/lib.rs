@@ -9,7 +9,8 @@ use alphonse_api as api;
 use api::classifiers;
 use api::classifiers::{matched, RuleID};
 use api::packet::{Direction, Packet, Protocol};
-use api::parsers::ParserID;
+use api::plugins::parsers::{Processor, ProcessorID};
+use api::plugins::{Plugin, PluginType};
 use api::session::Session;
 
 mod cert;
@@ -47,8 +48,8 @@ struct SideInfo {
 }
 
 #[derive(Clone, Default)]
-struct Processor {
-    id: ParserID,
+struct TlsProcessor {
+    id: ProcessorID,
     name: String,
     classified: bool,
 
@@ -60,7 +61,7 @@ struct Processor {
     hostnames: HashSet<String>,
 }
 
-impl Processor {
+impl TlsProcessor {
     fn new() -> Self {
         let mut p = Self::default();
         p.name = String::from("tls");
@@ -68,24 +69,29 @@ impl Processor {
     }
 }
 
-impl api::parsers::ProtocolParserTrait for Processor {
-    fn box_clone(&self) -> Box<dyn api::parsers::ProtocolParserTrait> {
+impl Plugin for TlsProcessor {
+    fn plugin_type(&self) -> PluginType {
+        PluginType::PacketProcessor
+    }
+
+    fn name(&self) -> &str {
+        &self.name.as_str()
+    }
+}
+
+impl Processor for TlsProcessor {
+    fn clone_processor(&self) -> Box<dyn Processor> {
         Box::new(self.clone())
     }
 
     /// Get parser id
-    fn id(&self) -> ParserID {
+    fn id(&self) -> ProcessorID {
         self.id
     }
 
     /// Get parser id
-    fn set_id(&mut self, id: ParserID) {
+    fn set_id(&mut self, id: ProcessorID) {
         self.id = id
-    }
-
-    /// Get parser name
-    fn name(&self) -> &str {
-        &self.name.as_str()
     }
 
     fn register_classify_rules(
@@ -130,11 +136,10 @@ impl api::parsers::ProtocolParserTrait for Processor {
                 Side::Server => {}
             };
         }
-        println!("{}", serde_json::to_string_pretty(ses).unwrap());
     }
 }
 
-impl Processor {
+impl TlsProcessor {
     fn handle_server_hello(&mut self, dir: Direction, hello: &TlsServerHelloContents) {
         let dir = dir as u8 as usize;
         self.side_data[dir].side = Side::Server;
@@ -152,13 +157,13 @@ mod test {
     use super::*;
     use api::classifiers::ClassifierManager;
     use api::packet::Protocol;
-    use api::parsers::ProtocolParserTrait;
+    use api::plugins::parsers::Processor;
     use api::utils::packet::Packet as TestPacket;
 
     #[test]
     fn classify() {
         let mut manager = ClassifierManager::new();
-        let mut parser = Processor::new();
+        let mut parser = TlsProcessor::new();
         parser.register_classify_rules(&mut manager).unwrap();
         manager.prepare().unwrap();
         let mut scratch = manager.alloc_scratch().unwrap();
@@ -206,6 +211,11 @@ mod test {
 }
 
 #[no_mangle]
-pub extern "C" fn al_new_protocol_parser() -> Box<Box<dyn api::parsers::ProtocolParserTrait>> {
-    Box::new(Box::new(Processor::new()))
+pub extern "C" fn al_new_pkt_processor() -> Box<Box<dyn Processor>> {
+    Box::new(Box::new(TlsProcessor::new()))
+}
+
+#[no_mangle]
+pub extern "C" fn al_plugin_type() -> PluginType {
+    PluginType::PacketProcessor
 }

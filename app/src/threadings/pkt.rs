@@ -8,7 +8,7 @@ use alphonse_api as api;
 use api::classifiers::ClassifierManager;
 use api::config::Config;
 use api::packet::{Packet, PacketHashKey};
-use api::parsers::ProtocolParserTrait;
+use api::plugins::parsers::Processor;
 use api::utils::timeval::TimeVal;
 
 use crate::rx::{SessionData, SessionTable};
@@ -43,42 +43,39 @@ impl PktThread {
     fn parse_pkt(
         &self,
         scratch: &mut api::classifiers::ClassifyScratch,
-        protocol_parsers: &mut Box<Vec<Box<dyn ProtocolParserTrait>>>,
+        processors: &mut Box<Vec<Box<dyn Processor>>>,
         pkt: &mut dyn Packet,
         ses_data: &mut SessionData,
     ) -> Result<()> {
         self.classifier.classify(pkt, scratch)?;
 
         for rule in pkt.rules().iter() {
-            for parser_id in rule.parsers.iter() {
-                match ses_data.parsers.get_mut(parser_id) {
+            for id in rule.processors.iter() {
+                match ses_data.processors.get_mut(id) {
                     Some(_) => {}
                     None => {
-                        let parser = protocol_parsers
-                            .get_mut(*parser_id as usize)
-                            .unwrap()
-                            .box_clone();
-                        ses_data.parsers.insert(parser.id(), parser);
+                        let processor = processors[*id as usize].clone_processor();
+                        ses_data.processors.insert(processor.id(), processor);
                     }
                 };
             }
         }
 
-        for (_, parser) in ses_data.parsers.iter_mut() {
+        for (_, processor) in ses_data.processors.iter_mut() {
             let mut matched = false;
             for rule in pkt.rules().iter() {
-                // If parser has bind a rule this packet matches, parse with this rule
+                // If processor has bind a rule this packet matches, parse with this rule
                 // otherwise this pkt just belongs to the same session, parse without rule information
-                for parser_id in rule.parsers.iter() {
-                    if *parser_id == parser.id() {
-                        parser.parse_pkt(pkt, Some(rule), ses_data.info.as_mut())?;
+                for id in rule.processors.iter() {
+                    if *id == processor.id() {
+                        processor.parse_pkt(pkt, Some(rule), ses_data.info.as_mut())?;
                         matched = true;
                     }
                 }
             }
 
             if !matched {
-                parser.parse_pkt(pkt, None, ses_data.info.as_mut())?;
+                processor.parse_pkt(pkt, None, ses_data.info.as_mut())?;
             }
         }
 
@@ -89,7 +86,7 @@ impl PktThread {
         &self,
         cfg: Arc<Config>,
         session_table: Arc<SessionTable>,
-        mut protocol_parsers: Box<Vec<Box<dyn ProtocolParserTrait>>>,
+        mut processors: Box<Vec<Box<dyn Processor>>>,
     ) -> Result<()> {
         let parser = crate::packet::Parser::new(crate::packet::link::ETHERNET);
         let mut classify_scratch = match self.classifier.alloc_scratch() {
@@ -100,7 +97,10 @@ impl PktThread {
 
         while !self.exit.load(Ordering::Relaxed) {
             let mut pkt = match self.receiver.recv() {
-                Err(_) => break,
+                Err(_) => {
+                    self.exit.store(true, Ordering::SeqCst);
+                    break;
+                }
                 Ok(s) => s,
             };
 
@@ -118,7 +118,7 @@ impl PktThread {
                     ses.info.update(pkt.as_ref());
                     self.parse_pkt(
                         &mut classify_scratch,
-                        &mut protocol_parsers,
+                        &mut processors,
                         pkt.as_mut(),
                         ses.as_mut(),
                     )
@@ -132,7 +132,7 @@ impl PktThread {
                     ses.info.update(pkt.as_ref());
                     self.parse_pkt(
                         &mut classify_scratch,
-                        &mut protocol_parsers,
+                        &mut processors,
                         pkt.as_mut(),
                         ses.as_mut(),
                     )

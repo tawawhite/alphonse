@@ -5,7 +5,7 @@ use serde::{Serialize, Serializer};
 use tls_parser::TlsCertificateContents;
 use x509_parser::prelude::{parse_x509_certificate, GeneralName, ParsedExtension};
 
-use crate::Processor;
+use crate::TlsProcessor;
 
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct CertInfo {
@@ -96,7 +96,7 @@ impl Cert {
     }
 }
 
-impl Processor {
+impl TlsProcessor {
     pub fn handle_certificate(&mut self, cert: &TlsCertificateContents) {
         for raw_cert in &cert.cert_chain {
             let mut cert = Cert::default();

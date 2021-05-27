@@ -61,7 +61,7 @@ impl From<(&Rule, &matched::Rule)> for super::Rule {
             id: r.1.id(),
             priority: r.1.priority,
             rule_type: super::RuleType::DPI(r.0.clone()),
-            parsers: r.1.parsers.clone(),
+            processors: r.1.processors.clone(),
         }
     }
 }
@@ -107,12 +107,12 @@ impl super::Classifier for Classifier {
                 )))
             }
             Some(i) => {
-                // If same parser register same rule, skip
-                // Other wise append this parser's id into rule's parser list
+                // If same processor register same rule, skip
+                // Other wise append this processor's id into rule's processor list
                 let r = &mut self.rules[i];
-                match r.parsers.iter().find(|id| **id == rule.parsers[0]) {
+                match r.processors.iter().find(|id| **id == rule.processors[0]) {
                     Some(_) => {}
-                    None => r.parsers.push(rule.parsers[0]),
+                    None => r.processors.push(rule.processors[0]),
                 };
                 Ok(super::Rule::from((&self.dpi_rules[i], &self.rules[i])))
             }
@@ -202,7 +202,7 @@ mod test {
         assert!(matches!(classifier.add_rule(&rule), Ok(_)));
 
         let mut rule = rule.clone();
-        rule.parsers = tiny_vec![1];
+        rule.processors = tiny_vec![1];
         assert!(matches!(classifier.add_rule(&rule), Ok(rule) if rule.id == 0));
     }
 
@@ -222,7 +222,7 @@ mod test {
         let rule = super::super::Rule {
             id: 10,
             priority: 100,
-            parsers: tiny_vec![0],
+            processors: tiny_vec![0],
             rule_type: super::super::RuleType::DPI(dpi_rule),
         };
 
@@ -240,8 +240,8 @@ mod test {
         assert_eq!(pkt.rules().len(), 1);
         assert_eq!(pkt.rules()[0].id(), 10);
         assert_eq!(pkt.rules()[0].priority, 100);
-        assert_eq!(pkt.rules()[0].parsers.len(), 1);
-        assert_eq!(pkt.rules()[0].parsers[0], 0);
+        assert_eq!(pkt.rules()[0].processors.len(), 1);
+        assert_eq!(pkt.rules()[0].processors[0], 0);
 
         // unmatched
         let mut pkt = Box::new(utils::packet::Packet::default());
@@ -261,7 +261,7 @@ mod test {
         let rule = super::super::Rule {
             id: 10,
             priority: 100,
-            parsers: tiny_vec![0],
+            processors: tiny_vec![0],
             rule_type: super::super::RuleType::DPI(dpi_rule),
         };
 

@@ -3,12 +3,9 @@ use anyhow::Result;
 use alphonse_api as api;
 use api::classifiers::{dpi, ClassifierManager};
 
-use crate::{add_simple_dpi_rule, add_simple_dpi_tcp_rule, MatchCallBack, ProtocolParser};
+use crate::{add_simple_dpi_rule, add_simple_dpi_tcp_rule, MatchCallBack, Misc};
 
-pub fn register_classify_rules(
-    parser: &mut ProtocolParser,
-    manager: &mut ClassifierManager,
-) -> Result<()> {
+pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManager) -> Result<()> {
     add_simple_dpi_tcp_rule!(r"^\xf9\xbe\xb4[\xd9\xfe]", "bitcoin", parser, manager);
 
     Ok(())
@@ -18,15 +15,16 @@ pub fn register_classify_rules(
 mod test {
     use super::*;
     use api::packet::Protocol;
+    use api::plugins::parsers::Processor;
     use api::session::Session;
-    use api::{parsers::ProtocolParserTrait, utils::packet::Packet as TestPacket};
+    use api::utils::packet::Packet as TestPacket;
 
-    use crate::ProtocolParser;
+    use crate::Misc;
 
     #[test]
     fn bitcoin() {
         let mut manager = ClassifierManager::new();
-        let mut parser = ProtocolParser::default();
+        let mut parser = Misc::default();
         parser.register_classify_rules(&mut manager).unwrap();
         manager.prepare().unwrap();
         let mut scratch = manager.alloc_scratch().unwrap();

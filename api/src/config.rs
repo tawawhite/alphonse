@@ -5,7 +5,7 @@ pub struct Config {
     pub exit: Arc<AtomicBool>,
     /// Configure file dist location
     pub fpath: String,
-    pub rx_backend: String,
+    pub rx_driver: String,
     pub verbose_mode: bool,
     pub pkt_channel_size: u32,
     pub default_timeout: u16,
@@ -14,7 +14,7 @@ pub struct Config {
     pub dry_run: bool,
     pub interfaces: Vec<String>,
     pub output_threads: u8,
-    pub parsers: Vec<String>,
+    pub processors: Vec<String>,
     pub pcap_file: String,
     pub pcap_dir: String,
     pub pkt_threads: u8,

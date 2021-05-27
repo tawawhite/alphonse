@@ -11,7 +11,8 @@ use serde_json::json;
 use alphonse_api as api;
 use api::classifiers;
 use api::packet::Protocol;
-use api::parsers::ParserID;
+use api::plugins::parsers::{Processor, ProcessorID};
+use api::plugins::{Plugin, PluginType};
 use api::session::Session;
 
 static ASN_DB: OnceCell<GeoLiteReader<Mmap>> = OnceCell::new();
@@ -38,8 +39,8 @@ impl Default for IpInfo {
 }
 
 #[derive(Default)]
-struct Processor {
-    id: ParserID,
+struct IPProcessor {
+    id: ProcessorID,
     name: String,
     classified: bool,
     processed: bool,
@@ -47,7 +48,7 @@ struct Processor {
     dst_ip: IpInfo,
 }
 
-impl Clone for Processor {
+impl Clone for IPProcessor {
     fn clone(&self) -> Self {
         Self {
             id: self.id,
@@ -60,19 +61,9 @@ impl Clone for Processor {
     }
 }
 
-impl api::parsers::ProtocolParserTrait for Processor {
-    fn box_clone(&self) -> Box<dyn api::parsers::ProtocolParserTrait> {
-        Box::new(self.clone())
-    }
-
-    /// Get parser id
-    fn id(&self) -> ParserID {
-        self.id
-    }
-
-    /// Get parser id
-    fn set_id(&mut self, id: ParserID) {
-        self.id = id
+impl Plugin for IPProcessor {
+    fn plugin_type(&self) -> PluginType {
+        PluginType::PacketProcessor
     }
 
     /// Get parser name
@@ -80,7 +71,7 @@ impl api::parsers::ProtocolParserTrait for Processor {
         &self.name.as_str()
     }
 
-    fn init(&mut self, alcfg: &api::config::Config) -> Result<()> {
+    fn init(&self, alcfg: &api::config::Config) -> Result<()> {
         let db_dir = PathBuf::from(alcfg.get_str(&"ip.db.directory", "etc"));
         let db_path = db_dir.join("GeoLite2-ASN.mmdb");
         ASN_DB
@@ -101,6 +92,22 @@ impl api::parsers::ProtocolParserTrait for Processor {
             .ok_or(anyhow!("{} CITY_DBS are already set", self.name()))?;
 
         Ok(())
+    }
+}
+
+impl Processor for IPProcessor {
+    fn clone_processor(&self) -> Box<dyn Processor> {
+        Box::new(self.clone())
+    }
+
+    /// Get parser id
+    fn id(&self) -> ProcessorID {
+        self.id
+    }
+
+    /// Get parser id
+    fn set_id(&mut self, id: ProcessorID) {
+        self.id = id
     }
 
     fn register_classify_rules(
@@ -257,6 +264,11 @@ fn city_to_string(city: &Option<geoip2::City>) -> String {
 }
 
 #[no_mangle]
-pub extern "C" fn al_new_protocol_parser() -> Box<Box<dyn api::parsers::ProtocolParserTrait>> {
-    Box::new(Box::new(Processor::default()))
+pub extern "C" fn al_new_pkt_processor() -> Box<Box<dyn Processor>> {
+    Box::new(Box::new(IPProcessor::default()))
+}
+
+#[no_mangle]
+pub extern "C" fn al_plugin_type() -> PluginType {
+    PluginType::PacketProcessor
 }

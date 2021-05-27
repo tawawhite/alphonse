@@ -36,12 +36,12 @@ impl super::Classifier for Classifier {
 
         let etype = proto_rule.ethertype as usize;
         self.rules[etype].id = rule.id;
-        self.rules[etype].parsers.push(rule.parsers[0]);
+        self.rules[etype].processors.push(rule.processors[0]);
         Ok(super::Rule {
             id: self.rules[etype].id(),
             priority: self.rules[etype].priority,
             rule_type: rule.rule_type.clone(),
-            parsers: self.rules[etype].parsers.clone(),
+            processors: self.rules[etype].processors.clone(),
         })
     }
 }
@@ -53,7 +53,7 @@ impl Classifier {
                 let offset = pkt.layers().data_link.offset as usize;
                 let etype = (pkt.raw()[offset + 12] as u16) << 8 | (pkt.raw()[offset + 13] as u16);
                 let etype = etype as usize;
-                if self.rules[etype].parsers.len() > 0 {
+                if self.rules[etype].processors.len() > 0 {
                     pkt.rules_mut().push(self.rules[etype].clone());
                 }
             }
@@ -79,8 +79,8 @@ mod test {
         assert!(matches!(classifier.add_rule(&mut rule), Ok(_)));
 
         let rule = &classifier.rules[etype_rule.ethertype as usize];
-        assert_eq!(rule.parsers.len(), 1);
-        assert_eq!(rule.parsers[0], 1);
+        assert_eq!(rule.processors.len(), 1);
+        assert_eq!(rule.processors[0], 1);
 
         // Add a same rule only ID is different, we expected the same
         let etype_rule = Rule { ethertype: 0 };
@@ -89,8 +89,8 @@ mod test {
         assert!(matches!(classifier.add_rule(&mut rule), Ok(rule) if rule.id == 0));
 
         let rule = &classifier.rules[etype_rule.ethertype as usize];
-        assert_eq!(rule.parsers.len(), 2);
-        assert_eq!(rule.parsers[1], 2);
+        assert_eq!(rule.processors.len(), 2);
+        assert_eq!(rule.processors[1], 2);
     }
 
     #[test]
@@ -123,7 +123,7 @@ mod test {
         classifier.classify(pkt.as_mut());
         assert_eq!(pkt.rules().len(), 1);
         assert_eq!(pkt.rules()[0].rule_type, matched::RuleType::EtherType);
-        assert_eq!(pkt.rules()[0].parsers[0], 1);
-        assert_eq!(pkt.rules()[0].parsers.len(), 1);
+        assert_eq!(pkt.rules()[0].processors[0], 1);
+        assert_eq!(pkt.rules()[0].processors.len(), 1);
     }
 }

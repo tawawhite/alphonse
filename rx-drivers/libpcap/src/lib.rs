@@ -1,5 +1,5 @@
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use std::thread::JoinHandle;
 
 use anyhow::{anyhow, Result};
@@ -10,35 +10,72 @@ use api::classifiers::matched::Rule;
 use api::config::Config;
 use api::packet::Packet as PacketTrait;
 use api::packet::{Layers, Rules, Tunnel};
+use api::plugins::rx::{RxDriver, RxStat};
+use api::plugins::{Plugin, PluginType};
 
-use crate::rx::RxUtility;
-use crate::stats::CaptureStat;
+#[derive(Clone, Default)]
+struct Driver {
+    handles: Arc<RwLock<Vec<JoinHandle<Result<()>>>>>,
+    stats: RxStat,
+}
 
-pub const UTILITY: RxUtility = RxUtility {
-    init: |_| Ok(()),
-    start,
-    cleanup: |_| Ok(()),
-};
-
-pub fn start(
-    exit: Arc<AtomicBool>,
-    cfg: Arc<Config>,
-    sender: Sender<Box<dyn PacketTrait>>,
-) -> Result<Vec<JoinHandle<Result<()>>>> {
-    let mut handles = vec![];
-    for interface in cfg.interfaces.iter() {
-        let cfg = cfg.clone();
-        let mut thread = RxThread {
-            exit: exit.clone(),
-            sender: sender.clone(),
-            interface: interface.clone(),
-        };
-        let builder = std::thread::Builder::new().name(thread.name());
-        let handle = builder.spawn(move || thread.spawn(cfg))?;
-        handles.push(handle);
+impl Plugin for Driver {
+    fn plugin_type(&self) -> PluginType {
+        PluginType::RxDriver
     }
 
-    Ok(handles)
+    fn name(&self) -> &str {
+        "rx-libpcap"
+    }
+
+    fn cleanup(&self) -> Result<()> {
+        let mut handles = match self.handles.write() {
+            Ok(h) => h,
+            Err(e) => return Err(anyhow!("{}", e)),
+        };
+
+        while handles.len() > 0 {
+            let hdl = handles.pop();
+            match hdl {
+                None => continue,
+                Some(hdl) => match hdl.join() {
+                    Ok(_) => {}
+                    Err(e) => eprintln!("{:?}", e),
+                },
+            }
+        }
+
+        Ok(())
+    }
+}
+
+impl RxDriver for Driver {
+    fn start(&self, cfg: Arc<Config>, sender: Sender<Box<dyn PacketTrait>>) -> Result<()> {
+        let mut handles = vec![];
+        for interface in cfg.interfaces.iter() {
+            let cfg = cfg.clone();
+            let mut thread = RxThread {
+                exit: cfg.exit.clone(),
+                sender: sender.clone(),
+                interface: interface.clone(),
+            };
+            let builder = std::thread::Builder::new().name(thread.name());
+            let handle = builder.spawn(move || thread.spawn(cfg))?;
+            handles.push(handle);
+        }
+
+        match self.handles.write() {
+            Ok(mut h) => {
+                *h.as_mut() = handles;
+            }
+            Err(e) => return Err(anyhow!("{}", e)),
+        };
+        Ok(())
+    }
+
+    fn stats(&self) -> RxStat {
+        self.stats
+    }
 }
 
 struct RxThread {
@@ -127,8 +164,8 @@ impl NetworkInterface {
         Ok(pkt)
     }
 
-    fn stats(&mut self) -> Result<CaptureStat> {
-        let mut stats = CaptureStat::default();
+    fn stats(&mut self) -> Result<RxStat> {
+        let mut stats = RxStat::default();
         let cap_stats = self.cap.as_mut().stats()?;
         stats.rx_pkts = cap_stats.received as u64;
         stats.dropped = cap_stats.dropped as u64;
@@ -225,4 +262,14 @@ impl From<&pcap::Packet<'_>> for Packet {
             tunnel: Tunnel::default(),
         }
     }
+}
+
+#[no_mangle]
+pub extern "C" fn al_new_rx_driver() -> Box<Box<dyn RxDriver>> {
+    Box::new(Box::new(Driver::default()))
+}
+
+#[no_mangle]
+pub extern "C" fn al_plugin_type() -> PluginType {
+    PluginType::RxDriver
 }

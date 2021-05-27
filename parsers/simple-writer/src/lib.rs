@@ -14,7 +14,8 @@ use yaml_rust::YamlEmitter;
 use alphonse_api as api;
 use api::classifiers::{matched::Rule, ClassifierManager};
 use api::packet::{Packet, PacketHashKey};
-use api::parsers::{ParserID, ProtocolParserTrait};
+use api::plugins::parsers::{Processor, ProcessorID};
+use api::plugins::{Plugin, PluginType};
 use api::session::Session;
 use api::utils::yaml::Yaml;
 
@@ -110,9 +111,9 @@ pub struct PacketInfo {
 }
 
 #[derive(Default)]
-struct Processor {
+struct SimpleWriterProcessor {
     /// Processor ID
-    id: ParserID,
+    id: ProcessorID,
     /// Whether current packet is registered with this processer
     classified: bool,
     /// Actual packet disk position
@@ -123,7 +124,7 @@ struct Processor {
     fid: u32,
 }
 
-impl Clone for Processor {
+impl Clone for SimpleWriterProcessor {
     fn clone(&self) -> Self {
         Self {
             id: self.id,
@@ -135,24 +136,16 @@ impl Clone for Processor {
     }
 }
 
-impl ProtocolParserTrait for Processor {
-    fn box_clone(&self) -> Box<dyn ProtocolParserTrait> {
-        Box::new(self.clone())
-    }
-
-    fn id(&self) -> ParserID {
-        self.id
-    }
-
-    fn set_id(&mut self, id: ParserID) {
-        self.id = id
+impl Plugin for SimpleWriterProcessor {
+    fn plugin_type(&self) -> PluginType {
+        PluginType::PacketProcessor
     }
 
     fn name(&self) -> &str {
         PKG_NAME
     }
 
-    fn init(&mut self, alcfg: &api::config::Config) -> Result<()> {
+    fn init(&self, alcfg: &api::config::Config) -> Result<()> {
         let root = "simple-writer";
         let yaml = match alcfg.doc.as_ref()[root] {
             yaml_rust::Yaml::Hash(_) => {
@@ -229,7 +222,7 @@ impl ProtocolParserTrait for Processor {
         Ok(())
     }
 
-    fn exit(&mut self) -> Result<()> {
+    fn cleanup(&self) -> Result<()> {
         // At this moment, all packet process threads are finished, nothing would use SCHEDULERS any more,
         // so cleanup all existing schedulers. Once all the schedulers were dropped, PacketInfo channel
         // would be closed, so the packet writing thread would be closed too.
@@ -250,6 +243,20 @@ impl ProtocolParserTrait for Processor {
             };
         }
         Ok(())
+    }
+}
+
+impl Processor for SimpleWriterProcessor {
+    fn clone_processor(&self) -> Box<dyn Processor> {
+        Box::new(self.clone())
+    }
+
+    fn id(&self) -> ProcessorID {
+        self.id
+    }
+
+    fn set_id(&mut self, id: ProcessorID) {
+        self.id = id
     }
 
     fn register_classify_rules(&mut self, manager: &mut ClassifierManager) -> Result<()> {
@@ -309,8 +316,13 @@ impl ProtocolParserTrait for Processor {
 }
 
 #[no_mangle]
-pub extern "C" fn al_new_protocol_parser() -> Box<Box<dyn api::parsers::ProtocolParserTrait>> {
-    Box::new(Box::new(Processor::default()))
+pub extern "C" fn al_new_pkt_processor() -> Box<Box<dyn Processor>> {
+    Box::new(Box::new(SimpleWriterProcessor::default()))
+}
+
+#[no_mangle]
+pub extern "C" fn al_plugin_type() -> PluginType {
+    PluginType::PacketProcessor
 }
 
 #[cfg(test)]
@@ -319,7 +331,7 @@ mod tests {
 
     #[test]
     fn finish() {
-        let mut processor = Processor::default();
+        let mut processor = SimpleWriterProcessor::default();
         processor.packet_pos = vec![-1, 1, 2, 3, 4, 5];
 
         let mut ses = Session::new();

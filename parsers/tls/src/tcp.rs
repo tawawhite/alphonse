@@ -6,13 +6,14 @@ use tls_parser::{
 
 use alphonse_api as api;
 use api::packet::{Direction, Packet};
-use api::parsers::ProtocolParserTrait;
+use api::plugins::parsers::Processor;
+use api::plugins::Plugin;
 use api::session::Session;
 
 use crate::ja3::Ja3;
-use crate::{Processor, Side};
+use crate::{Side, TlsProcessor};
 
-impl Processor {
+impl TlsProcessor {
     pub fn parse_tcp_pkt(&mut self, pkt: &dyn Packet, ses: &mut Session) -> Result<()> {
         if !self.is_classified() {
             // If this session is already classified as this protocol, skip

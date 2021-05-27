@@ -1,122 +1,69 @@
 #[macro_use]
 extern crate clap;
 
-use std::collections::HashMap;
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
-use std::thread::JoinHandle;
 
 use anyhow::Result;
-use crossbeam_channel::{bounded, Sender};
+use crossbeam_channel::bounded;
 
 use alphonse_api as api;
-use api::config::Config;
-use api::packet::Packet;
-use api::parsers::NewProtocolParserFunc;
-use api::{classifiers, parsers::ParserID};
+use api::classifiers;
 
 mod commands;
 mod config;
 mod packet;
+mod plugins;
 mod rx;
 mod stats;
 mod threadings;
 
-fn start_rx<'a>(
-    exit: Arc<AtomicBool>,
-    cfg: Arc<Config>,
-    sender: Sender<Box<dyn Packet>>,
-) -> Result<Vec<JoinHandle<Result<()>>>> {
-    if !cfg.pcap_file.is_empty() {
-        return (rx::files::UTILITY.start)(exit, cfg, sender);
-    }
-
-    match cfg.rx_backend.as_str() {
-        "libpcap" => return (rx::libpcap::UTILITY.start)(exit, cfg, sender),
-        #[cfg(all(target_os = "linux", feature = "dpdk"))]
-        "dpdk" => return (rx::dpdk::UTILITY.start)(exit, cfg, sender),
-        _ => unreachable!(),
-    };
-}
-
 fn main() -> Result<()> {
     let root_cmd = commands::new_root_command();
-    let mut cfg = config::parse_args(root_cmd)?;
-    let exit = Arc::new(AtomicBool::new(false));
+    let cfg = config::parse_args(root_cmd)?;
 
     let session_table = Arc::new(dashmap::DashMap::with_capacity_and_hasher(
         1000000,
         fnv::FnvBuildHasher::default(),
     ));
-    match cfg.rx_backend.as_str() {
-        "libpcap" => {
-            (rx::libpcap::UTILITY.init)(&mut cfg)?;
-        }
-        #[cfg(all(target_os = "linux", feature = "dpdk"))]
-        "dpdk" => {
-            (rx::dpdk::UTILITY.init)(&mut cfg)?;
-        }
-        _ => unreachable!(),
-    };
 
-    signal_hook::flag::register(signal_hook::consts::SIGTERM, Arc::clone(&exit))?;
-    signal_hook::flag::register(signal_hook::consts::SIGINT, Arc::clone(&exit))?;
+    signal_hook::flag::register(signal_hook::consts::SIGTERM, cfg.exit.clone())?;
+    signal_hook::flag::register(signal_hook::consts::SIGINT, cfg.exit.clone())?;
 
     let cfg = Arc::new(cfg);
 
-    let mut handles = vec![];
-
-    // keep share library 'alive' so that the vtable of trait object pointer is not pointing to an invalid position
-    let mut parser_libraries = HashMap::new();
-    let mut protocol_parsers = Vec::new();
-
-    for p in &cfg.as_ref().parsers {
-        let lib = unsafe { libloading::Library::new(p)? };
-        parser_libraries.insert(p.clone(), lib);
-        let lib = parser_libraries.get(p).unwrap();
-
-        unsafe {
-            match lib.get::<NewProtocolParserFunc>(b"al_new_protocol_parser\0") {
-                Ok(func) => {
-                    let mut parser = func();
-                    parser.set_id(protocol_parsers.len() as ParserID);
-                    let parser = api::parsers::ProtocolParser::new(parser);
-                    protocol_parsers.push(parser);
-                }
-                Err(e) => {
-                    eprintln!("{:?}", e);
-                }
-            }
-        }
-    }
+    let plugins = plugins::load_plugins(&cfg)?;
+    let mut warehouse = plugins::PluginWarehouse::default();
+    plugins::init_plugins(&plugins, &mut warehouse, &cfg)?;
 
     let mut classifier_manager = classifiers::ClassifierManager::new();
-    for parser in &mut protocol_parsers {
+    for parser in &mut warehouse.pkt_processors {
         parser.register_classify_rules(&mut classifier_manager)?;
-        parser.init(&cfg)?;
     }
 
     classifier_manager.prepare()?;
     let classifier_manager = Arc::new(classifier_manager);
 
+    let mut handles = vec![];
     let (ses_sender, ses_receiver) = bounded(cfg.pkt_channel_size as usize);
     let mut output_thread = threadings::output::Thread::new(ses_receiver.clone());
 
     // initialize pkt threads
     let (pkt_sender, pkt_receiver) = bounded(cfg.pkt_channel_size as usize);
     let mut pkt_threads = Vec::new();
+    warehouse.start_rx(&cfg, &pkt_sender)?;
 
     for i in 0..cfg.pkt_threads {
         let thread = threadings::PktThread::new(
             i,
-            exit.clone(),
+            cfg.exit.clone(),
             classifier_manager.clone(),
             pkt_receiver.clone(),
         );
         pkt_threads.push(thread);
     }
 
-    let timeout_thread = threadings::TimeoutThread::new(exit.clone(), ses_sender.clone());
+    let timeout_thread = threadings::TimeoutThread::new(cfg.exit.clone(), ses_sender.clone());
 
     // start all output threads
     {
@@ -130,7 +77,13 @@ fn main() -> Result<()> {
     for thread in pkt_threads {
         let cfg = cfg.clone();
         let session_table = session_table.clone();
-        let parsers = Box::new(protocol_parsers.iter().map(|p| p.box_clone()).collect());
+        let parsers = Box::new(
+            warehouse
+                .pkt_processors
+                .iter()
+                .map(|p| p.clone_processor())
+                .collect(),
+        );
         let builder = std::thread::Builder::new().name(thread.name());
         let handle = builder.spawn(move || thread.spawn(cfg, session_table, parsers))?;
         handles.push(handle);
@@ -146,11 +99,6 @@ fn main() -> Result<()> {
         handles.push(handle);
     }
 
-    let rx_handles = start_rx(exit.clone(), cfg.clone(), pkt_sender.clone())?;
-    for h in rx_handles {
-        handles.push(h);
-    }
-
     drop(pkt_sender);
     drop(pkt_receiver);
     drop(ses_sender);
@@ -159,24 +107,16 @@ fn main() -> Result<()> {
     for handle in handles {
         match handle.join() {
             Ok(_) => {}
-            Err(e) => println!("{:?}", e),
+            Err(e) => {
+                cfg.exit.store(true, Ordering::SeqCst);
+                println!("{:?}", e)
+            }
         };
     }
 
-    for parser in &mut protocol_parsers {
-        parser.exit()?;
+    for parser in &warehouse.pkt_processors {
+        parser.cleanup()?;
     }
-
-    match cfg.rx_backend.as_str() {
-        "libpcap" => {
-            (rx::libpcap::UTILITY.cleanup)(&cfg)?;
-        }
-        #[cfg(all(target_os = "linux", feature = "dpdk"))]
-        "dpdk" => {
-            (rx::dpdk::UTILITY.cleanup)(&cfg)?;
-        }
-        _ => unreachable!(),
-    };
 
     Ok(())
 }

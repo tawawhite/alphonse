@@ -4,8 +4,8 @@ use fnv::FnvHashMap;
 use alphonse_api as api;
 use api::classifiers::{ClassifierManager, RuleID};
 use api::packet::Packet;
-use api::parsers::ParserID;
-use api::parsers::ProtocolParserTrait;
+use api::plugins::parsers::{Processor, ProcessorID};
+use api::plugins::{Plugin, PluginType};
 use api::session::Session;
 
 mod areospike;
@@ -40,8 +40,8 @@ mod vnc;
 mod zabbix;
 
 #[derive(Clone, Default)]
-pub struct ProtocolParser {
-    id: ParserID,
+pub struct Misc {
+    id: ProcessorID,
     name: String,
     classified: bool,
     match_cbs: FnvHashMap<RuleID, MatchCallBack>,
@@ -57,24 +57,29 @@ pub enum MatchCallBack {
     None,
 }
 
-impl ProtocolParserTrait for ProtocolParser {
-    fn box_clone(&self) -> Box<dyn api::parsers::ProtocolParserTrait> {
+impl Plugin for Misc {
+    fn plugin_type(&self) -> PluginType {
+        PluginType::PacketProcessor
+    }
+
+    fn name(&self) -> &str {
+        &self.name.as_str()
+    }
+}
+
+impl Processor for Misc {
+    fn clone_processor(&self) -> Box<dyn Processor> {
         Box::new(self.clone())
     }
 
     /// Get parser id
-    fn id(&self) -> ParserID {
+    fn id(&self) -> ProcessorID {
         self.id
     }
 
     /// Get parser id
-    fn set_id(&mut self, id: ParserID) {
+    fn set_id(&mut self, id: ProcessorID) {
         self.id = id
-    }
-
-    /// Get parser name
-    fn name(&self) -> &str {
-        &self.name.as_str()
     }
 
     fn register_classify_rules(&mut self, manager: &mut ClassifierManager) -> Result<()> {
@@ -149,6 +154,11 @@ impl ProtocolParserTrait for ProtocolParser {
 }
 
 #[no_mangle]
-pub extern "C" fn al_new_protocol_parser() -> Box<Box<dyn api::parsers::ProtocolParserTrait>> {
-    Box::new(Box::new(ProtocolParser::default()))
+pub extern "C" fn al_new_pkt_processor() -> Box<Box<dyn Processor>> {
+    Box::new(Box::new(Misc::default()))
+}
+
+#[no_mangle]
+pub extern "C" fn al_plugin_type() -> PluginType {
+    PluginType::PacketProcessor
 }
