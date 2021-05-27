@@ -17,10 +17,15 @@ mod bjnp;
 mod cassandra;
 mod dcerpc;
 mod dropbox;
+mod elasticsearch;
 mod flap;
 mod flash_policy;
 mod gh0st;
+mod hadoop;
+mod hbase;
+mod hdfs;
 mod honeywell;
+mod hsrp;
 mod imap;
 mod isakmp;
 mod jabber;
@@ -28,6 +33,8 @@ mod kafka;
 mod macros;
 mod memcached;
 mod mongo;
+mod mqtt;
+mod netflow;
 mod nsclient;
 mod ntp;
 mod nzsql;
@@ -38,18 +45,24 @@ mod rdp;
 mod redis;
 mod rip;
 mod rmi;
+mod safet;
 mod sip;
+mod skinny;
 mod splunk;
 mod ssdp;
 mod steam;
 mod stun;
 mod syslog;
 mod tacacs;
+mod telnet;
 mod thrift;
 mod user;
 mod vnc;
+mod whois;
+mod wudo;
 mod x11;
 mod zabbix;
+mod zookeeper;
 
 #[derive(Clone, Default)]
 pub struct Misc {
@@ -104,16 +117,23 @@ impl Processor for Misc {
         cassandra::register_classify_rules(self, manager)?;
         dcerpc::register_classify_rules(self, manager)?;
         dropbox::register_classify_rules(self, manager)?;
+        elasticsearch::register_classify_rules(self, manager)?;
         flash_policy::register_classify_rules(self, manager)?;
         flap::register_classify_rules(self, manager)?;
         gh0st::register_classify_rules(self, manager)?;
+        hadoop::register_classify_rules(self, manager)?;
+        hbase::register_classify_rules(self, manager)?;
+        hdfs::register_classify_rules(self, manager)?;
         honeywell::register_classify_rules(self, manager)?;
+        hsrp::register_classify_rules(self, manager)?;
         imap::register_classify_rules(self, manager)?;
         isakmp::register_classify_rules(self, manager)?;
         jabber::register_classify_rules(self, manager)?;
         kafka::register_classify_rules(self, manager)?;
         memcached::register_classify_rules(self, manager)?;
         mongo::register_classify_rules(self, manager)?;
+        mqtt::register_classify_rules(self, manager)?;
+        netflow::register_classify_rules(self, manager)?;
         nsclient::register_classify_rules(self, manager)?;
         ntp::register_classify_rules(self, manager)?;
         nzsql::register_classify_rules(self, manager)?;
@@ -124,6 +144,8 @@ impl Processor for Misc {
         redis::register_classify_rules(self, manager)?;
         rip::register_classify_rules(self, manager)?;
         rmi::register_classify_rules(self, manager)?;
+        safet::register_classify_rules(self, manager)?;
+        skinny::register_classify_rules(self, manager)?;
         sip::register_classify_rules(self, manager)?;
         splunk::register_classify_rules(self, manager)?;
         ssdp::register_classify_rules(self, manager)?;
@@ -131,11 +153,15 @@ impl Processor for Misc {
         stun::register_classify_rules(self, manager)?;
         syslog::register_classify_rules(self, manager)?;
         tacacs::register_classify_rules(self, manager)?;
+        telnet::register_classify_rules(self, manager)?;
         thrift::register_classify_rules(self, manager)?;
         user::register_classify_rules(self, manager)?;
         vnc::register_classify_rules(self, manager)?;
+        whois::register_classify_rules(self, manager)?;
+        wudo::register_classify_rules(self, manager)?;
         x11::register_classify_rules(self, manager)?;
         zabbix::register_classify_rules(self, manager)?;
+        zookeeper::register_classify_rules(self, manager)?;
 
         Ok(())
     }
