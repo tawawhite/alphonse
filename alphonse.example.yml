@@ -31,7 +31,7 @@ threads.pkt: 1
 threads.rx: 1
 threads.session: 1
 threads.output: 1
-plugins: ["http", "ip", "misc", "tls"]
+plugins: ["http", "ip", "misc", "tls", "rxlibpcap"]
 plugins.dirs: ["target/debug"]
 
 # Configuration for simple writer
