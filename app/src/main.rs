@@ -14,7 +14,6 @@ mod commands;
 mod config;
 mod packet;
 mod plugins;
-mod rx;
 mod stats;
 mod threadings;
 

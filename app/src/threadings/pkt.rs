@@ -11,7 +11,7 @@ use api::packet::{Packet, PacketHashKey};
 use api::plugins::processor::Processor;
 use api::utils::timeval::TimeVal;
 
-use crate::rx::{SessionData, SessionTable};
+use crate::threadings::{SessionData, SessionTable};
 
 pub struct PktThread {
     id: u8,

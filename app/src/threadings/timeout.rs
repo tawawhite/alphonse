@@ -5,14 +5,32 @@ use std::time::SystemTime;
 
 use anyhow::Result;
 use crossbeam_channel::Sender;
+use dashmap::DashMap;
+use fnv::{FnvBuildHasher, FnvHashMap};
 use rayon::iter::{ParallelBridge, ParallelIterator};
 
 use alphonse_api as api;
 use api::config::Config;
-use api::packet::Protocol;
+use api::packet::{PacketHashKey, Protocol};
+use api::plugins::processor::{Processor, ProcessorID};
 use api::session::Session;
 
-use crate::rx::SessionTable;
+pub struct SessionData {
+    pub info: Box<Session>,
+    pub processors: Box<FnvHashMap<ProcessorID, Box<dyn Processor>>>,
+}
+
+impl Default for SessionData {
+    fn default() -> SessionData {
+        SessionData {
+            // Here we use Session::new(), since default() doesn't generate the struct we need
+            info: Box::new(Session::new()),
+            processors: Box::new(FnvHashMap::default()),
+        }
+    }
+}
+
+pub type SessionTable = DashMap<PacketHashKey, Box<SessionData>, FnvBuildHasher>;
 
 /// Session table timeout thread
 pub struct TimeoutThread {

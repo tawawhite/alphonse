@@ -10,9 +10,8 @@ use alphonse_api as api;
 use api::classifiers::matched::Rule;
 use api::config::Config;
 use api::packet::{Layers, Packet as PacketTrait, Rules, Tunnel};
+use api::plugins::rx::RxStat;
 use api::utils::timeval::{precision, TimeVal};
-
-use crate::stats::CaptureStat;
 
 /// Minimium DPDK rx unit
 #[derive(Clone, Debug)]
@@ -49,8 +48,8 @@ impl Device {
         unimplemented!("dpdk::Device::next not implemented")
     }
 
-    pub fn stats(&mut self) -> Result<CaptureStat> {
-        Ok(CaptureStat::default())
+    pub fn stats(&mut self) -> Result<RxStat> {
+        Ok(RxStat::default())
     }
 }
 
