@@ -5,7 +5,7 @@ pub struct Config {
     pub exit: Arc<AtomicBool>,
     /// Configure file dist location
     pub fpath: String,
-    pub rx_backend: String,
+    pub rx_driver: String,
     pub verbose_mode: bool,
     pub pkt_channel_size: u32,
     pub default_timeout: u16,

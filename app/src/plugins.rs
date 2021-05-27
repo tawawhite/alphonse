@@ -48,22 +48,21 @@ impl Plugins {
 
 #[derive(Default)]
 pub struct PluginWarehouse {
-    pub rx_drivers: Vec<Box<dyn RxDriver>>,
+    pub rx_driver: Option<Box<dyn RxDriver>>,
     pub pkt_processors: Vec<Box<dyn Processor>>,
 }
 
 impl PluginWarehouse {
     pub fn start_rx(&self, cfg: &Arc<Config>, sender: &Sender<Box<dyn Packet>>) -> Result<()> {
-        for driver in &self.rx_drivers {
-            driver.start(cfg.clone(), sender.clone())?;
+        match &self.rx_driver {
+            None => return Err(anyhow!("alphonse hasn't load any rx driver plugin")),
+            Some(driver) => driver.start(cfg.clone(), sender.clone())?,
         }
         Ok(())
     }
 }
 
 pub fn load_plugins(cfg: &Config) -> Result<Plugins> {
-    let mut plugins = Plugins::default();
-
     let plugin_dirs = cfg.get_str_arr("plugins.dirs");
     let plugin_dirs = if plugin_dirs.is_empty() {
         vec!["target/debug"]
@@ -79,7 +78,11 @@ pub fn load_plugins(cfg: &Config) -> Result<Plugins> {
         Search::Default,
     );
 
-    for plg_name in &cfg.get_str_arr("plugins") {
+    let mut plugin_names = cfg.processors.clone();
+    plugin_names.push(cfg.rx_driver.clone());
+
+    let mut plugins = Plugins::default();
+    for plg_name in &plugin_names {
         match reload_handler.add_library(plg_name, PlatformName::Yes) {
             Ok(lib) => plugins.add_plugin(&lib),
             Err(e) => {
@@ -132,7 +135,17 @@ pub fn init_plugins(
                     let driver = *func();
                     println!("Initializing {} rx driver", driver.name());
                     driver.init(cfg)?;
-                    warehouse.rx_drivers.push(driver);
+                    match &warehouse.rx_driver {
+                        None => warehouse.rx_driver = Some(driver),
+                        Some(d) => {
+                            return Err(anyhow!(
+                                "alphonse is trying to load rx driver '{}', however alphonse has already loaded rx driver '{}', please check {} again",
+                                driver.name(),
+                                d.name(),
+                                cfg.fpath
+                            ))
+                        }
+                    }
                 }
                 PluginType::PacketProcessor => {
                     let func = plugin
