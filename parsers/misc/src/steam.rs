@@ -22,8 +22,10 @@ mod test {
     use super::*;
     use api::packet::Protocol;
     use api::plugins::processor::Processor;
-    use api::session::Session;
+    use api::session::{ProtocolLayer, Session};
     use api::utils::packet::Packet as TestPacket;
+
+    use crate::assert_has_protocol;
 
     #[test]
     fn steam() {
@@ -45,7 +47,7 @@ mod test {
         parser
             .parse_pkt(pkt.as_ref(), Some(&pkt.rules()[0]), &mut ses)
             .unwrap();
-        assert!(ses.has_protocol(&"steam-friends"));
+        assert_has_protocol!(ses, "steam-friends");
 
         // rule2
         let mut pkt: Box<TestPacket> = Box::new(TestPacket::default());
@@ -59,6 +61,6 @@ mod test {
         parser
             .parse_pkt(pkt.as_ref(), Some(&pkt.rules()[0]), &mut ses)
             .unwrap();
-        assert!(ses.has_protocol(&"valve-a2s"));
+        assert_has_protocol!(ses, "valve-a2s");
     }
 }

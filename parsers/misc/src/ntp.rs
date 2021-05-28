@@ -3,9 +3,11 @@ use anyhow::Result;
 use alphonse_api as api;
 use api::classifiers::{dpi, ClassifierManager};
 use api::packet::Packet;
-use api::session::Session;
+use api::session::{ProtocolLayer, Session};
 
-use super::{add_dpi_rule_with_func, add_dpi_udp_rule_with_func, MatchCallBack, Misc};
+use super::{
+    add_dpi_rule_with_func, add_dpi_udp_rule_with_func, add_protocol, MatchCallBack, Misc,
+};
 
 pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManager) -> Result<()> {
     add_dpi_udp_rule_with_func!(
@@ -18,18 +20,19 @@ pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManage
     Ok(())
 }
 
-fn classify(ses: &mut Session, pkt: &dyn Packet) {
+fn classify(ses: &mut Session, pkt: &dyn Packet) -> Result<()> {
     unsafe {
         if pkt.src_port() != 123 && pkt.dst_port() != 123 {
-            return;
+            return Ok(());
         }
     }
 
     if pkt.payload().len() < 48 || pkt.payload()[1] > 16 {
-        return;
+        return Ok(());
     }
 
-    ses.add_protocol(&"ntp");
+    add_protocol!(ses, "ntp");
+    Ok(())
 }
 
 #[cfg(test)]
@@ -40,7 +43,7 @@ mod test {
     use api::session::Session;
     use api::utils::packet::Packet as TestPacket;
 
-    use crate::Misc;
+    use crate::assert_has_protocol;
 
     #[test]
     fn ntp() {
@@ -70,6 +73,6 @@ mod test {
                 .parse_pkt(pkt.as_ref(), Some(rule), &mut ses)
                 .unwrap();
         }
-        assert!(ses.has_protocol(&"ntp"));
+        assert_has_protocol!(ses, "ntp");
     }
 }

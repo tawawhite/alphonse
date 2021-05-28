@@ -3,9 +3,11 @@ use anyhow::Result;
 use alphonse_api as api;
 use api::classifiers::{dpi, ClassifierManager};
 use api::packet::Packet;
-use api::session::Session;
+use api::session::{ProtocolLayer, Session};
 
-use crate::{add_dpi_rule_with_func, add_dpi_tcp_rule_with_func, MatchCallBack, Misc};
+use crate::{
+    add_dpi_rule_with_func, add_dpi_tcp_rule_with_func, add_protocol, MatchCallBack, Misc,
+};
 
 pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManager) -> Result<()> {
     add_dpi_tcp_rule_with_func!(r"^\x00\x00", classify, parser, manager);
@@ -13,16 +15,20 @@ pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManage
     Ok(())
 }
 
-fn classify(ses: &mut Session, pkt: &dyn Packet) {
+fn classify(ses: &mut Session, pkt: &dyn Packet) -> Result<()> {
     let payload = pkt.payload();
     if payload.len() < 10 || payload[4] != 0 || payload[5] > 6 || payload[7] != 0 {
-        return;
+        return Ok(());
     }
+
     let flen = 4 + ((payload[2] as u16) << 8 | payload[3] as u16) as usize;
     if payload.len() != flen {
-        return;
+        return Ok(());
     }
-    ses.add_protocol(&"kafka");
+
+    add_protocol!(ses, "kafka");
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -33,7 +39,7 @@ mod test {
     use api::session::Session;
     use api::utils::packet::Packet as TestPacket;
 
-    use crate::Misc;
+    use crate::assert_has_protocol;
 
     #[test]
     fn test() {
@@ -61,6 +67,6 @@ mod test {
         parser
             .parse_pkt(pkt.as_ref(), Some(&pkt.rules()[0]), &mut ses)
             .unwrap();
-        assert!(ses.has_protocol(&"kafka"));
+        assert_has_protocol!(ses, "kafka");
     }
 }

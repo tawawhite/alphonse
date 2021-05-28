@@ -8,9 +8,9 @@ use anyhow::Result;
 use alphonse_api as api;
 use api::classifiers::ClassifierManager;
 use api::packet::{Packet, Protocol};
-use api::session::Session;
+use api::session::{ProtocolLayer, Session};
 
-use crate::{add_port_rule_with_func, MatchCallBack, Misc};
+use crate::{add_port_rule_with_func, add_protocol, MatchCallBack, Misc};
 
 pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManager) -> Result<()> {
     add_port_rule_with_func!(2000, classify, Protocol::TCP, parser, manager);
@@ -18,20 +18,21 @@ pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManage
     Ok(())
 }
 
-fn classify(ses: &mut Session, pkt: &dyn Packet) {
+fn classify(ses: &mut Session, pkt: &dyn Packet) -> Result<()> {
     let len = (pkt.payload()[0] as u32)
         | (pkt.payload()[1] as u32) << 8
         | (pkt.payload()[2] as u32) << 16
         | (pkt.payload()[3] as u32) << 24;
     if pkt.payload().len() < len as usize {
-        return;
+        return Ok(());
     }
 
     if pkt.payload()[4..8] != [0; 4] {
-        return;
+        return Ok(());
     }
 
-    ses.add_protocol(&"skinny");
+    add_protocol!(ses, "skinny");
+    Ok(())
 }
 
 #[cfg(test)]
@@ -42,7 +43,7 @@ mod test {
     use api::session::Session;
     use api::utils::packet::Packet as TestPacket;
 
-    use crate::Misc;
+    use crate::assert_has_protocol;
 
     #[test]
     fn skinny() {
@@ -70,6 +71,6 @@ mod test {
         parser
             .parse_pkt(pkt.as_ref(), Some(&pkt.rules()[0]), &mut ses)
             .unwrap();
-        assert!(ses.has_protocol(&"skinny"));
+        assert_has_protocol!(ses, "skinny");
     }
 }

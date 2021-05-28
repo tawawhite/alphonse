@@ -3,9 +3,11 @@ use anyhow::Result;
 use alphonse_api as api;
 use api::classifiers::{dpi, ClassifierManager};
 use api::packet::Packet;
-use api::session::Session;
+use api::session::{ProtocolLayer, Session};
 
-use crate::{add_dpi_rule_with_func, add_dpi_udp_rule_with_func, MatchCallBack, Misc};
+use crate::{
+    add_dpi_rule_with_func, add_dpi_udp_rule_with_func, add_protocol, MatchCallBack, Misc,
+};
 
 pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManager) -> Result<()> {
     add_dpi_udp_rule_with_func!(r"^[\x01\x02]{2}\x00\x00", classify, parser, manager);
@@ -13,12 +15,14 @@ pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManage
     Ok(())
 }
 
-fn classify(ses: &mut Session, pkt: &dyn Packet) {
+fn classify(ses: &mut Session, pkt: &dyn Packet) -> Result<()> {
     unsafe {
         if pkt.src_port() == 520 || pkt.dst_port() == 520 {
-            ses.add_protocol(&"rip");
+            add_protocol!(ses, "rip");
         }
     }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -26,10 +30,9 @@ mod test {
     use super::*;
     use api::packet::Protocol;
     use api::plugins::processor::Processor;
-    use api::session::Session;
     use api::utils::packet::Packet as TestPacket;
 
-    use crate::Misc;
+    use crate::assert_has_protocol;
 
     #[test]
     fn rip() {
@@ -54,7 +57,7 @@ mod test {
                 .parse_pkt(pkt.as_ref(), Some(rule), &mut ses)
                 .unwrap();
         }
-        assert!(ses.has_protocol(&"rip"));
+        assert_has_protocol!(ses, "rip");
 
         // \x01\x02\x00\x00
         let mut pkt: Box<TestPacket> = Box::new(TestPacket::default());
@@ -71,7 +74,7 @@ mod test {
                 .parse_pkt(pkt.as_ref(), Some(rule), &mut ses)
                 .unwrap();
         }
-        assert!(ses.has_protocol(&"rip"));
+        assert_has_protocol!(ses, "rip");
 
         // \x02\x01\x00\x00
         let mut pkt: Box<TestPacket> = Box::new(TestPacket::default());
@@ -88,7 +91,7 @@ mod test {
                 .parse_pkt(pkt.as_ref(), Some(rule), &mut ses)
                 .unwrap();
         }
-        assert!(ses.has_protocol(&"rip"));
+        assert_has_protocol!(ses, "rip");
 
         // \x02\x02\x00\x00
         let mut pkt: Box<TestPacket> = Box::new(TestPacket::default());
@@ -105,6 +108,6 @@ mod test {
                 .parse_pkt(pkt.as_ref(), Some(rule), &mut ses)
                 .unwrap();
         }
-        assert!(ses.has_protocol(&"rip"));
+        assert_has_protocol!(ses, "rip");
     }
 }

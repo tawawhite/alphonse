@@ -4,9 +4,9 @@ use serde_json::json;
 use alphonse_api as api;
 use api::classifiers::ClassifierManager;
 use api::packet::{Packet, Protocol};
-use api::session::Session;
+use api::session::{ProtocolLayer, Session};
 
-use crate::{add_port_rule_with_func, MatchCallBack, Misc};
+use crate::{add_port_rule_with_func, add_protocol, MatchCallBack, Misc};
 
 const MARKER: [u8; 16] = [0xff; 16];
 const TYPE: &[&str] = &[
@@ -24,12 +24,13 @@ pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManage
     Ok(())
 }
 
-fn classify(ses: &mut Session, pkt: &dyn Packet) {
+fn classify(ses: &mut Session, pkt: &dyn Packet) -> Result<()> {
+    println!("{:?} {:?}", &pkt.payload()[0..16], MARKER);
     if pkt.data_len() < 19 || pkt.payload()[0..16] != MARKER {
-        return;
+        return Ok(());
     }
 
-    ses.add_protocol(&"bgp");
+    add_protocol!(ses, "bgp");
 
     let msg_type = pkt.payload()[18] as usize;
     if msg_type < TYPE.len() {
@@ -37,6 +38,8 @@ fn classify(ses: &mut Session, pkt: &dyn Packet) {
     } else {
         ses.add_field(&"bgp.type", &json!("Unassigned"));
     }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -44,10 +47,9 @@ mod test {
     use super::*;
     use api::packet::Protocol;
     use api::plugins::processor::Processor;
-    use api::session::Session;
     use api::utils::packet::Packet as TestPacket;
 
-    use crate::Misc;
+    use crate::assert_has_protocol;
 
     #[test]
     fn bgp() {
@@ -85,13 +87,18 @@ mod test {
         pkt.caplen = 85;
         let mut pkt: Box<dyn api::packet::Packet> = pkt;
         manager.classify(pkt.as_mut(), &mut scratch).unwrap();
-        assert_eq!(pkt.rules().len(), 1);
+        assert!(pkt.rules().len() > 0);
 
         let mut ses = Session::new();
-        parser
-            .parse_pkt(pkt.as_ref(), Some(&pkt.rules()[0]), &mut ses)
-            .unwrap();
-        assert!(!ses.has_protocol(&"bgp"));
+        for rule in pkt.rules() {
+            parser
+                .parse_pkt(pkt.as_ref(), Some(rule), &mut ses)
+                .unwrap();
+        }
+        assert!(!ses.has_protocol(&"bgp", ProtocolLayer::All).unwrap());
+        assert!(!ses
+            .has_protocol(&"bgp", ProtocolLayer::Application)
+            .unwrap());
 
         // OPEN message type
         let mut pkt: Box<TestPacket> = Box::new(TestPacket::default());
@@ -115,7 +122,7 @@ mod test {
         parser
             .parse_pkt(pkt.as_ref(), Some(&pkt.rules()[0]), &mut ses)
             .unwrap();
-        assert!(ses.has_protocol(&"bgp"));
+        assert_has_protocol!(ses, "bgp");
         let a = &ses.fields.as_object().unwrap()["bgp.type"];
         assert_eq!(a.as_str().unwrap(), "OPEN");
     }

@@ -22,10 +22,10 @@ mod test {
     use super::*;
     use api::packet::Protocol;
     use api::plugins::processor::Processor;
-    use api::session::Session;
+    use api::session::{ProtocolLayer, Session};
     use api::utils::packet::Packet as TestPacket;
 
-    use crate::Misc;
+    use crate::assert_has_protocol;
 
     #[test]
     fn bittorrent() {
@@ -47,7 +47,7 @@ mod test {
         parser
             .parse_pkt(pkt.as_ref(), Some(&pkt.rules()[0]), &mut ses)
             .unwrap();
-        assert!(ses.has_protocol(&"bittorrent"));
+        assert_has_protocol!(ses, "bittorrent");
 
         // rule 2
         let mut pkt: Box<TestPacket> = Box::new(TestPacket::default());
@@ -61,7 +61,7 @@ mod test {
         parser
             .parse_pkt(pkt.as_ref(), Some(&pkt.rules()[0]), &mut ses)
             .unwrap();
-        assert!(ses.has_protocol(&"bittorrent"));
+        assert_has_protocol!(ses, "bittorrent");
 
         // rule 3
         let mut pkt: Box<TestPacket> = Box::new(TestPacket::default());
@@ -75,6 +75,6 @@ mod test {
         parser
             .parse_pkt(pkt.as_ref(), Some(&pkt.rules()[0]), &mut ses)
             .unwrap();
-        assert!(ses.has_protocol(&"bittorrent"));
+        assert_has_protocol!(ses, "bittorrent");
     }
 }

@@ -3,9 +3,11 @@ use anyhow::Result;
 use alphonse_api as api;
 use api::classifiers::{dpi, ClassifierManager};
 use api::packet::Packet;
-use api::session::Session;
+use api::session::{ProtocolLayer, Session};
 
-use super::{add_dpi_rule_with_func, add_dpi_tcp_rule_with_func, MatchCallBack, Misc};
+use super::{
+    add_dpi_rule_with_func, add_dpi_tcp_rule_with_func, add_protocol, MatchCallBack, Misc,
+};
 
 pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManager) -> Result<()> {
     add_dpi_tcp_rule_with_func!(
@@ -24,28 +26,32 @@ pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManage
     Ok(())
 }
 
-fn classify_windows(ses: &mut Session, pkt: &dyn Packet) {
+fn classify_windows(ses: &mut Session, pkt: &dyn Packet) -> Result<()> {
     let payload = pkt.payload();
     if payload.len() < 15 {
-        return;
+        return Ok(());
     }
 
     if ((payload[6] as u16 & 0xff) << 8 | (payload[5] as u16 & 0xff)) == payload.len() as u16 {
-        ses.add_protocol(&"gh0st");
+        add_protocol!(ses, "gh0st");
     } else if payload[11] == 0 && payload[12] == 0 {
-        ses.add_protocol(&"gh0st");
+        add_protocol!(ses, "gh0st");
     }
+
+    Ok(())
 }
 
-fn classify_mac(ses: &mut Session, pkt: &dyn Packet) {
+fn classify_mac(ses: &mut Session, pkt: &dyn Packet) -> Result<()> {
     let payload = pkt.payload();
     if payload.len() < 15 {
-        return;
+        return Ok(());
     }
 
     if ((payload[7] as u16 & 0xff) << 8 | (payload[8] as u16 & 0xff)) == payload.len() as u16 {
-        ses.add_protocol(&"gh0st");
+        add_protocol!(ses, "gh0st");
     }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -56,7 +62,7 @@ mod test {
     use api::session::Session;
     use api::utils::packet::Packet as TestPacket;
 
-    use crate::Misc;
+    use crate::assert_has_protocol;
 
     #[test]
     fn gh0st() {
@@ -78,7 +84,7 @@ mod test {
         parser
             .parse_pkt(pkt.as_ref(), Some(&pkt.rules()[0]), &mut ses)
             .unwrap();
-        assert!(ses.has_protocol(&"gh0st"));
+        assert_has_protocol!(ses, "gh0st");
 
         // Windows branch 2
         let mut pkt: Box<TestPacket> = Box::new(TestPacket::default());
@@ -92,7 +98,7 @@ mod test {
         parser
             .parse_pkt(pkt.as_ref(), Some(&pkt.rules()[0]), &mut ses)
             .unwrap();
-        assert!(ses.has_protocol(&"gh0st"));
+        assert_has_protocol!(ses, "gh0st");
 
         // mac
         let mut pkt: Box<TestPacket> = Box::new(TestPacket::default());
@@ -106,6 +112,6 @@ mod test {
         parser
             .parse_pkt(pkt.as_ref(), Some(&pkt.rules()[0]), &mut ses)
             .unwrap();
-        assert!(ses.has_protocol(&"gh0st"));
+        assert_has_protocol!(ses, "gh0st");
     }
 }

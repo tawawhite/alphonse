@@ -3,9 +3,9 @@ use anyhow::Result;
 use alphonse_api as api;
 use api::classifiers::ClassifierManager;
 use api::packet::{Packet, Protocol};
-use api::session::Session;
+use api::session::{ProtocolLayer, Session};
 
-use crate::{add_port_rule_with_func, MatchCallBack, Misc};
+use crate::{add_port_rule_with_func, add_protocol, MatchCallBack, Misc};
 
 pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManager) -> Result<()> {
     add_port_rule_with_func!(7680, classify, Protocol::TCP, parser, manager);
@@ -13,14 +13,16 @@ pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManage
     Ok(())
 }
 
-fn classify(ses: &mut Session, pkt: &dyn Packet) {
+fn classify(ses: &mut Session, pkt: &dyn Packet) -> Result<()> {
     if pkt.payload().len() < 15 {
-        return;
+        return Ok(());
     }
 
     if pkt.payload()[0..4] == [0; 4] || &pkt.payload()[0..15] == b"\x0eSwarm protocol" {
-        ses.add_protocol(&"wudo");
+        add_protocol!(ses, "wudo");
     }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -31,7 +33,7 @@ mod test {
     use api::session::Session;
     use api::utils::packet::Packet as TestPacket;
 
-    use crate::Misc;
+    use crate::assert_has_protocol;
 
     #[test]
     fn wudo() {
@@ -57,7 +59,7 @@ mod test {
         parser
             .parse_pkt(pkt.as_ref(), Some(&pkt.rules()[0]), &mut ses)
             .unwrap();
-        assert!(ses.has_protocol(&"wudo"));
+        assert_has_protocol!(ses, "wudo");
 
         // Swarm protocol
         let mut pkt: Box<TestPacket> = Box::new(TestPacket::default());
@@ -73,6 +75,6 @@ mod test {
         parser
             .parse_pkt(pkt.as_ref(), Some(&pkt.rules()[0]), &mut ses)
             .unwrap();
-        assert!(ses.has_protocol(&"wudo"));
+        assert_has_protocol!(ses, "wudo");
     }
 }

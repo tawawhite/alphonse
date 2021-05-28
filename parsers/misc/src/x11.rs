@@ -16,10 +16,10 @@ mod test {
     use super::*;
     use api::packet::Protocol;
     use api::plugins::processor::Processor;
-    use api::session::Session;
+    use api::session::{ProtocolLayer, Session};
     use api::utils::packet::Packet as TestPacket;
 
-    use crate::Misc;
+    use crate::assert_has_protocol;
 
     #[test]
     fn x11() {
@@ -43,6 +43,6 @@ mod test {
                 .parse_pkt(pkt.as_ref(), Some(rule), &mut ses)
                 .unwrap();
         }
-        assert!(ses.has_protocol(&"x11"));
+        assert_has_protocol!(ses, "x11");
     }
 }

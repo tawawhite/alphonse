@@ -3,9 +3,11 @@ use anyhow::Result;
 use alphonse_api as api;
 use api::classifiers::{dpi, ClassifierManager};
 use api::packet::Packet;
-use api::session::Session;
+use api::session::{ProtocolLayer, Session};
 
-use super::{add_dpi_rule_with_func, add_dpi_tcp_rule_with_func, MatchCallBack, Misc};
+use super::{
+    add_dpi_rule_with_func, add_dpi_tcp_rule_with_func, add_protocol, MatchCallBack, Misc,
+};
 
 pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManager) -> Result<()> {
     add_dpi_tcp_rule_with_func!(r"^220\s", classify, parser, manager);
@@ -13,12 +15,12 @@ pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManage
     Ok(())
 }
 
-fn classify(ses: &mut Session, pkt: &dyn Packet) {
+fn classify(ses: &mut Session, pkt: &dyn Packet) -> Result<()> {
     let payload = pkt.payload();
     match payload[4..].windows(4).position(|win| win == b"LMTP") {
         Some(_) => {
-            ses.add_protocol(&"lmtp");
-            return;
+            add_protocol!(ses, "lmtp");
+            return Ok(());
         }
         None => {}
     }
@@ -27,9 +29,13 @@ fn classify(ses: &mut Session, pkt: &dyn Packet) {
         payload[4..].windows(4).position(|win| win == b"SMTP"),
         payload[4..].windows(4).position(|win| win == b"TLS"),
     ) {
-        (None, None) => ses.add_protocol(&"ftp"),
+        (None, None) => {
+            add_protocol!(ses, "ftp");
+        }
         _ => {}
-    }
+    };
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -40,7 +46,7 @@ mod test {
     use api::session::Session;
     use api::utils::packet::Packet as TestPacket;
 
-    use crate::Misc;
+    use crate::assert_has_protocol;
 
     #[test]
     fn other220() {
@@ -62,7 +68,7 @@ mod test {
         parser
             .parse_pkt(pkt.as_ref(), Some(&pkt.rules()[0]), &mut ses)
             .unwrap();
-        assert!(ses.has_protocol(&"lmtp"));
+        assert_has_protocol!(ses, "lmtp");
 
         // ftp
         let mut pkt: Box<TestPacket> = Box::new(TestPacket::default());
@@ -76,6 +82,6 @@ mod test {
         parser
             .parse_pkt(pkt.as_ref(), Some(&pkt.rules()[0]), &mut ses)
             .unwrap();
-        assert!(ses.has_protocol(&"ftp"));
+        assert_has_protocol!(ses, "ftp");
     }
 }

@@ -3,21 +3,24 @@ use anyhow::Result;
 use alphonse_api as api;
 use api::classifiers::{dpi, ClassifierManager};
 use api::packet::Packet;
-use api::session::Session;
+use api::session::{ProtocolLayer, Session};
 
-use super::{add_dpi_rule_with_func, add_dpi_tcp_rule_with_func, MatchCallBack, Misc};
+use super::{
+    add_dpi_rule_with_func, add_dpi_tcp_rule_with_func, add_protocol, MatchCallBack, Misc,
+};
 
 pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManager) -> Result<()> {
     add_dpi_tcp_rule_with_func!(r"^\x00\x1c[\x50\x51\x55]", classify, parser, manager);
     Ok(())
 }
 
-fn classify(ses: &mut Session, pkt: &dyn Packet) {
+fn classify(ses: &mut Session, pkt: &dyn Packet) -> Result<()> {
     if pkt.payload().len() < 10 || pkt.payload()[5] != 0xa {
-        return;
+        return Ok(());
     }
 
-    ses.add_protocol(&"hdfs");
+    add_protocol!(ses, "hdfs");
+    Ok(())
 }
 
 #[cfg(test)]
@@ -28,10 +31,10 @@ mod test {
     use api::session::Session;
     use api::utils::packet::Packet as TestPacket;
 
-    use crate::Misc;
+    use crate::assert_has_protocol;
 
     #[test]
-    fn netflow() {
+    fn hdfs() {
         let mut manager = ClassifierManager::new();
         let mut parser = Misc::default();
         parser.register_classify_rules(&mut manager).unwrap();
@@ -51,6 +54,6 @@ mod test {
                 .parse_pkt(pkt.as_ref(), Some(rule), &mut ses)
                 .unwrap();
         }
-        assert!(ses.has_protocol(&"hdfs"));
+        assert_has_protocol!(ses, "hdfs");
     }
 }

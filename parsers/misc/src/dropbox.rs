@@ -3,9 +3,11 @@ use anyhow::Result;
 use alphonse_api as api;
 use api::classifiers::{dpi, ClassifierManager};
 use api::packet::Packet;
-use api::session::Session;
+use api::session::{ProtocolLayer, Session};
 
-use crate::{add_dpi_rule_with_func, add_dpi_udp_rule_with_func, MatchCallBack, Misc};
+use crate::{
+    add_dpi_rule_with_func, add_dpi_udp_rule_with_func, add_protocol, MatchCallBack, Misc,
+};
 
 pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManager) -> Result<()> {
     add_dpi_udp_rule_with_func!(r"^.host_int", classify, parser, manager);
@@ -13,12 +15,13 @@ pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManage
     Ok(())
 }
 
-fn classify(ses: &mut Session, pkt: &dyn Packet) {
+fn classify(ses: &mut Session, pkt: &dyn Packet) -> Result<()> {
     unsafe {
         if pkt.src_port() == 17500 || pkt.dst_port() == 17500 {
-            ses.add_protocol(&"dropbox-lan-sync");
+            add_protocol!(ses, "dropbox-lan-sync");
         }
     }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -26,10 +29,9 @@ mod test {
     use super::*;
     use api::packet::Protocol;
     use api::plugins::processor::Processor;
-    use api::session::Session;
     use api::utils::packet::Packet as TestPacket;
 
-    use crate::Misc;
+    use crate::assert_has_protocol;
 
     #[test]
     fn test() {
@@ -55,6 +57,6 @@ mod test {
         parser
             .parse_pkt(pkt.as_ref(), Some(&pkt.rules()[0]), &mut ses)
             .unwrap();
-        assert!(ses.has_protocol(&"dropbox-lan-sync"));
+        assert_has_protocol!(ses, "dropbox-lan-sync");
     }
 }

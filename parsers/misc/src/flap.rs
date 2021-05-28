@@ -3,9 +3,11 @@ use anyhow::Result;
 use alphonse_api as api;
 use api::classifiers::{dpi, ClassifierManager};
 use api::packet::Packet;
-use api::session::Session;
+use api::session::{ProtocolLayer, Session};
 
-use super::{add_dpi_rule_with_func, add_dpi_tcp_rule_with_func, MatchCallBack, Misc};
+use super::{
+    add_dpi_rule_with_func, add_dpi_tcp_rule_with_func, add_protocol, MatchCallBack, Misc,
+};
 
 pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManager) -> Result<()> {
     add_dpi_tcp_rule_with_func!(r"^\x2a\x01", classify, parser, manager);
@@ -13,20 +15,22 @@ pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManage
     Ok(())
 }
 
-fn classify(ses: &mut Session, pkt: &dyn Packet) {
+fn classify(ses: &mut Session, pkt: &dyn Packet) -> Result<()> {
     let payload = pkt.payload();
     if payload.len() < 6 {
-        return;
+        return Ok(());
     }
 
     let flen = ((payload[4] as u16) << 8 | payload[5] as u16) as usize;
     if payload.len() < flen {
-        return;
+        return Ok(());
     }
 
     if payload.len() == flen || payload[flen] as char == '*' {
-        ses.add_protocol(&"flap");
+        add_protocol!(ses, "flap");
     }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -37,7 +41,7 @@ mod test {
     use api::session::Session;
     use api::utils::packet::Packet as TestPacket;
 
-    use crate::Misc;
+    use crate::assert_has_protocol;
 
     #[test]
     fn test() {
@@ -59,7 +63,7 @@ mod test {
         parser
             .parse_pkt(pkt.as_ref(), Some(&pkt.rules()[0]), &mut ses)
             .unwrap();
-        assert!(ses.has_protocol(&"flap"));
+        assert_has_protocol!(ses, "flap");
 
         // condition 2
         let mut pkt: Box<TestPacket> = Box::new(TestPacket::default());
@@ -73,6 +77,6 @@ mod test {
         parser
             .parse_pkt(pkt.as_ref(), Some(&pkt.rules()[0]), &mut ses)
             .unwrap();
-        assert!(ses.has_protocol(&"flap"));
+        assert_has_protocol!(ses, "flap");
     }
 }

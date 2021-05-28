@@ -3,9 +3,9 @@ use anyhow::Result;
 use alphonse_api as api;
 use api::classifiers::ClassifierManager;
 use api::packet::{Packet, Protocol};
-use api::session::Session;
+use api::session::{ProtocolLayer, Session};
 
-use crate::{add_port_rule_with_func, MatchCallBack, Misc};
+use crate::{add_port_rule_with_func, add_protocol, MatchCallBack, Misc};
 
 pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManager) -> Result<()> {
     add_port_rule_with_func!(500, classify, Protocol::UDP, parser, manager);
@@ -14,23 +14,26 @@ pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManage
     Ok(())
 }
 
-fn classify(ses: &mut Session, pkt: &dyn Packet) {
+fn classify(ses: &mut Session, pkt: &dyn Packet) -> Result<()> {
     if pkt.data_len() < 18 {
-        return;
+        return Ok(());
     }
+
     if pkt.payload()[16] != 1
         && pkt.payload()[16] != 8
         && pkt.payload()[16] != 33
         && pkt.payload()[16] != 46
     {
-        return;
+        return Ok(());
     }
 
     if pkt.payload()[17] != 0x10 && pkt.payload()[17] != 0x20 && pkt.payload()[17] != 0x02 {
-        return;
+        return Ok(());
     }
 
-    ses.add_protocol(&"isakmp");
+    add_protocol!(ses, "isakmp");
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -41,7 +44,7 @@ mod test {
     use api::session::Session;
     use api::utils::packet::Packet as TestPacket;
 
-    use crate::Misc;
+    use crate::assert_has_protocol;
 
     #[test]
     fn isakmp() {
@@ -71,7 +74,7 @@ mod test {
                 .parse_pkt(pkt.as_ref(), Some(rule), &mut ses)
                 .unwrap();
         }
-        assert!(ses.has_protocol(&"isakmp"));
+        assert_has_protocol!(ses, "isakmp");
 
         // UDP 4500
         let mut pkt: Box<TestPacket> = Box::new(TestPacket::default());
@@ -92,6 +95,6 @@ mod test {
                 .parse_pkt(pkt.as_ref(), Some(rule), &mut ses)
                 .unwrap();
         }
-        assert!(ses.has_protocol(&"isakmp"));
+        assert_has_protocol!(ses, "isakmp");
     }
 }

@@ -4,9 +4,11 @@ use serde_json::json;
 use alphonse_api as api;
 use api::classifiers::{dpi, ClassifierManager};
 use api::packet::Packet;
-use api::session::Session;
+use api::session::{ProtocolLayer, Session};
 
-use super::{add_dpi_rule_with_func, add_dpi_tcp_rule_with_func, MatchCallBack, Misc};
+use super::{
+    add_dpi_rule_with_func, add_dpi_tcp_rule_with_func, add_protocol, MatchCallBack, Misc,
+};
 
 pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManager) -> Result<()> {
     add_dpi_tcp_rule_with_func!(r"^\x03\x00", classify, parser, manager);
@@ -14,14 +16,14 @@ pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManage
     Ok(())
 }
 
-fn classify(ses: &mut Session, pkt: &dyn Packet) {
+fn classify(ses: &mut Session, pkt: &dyn Packet) -> Result<()> {
     let payload = pkt.payload();
     if payload.len() > 5
         && payload[3] < payload.len() as u8
         && payload[4] == payload[3] - 5
         && payload[5] == 0xe0
     {
-        ses.add_protocol(&"rdp");
+        add_protocol!(ses, "rdp");
         if payload.len() > 30 && &payload[11..28] == b"Cookie: mstshash=" {
             match payload[28..].windows(2).position(|win| win == b"\r\n") {
                 Some(pos) => ses.add_field(
@@ -31,7 +33,8 @@ fn classify(ses: &mut Session, pkt: &dyn Packet) {
                 None => {}
             }
         }
-    }
+    };
+    Ok(())
 }
 
 #[cfg(test)]
@@ -39,10 +42,9 @@ mod test {
     use super::*;
     use api::packet::Protocol;
     use api::plugins::processor::Processor;
-    use api::session::Session;
     use api::utils::packet::Packet as TestPacket;
 
-    use crate::Misc;
+    use crate::assert_has_protocol;
 
     #[test]
     fn rdp() {
@@ -65,7 +67,7 @@ mod test {
         parser
             .parse_pkt(pkt.as_ref(), Some(&pkt.rules()[0]), &mut ses)
             .unwrap();
-        assert!(ses.has_protocol(&"rdp"));
+        assert_has_protocol!(ses, "rdp");
         assert_eq!(ses.fields.as_object().unwrap().get("user").unwrap(), "user");
     }
 }

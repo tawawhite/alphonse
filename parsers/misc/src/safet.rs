@@ -3,21 +3,24 @@ use anyhow::Result;
 use alphonse_api as api;
 use api::classifiers::ClassifierManager;
 use api::packet::{Packet, Protocol};
-use api::session::Session;
+use api::session::{ProtocolLayer, Session};
 
-use crate::{add_port_rule_with_func, add_udp_port_rule_with_func, MatchCallBack, Misc};
+use crate::{
+    add_port_rule_with_func, add_protocol, add_udp_port_rule_with_func, MatchCallBack, Misc,
+};
 
 pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManager) -> Result<()> {
     add_udp_port_rule_with_func!(23294, classify, parser, manager);
     Ok(())
 }
 
-fn classify(ses: &mut Session, pkt: &dyn Packet) {
+fn classify(ses: &mut Session, pkt: &dyn Packet) -> Result<()> {
     if pkt.payload().len() < 24 || pkt.payload().len() != pkt.payload()[2] as usize {
-        return;
+        return Ok(());
     }
 
-    ses.add_protocol(&"safet");
+    add_protocol!(ses, "safet");
+    Ok(())
 }
 
 #[cfg(test)]
@@ -28,7 +31,7 @@ mod test {
     use api::session::Session;
     use api::utils::packet::Packet as TestPacket;
 
-    use crate::Misc;
+    use crate::assert_has_protocol;
 
     #[test]
     fn safet() {
@@ -54,6 +57,6 @@ mod test {
         parser
             .parse_pkt(pkt.as_ref(), Some(&pkt.rules()[0]), &mut ses)
             .unwrap();
-        assert!(ses.has_protocol(&"safet"));
+        assert_has_protocol!(ses, "safet");
     }
 }

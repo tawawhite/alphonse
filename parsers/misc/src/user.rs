@@ -25,10 +25,10 @@ pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManage
     Ok(())
 }
 
-fn classify(ses: &mut Session, pkt: &dyn Packet) {
+fn classify(ses: &mut Session, pkt: &dyn Packet) -> Result<()> {
     let payload = pkt.payload();
     if payload.len() <= 5 {
-        return;
+        return Ok(());
     }
 
     let user =
@@ -48,6 +48,7 @@ fn classify(ses: &mut Session, pkt: &dyn Packet) {
             }
         };
     ses.add_field(&"user", &serde_json::json!(user));
+    Ok(())
 }
 
 #[cfg(test)]

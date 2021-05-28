@@ -1,8 +1,10 @@
 use std::collections::HashSet;
 use std::os::raw::c_long;
 
+use anyhow::{anyhow, Result};
 use serde::ser::SerializeStruct;
 use serde::{Serialize, Serializer};
+use serde_json::json;
 
 use crate::packet;
 use crate::utils::timeval::{precision, TimeVal};
@@ -38,6 +40,16 @@ where
     state.serialize_field("srcDataBytes", &data_bytes[0])?;
     state.serialize_field("dstDataBytes", &data_bytes[1])?;
     state.end()
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum ProtocolLayer {
+    All,
+    Datalink,
+    Network,
+    Transport,
+    Application,
+    Tunnel,
 }
 
 /// Network session
@@ -94,11 +106,6 @@ pub struct Session {
     #[serde(skip_serializing_if = "HashSet::is_empty")]
     tags: Box<HashSet<String>>,
 
-    /// Protocols
-    #[cfg_attr(feature = "arkime", serde(rename = "protocol"))]
-    #[serde(skip_serializing_if = "HashSet::is_empty")]
-    protocols: Box<HashSet<String>>,
-
     /// Tunnel Protocols
     #[serde(skip_serializing_if = "packet::Tunnel::is_empty")]
     tunnels: packet::Tunnel,
@@ -137,17 +144,6 @@ impl Session {
         }
     }
 
-    /// Add session protocol information
-    #[inline]
-    pub fn add_protocol<S: AsRef<str>>(&mut self, protocol: &S) {
-        self.protocols.insert(protocol.as_ref().to_string());
-    }
-
-    #[inline]
-    pub fn has_protocol<S: AsRef<str>>(&self, protocol: &S) -> bool {
-        self.protocols.contains(protocol.as_ref())
-    }
-
     /// Add tag
     #[inline]
     pub fn add_tag<S: AsRef<str>>(&mut self, tag: &S) {
@@ -164,6 +160,75 @@ impl Session {
             },
             _ => todo!("need to guarantee fields is an object in Session initialization"),
         };
+    }
+
+    pub fn add_protocol<S: AsRef<str>>(
+        &mut self,
+        protocol: &S,
+        layer: ProtocolLayer,
+    ) -> Result<()> {
+        let layer = match layer {
+            ProtocolLayer::All => "protocol",
+            ProtocolLayer::Datalink => "protocol.datalink",
+            ProtocolLayer::Network => "protocol.network",
+            ProtocolLayer::Transport => "protocol.transport",
+            ProtocolLayer::Application => "protocol.app",
+            ProtocolLayer::Tunnel => "protocol.tunnel",
+        };
+        match self.fields.as_mut() {
+            serde_json::Value::Object(obj) => match obj.get_mut(layer) {
+                Some(protocols) => {
+                    let protocols = protocols
+                        .as_array_mut()
+                        .ok_or(anyhow!("{} is not an json array", layer))?;
+                    match protocols.iter().find(|p| match p.as_str() {
+                        Some(p) => p == protocol.as_ref(),
+                        None => false,
+                    }) {
+                        Some(p) => {}
+                        None => protocols.push(json!(protocol.as_ref())),
+                    };
+                }
+                None => {
+                    obj.insert(layer.to_string(), json!(vec![json!(protocol.as_ref())]));
+                }
+            },
+            _ => todo!("need to guarantee fields is an object in Session initialization"),
+        };
+        Ok(())
+    }
+
+    pub fn has_protocol<S: AsRef<str>>(
+        &mut self,
+        protocol: &S,
+        layer: ProtocolLayer,
+    ) -> Result<bool> {
+        let layer = match layer {
+            ProtocolLayer::All => "protocol",
+            ProtocolLayer::Datalink => "protocol.datalink",
+            ProtocolLayer::Network => "protocol.network",
+            ProtocolLayer::Transport => "protocol.transport",
+            ProtocolLayer::Application => "protocol.app",
+            ProtocolLayer::Tunnel => "protocol.tunnel",
+        };
+        match self.fields.as_mut() {
+            serde_json::Value::Object(obj) => match obj.get_mut(layer) {
+                Some(protocols) => {
+                    let protocols = protocols
+                        .as_array_mut()
+                        .ok_or(anyhow!("{} is not an json array", layer))?;
+                    match protocols.iter().find(|p| match p.as_str() {
+                        Some(p) => p == protocol.as_ref(),
+                        None => false,
+                    }) {
+                        Some(_) => Ok(true),
+                        None => Ok(false),
+                    }
+                }
+                None => Ok(false),
+            },
+            _ => todo!("need to guarantee fields is an object in Session initialization"),
+        }
     }
 
     /// Whether this session needs to do a middle save operation
@@ -198,5 +263,24 @@ impl Session {
         self.bytes = [0, 0];
         self.data_bytes = [0, 0];
         self.save_time = save_time;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[test]
+    fn add_protocol() -> Result<()> {
+        let mut ses = Session::new();
+        ses.add_protocol(&"protocol", ProtocolLayer::All)?;
+        ses.add_protocol(&"protocol", ProtocolLayer::All)?;
+        assert_eq!(
+            ses.has_protocol(&"protocol", ProtocolLayer::All).unwrap(),
+            true
+        );
+
+        Ok(())
     }
 }

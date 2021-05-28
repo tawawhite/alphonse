@@ -7,9 +7,11 @@ use serde_json::json;
 use alphonse_api as api;
 use api::classifiers::{dpi, ClassifierManager};
 use api::packet::Packet;
-use api::session::Session;
+use api::session::{ProtocolLayer, Session};
 
-use super::{add_dpi_rule_with_func, add_dpi_tcp_rule_with_func, MatchCallBack, Misc};
+use super::{
+    add_dpi_rule_with_func, add_dpi_tcp_rule_with_func, add_protocol, MatchCallBack, Misc,
+};
 
 pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManager) -> Result<()> {
     add_dpi_tcp_rule_with_func!(r"^\x10.{3}MQ", classify_wrapper, parser, manager);
@@ -17,16 +19,17 @@ pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManage
 }
 
 #[inline]
-fn classify_wrapper(ses: &mut Session, pkt: &dyn Packet) {
+fn classify_wrapper(ses: &mut Session, pkt: &dyn Packet) -> Result<()> {
+    add_protocol!(ses, "mqtt");
+
     match classify(ses, pkt) {
         Ok(_) => {}
         Err(_) => {}
     };
+    Ok(())
 }
 
 fn classify<'a>(ses: &'a mut Session, pkt: &'a dyn Packet) -> IResult<&'a [u8], ()> {
-    ses.add_protocol(&"mqtt");
-
     let payload = pkt.payload();
     let (payload, _msg_len) = be_u8(payload)?;
     let (payload, name_len) = be_u16(payload)?;
@@ -66,7 +69,7 @@ mod test {
     use api::session::Session;
     use api::utils::packet::Packet as TestPacket;
 
-    use crate::Misc;
+    use crate::assert_has_protocol;
 
     #[test]
     fn mqtt() {
@@ -93,6 +96,6 @@ mod test {
                 .parse_pkt(pkt.as_ref(), Some(rule), &mut ses)
                 .unwrap();
         }
-        assert!(ses.has_protocol(&"mqtt"));
+        assert_has_protocol!(ses, "mqtt");
     }
 }

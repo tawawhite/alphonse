@@ -6,7 +6,7 @@ use api::classifiers::{ClassifierManager, RuleID};
 use api::packet::Packet;
 use api::plugins::processor::{Processor, ProcessorID};
 use api::plugins::{Plugin, PluginType};
-use api::session::Session;
+use api::session::{ProtocolLayer, Session};
 
 mod areospike;
 mod aruba_papi;
@@ -72,8 +72,7 @@ pub struct Misc {
     match_cbs: FnvHashMap<RuleID, MatchCallBack>,
 }
 
-// fn classify_func(ses: &mut Session, payload: &[u8]) {}
-type ClassifyFunc = fn(ses: &mut Session, pkt: &dyn Packet);
+type ClassifyFunc = fn(ses: &mut Session, pkt: &dyn Packet) -> Result<()>;
 
 #[derive(Clone)]
 pub enum MatchCallBack {
@@ -190,9 +189,10 @@ impl Processor for Misc {
         match self.match_cbs.get(&rule.id()) {
             Some(cb) => match cb {
                 MatchCallBack::ProtocolName(protocol) => {
-                    ses.add_protocol(protocol);
+                    ses.add_protocol(protocol, ProtocolLayer::All)?;
+                    ses.add_protocol(protocol, ProtocolLayer::Application)?;
                 }
-                MatchCallBack::Func(func) => func(ses, pkt),
+                MatchCallBack::Func(func) => func(ses, pkt)?,
                 MatchCallBack::None => {}
             },
             None => {
