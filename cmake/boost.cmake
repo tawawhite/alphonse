@@ -1,12 +1,12 @@
 if(OFFLINE_ENVIRONMENT)
-    set(boost_url ${CMAKE_CURRENT_SOURCE_DIR}/third_party/boost_1_73_0.tar.bz2)
+    set(boost_url ${CMAKE_CURRENT_SOURCE_DIR}/third_party/boost_1_76_0.tar.bz2)
 else()
-    set(boost_url https://dl.bintray.com/boostorg/release/1.73.0/source/boost_1_73_0.tar.bz2)
+    set(boost_url https://boostorg.jfrog.io/artifactory/main/release/1.76.0/source/boost_1_76_0.tar.bz2)
 endif()
 
 ExternalProject_Add(boost
     URL ${boost_url}
-    URL_MD5 9273c8c4576423562bbe84574b07b2bd
+    URL_MD5 33334dd7f862e8ac9fe1cc7c6584fb6d
     EXCLUDE_FROM_ALL ON
     PREFIX boost
     CONFIGURE_COMMAND ""
