@@ -1,8 +1,8 @@
 use std::{borrow::Borrow, iter::FromIterator};
 
 use anyhow::{anyhow, Result};
+use fnv::FnvHashMap;
 use hyperscan::Builder;
-use tinyvec::TinyVec;
 
 use super::{matched, packet};
 
@@ -49,6 +49,22 @@ impl Rule {
     pub fn new(hs_pattern: hyperscan::Pattern) -> Self {
         Rule {
             hs_pattern,
+            protocol: Protocol::all(),
+            need_matched_pos: false,
+        }
+    }
+}
+
+impl From<&str> for Rule {
+    fn from(s: &str) -> Self {
+        Rule {
+            hs_pattern: hyperscan::Pattern {
+                expression: s.to_string(),
+                id: None,
+                flags: hyperscan::PatternFlags::empty(),
+                ext: hyperscan::ExprExt::default(),
+                som: None,
+            },
             protocol: Protocol::all(),
             need_matched_pos: false,
         }
@@ -128,22 +144,32 @@ impl Classifier {
     ) -> Result<()> {
         match (&self.hs_db, &scratch.hs_scratch) {
             (Some(db), Some(s)) => {
-                let mut ids = TinyVec::<[usize; 8]>::new();
-                let mut from_tos = TinyVec::<[(u64, u64); 8]>::new();
+                let mut id_from_tos: FnvHashMap<usize, (u64, u64)> = FnvHashMap::default();
                 db.scan(pkt.payload(), s, |id, from, to, _flags| {
-                    ids.push(id as usize);
-                    from_tos.push((from, to));
+                    match id_from_tos.get_mut(&(id as usize)) {
+                        Some((last_from, last_to)) => {
+                            if from < *last_from {
+                                *last_from = from;
+                            }
+                            if to > *last_to {
+                                *last_to = to;
+                            }
+                        }
+                        None => {
+                            id_from_tos.insert(id as usize, (from, to));
+                        }
+                    };
                     hyperscan::Matching::Continue
                 })?;
 
-                for (id, (from, to)) in ids.iter().zip(from_tos) {
+                for (id, (from, to)) in id_from_tos.iter() {
                     let proto = Protocol::from(pkt.layers().trans.protocol);
                     if self.dpi_rules[*id].protocol.contains(proto) {
                         let mut rule = self.rules[*id].clone();
                         if self.dpi_rules[*id].need_matched_pos {
-                            rule.from_to = Some((from as u16, to as u16));
+                            rule.from_to = Some((*from as u16, *to as u16));
                         }
-                        pkt.rules_mut().push(self.rules[*id].clone());
+                        pkt.rules_mut().push(rule);
                     }
                 }
 

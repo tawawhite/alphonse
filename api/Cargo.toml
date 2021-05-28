@@ -10,6 +10,7 @@ bitflags = "1.2"
 chrono = "0.4"
 crossbeam-channel = "0.5"
 enum-primitive-derive = "0.2"
+fnv = "1"
 hyperscan = { version = "0.2", features = ["static"] }
 libc = "0.2"
 num-traits = "0.2"
@@ -24,7 +25,6 @@ rustc_version = "0.3"
 
 [dev-dependencies]
 twox-hash = "*"
-fnv = "*"
 rand = "*"
 
 [features]
