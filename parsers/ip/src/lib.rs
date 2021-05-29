@@ -13,7 +13,7 @@ use api::classifiers;
 use api::packet::Protocol;
 use api::plugins::processor::{Processor, ProcessorID};
 use api::plugins::{Plugin, PluginType};
-use api::session::Session;
+use api::session::{ProtocolLayer, Session};
 
 static ASN_DB: OnceCell<GeoLiteReader<Mmap>> = OnceCell::new();
 static COUNTRY_DB: OnceCell<GeoLiteReader<Mmap>> = OnceCell::new();
@@ -141,8 +141,14 @@ impl Processor for IPProcessor {
         if !self.is_classified() {
             self.classified_as_this_protocol()?;
             match pkt.layers().network.protocol {
-                Protocol::IPV4 => ses.add_protocol(&"ipv4"),
-                Protocol::IPV6 => ses.add_protocol(&"ipv6"),
+                Protocol::IPV4 => {
+                    ses.add_protocol(&"ipv4", ProtocolLayer::All)?;
+                    ses.add_protocol(&"ipv4", ProtocolLayer::Network)?;
+                }
+                Protocol::IPV6 => {
+                    ses.add_protocol(&"ipv6", ProtocolLayer::All)?;
+                    ses.add_protocol(&"ipv6", ProtocolLayer::Network)?;
+                }
                 _ => unreachable!(),
             }
         }

@@ -7,7 +7,7 @@ use api::classifiers::dpi;
 use api::config::Config;
 use api::plugins::processor::{Processor, ProcessorID};
 use api::plugins::{Plugin, PluginType};
-use api::session::Session;
+use api::session::{ProtocolLayer, Session};
 
 static SETTINGS: OnceCell<llhttp::Settings> = OnceCell::new();
 
@@ -179,7 +179,8 @@ impl<'a> Processor for HttpProcessor<'static> {
         if !self.is_classified() {
             // If this session is already classified as this protocol, skip
             self.classified_as_this_protocol()?;
-            ses.add_protocol(&self.name());
+            ses.add_protocol(&self.name(), ProtocolLayer::All)?;
+            ses.add_protocol(&self.name(), ProtocolLayer::Application)?;
             let settings = match SETTINGS.get() {
                 Some(s) => s,
                 None => return Err(anyhow!("Global llhttp sttings is empty or initializing")),

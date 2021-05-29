@@ -8,7 +8,7 @@ use alphonse_api as api;
 use api::packet::{Direction, Packet};
 use api::plugins::processor::Processor;
 use api::plugins::Plugin;
-use api::session::Session;
+use api::session::{ProtocolLayer, Session};
 
 use crate::ja3::Ja3;
 use crate::TlsProcessor;
@@ -18,7 +18,8 @@ impl TlsProcessor {
         if !self.is_classified() {
             // If this session is already classified as this protocol, skip
             self.classified_as_this_protocol()?;
-            ses.add_protocol(&self.name());
+            ses.add_protocol(&self.name(), ProtocolLayer::All)?;
+            ses.add_protocol(&self.name(), ProtocolLayer::Application)?;
         }
 
         let (_, results) = match parse_dtls_plaintext_records(pkt.payload()) {
