@@ -113,9 +113,7 @@ fn main() -> Result<()> {
         };
     }
 
-    for parser in &warehouse.pkt_processors {
-        parser.cleanup()?;
-    }
+    plugins::cleanup_plugins(&mut warehouse)?;
 
     Ok(())
 }

@@ -168,3 +168,15 @@ pub fn init_plugins(
 
     Ok(())
 }
+
+pub fn cleanup_plugins(warehouse: &mut PluginWarehouse) -> Result<()> {
+    match &warehouse.rx_driver {
+        Some(driver) => driver.cleanup()?,
+        None => {}
+    };
+
+    for processor in &warehouse.pkt_processors {
+        processor.cleanup()?;
+    }
+    Ok(())
+}
