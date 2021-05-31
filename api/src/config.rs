@@ -12,6 +12,8 @@ pub struct Config {
     pub delete: bool,
     pub dpdk_eal_args: Vec<String>,
     pub dry_run: bool,
+    pub node: String,
+    pub hostname: String,
     pub interfaces: Vec<String>,
     pub output_threads: u8,
     pub processors: Vec<String>,

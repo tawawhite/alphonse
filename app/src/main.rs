@@ -1,5 +1,7 @@
 #[macro_use]
 extern crate clap;
+#[macro_use]
+extern crate strum;
 
 use std::sync::atomic::Ordering;
 use std::sync::Arc;

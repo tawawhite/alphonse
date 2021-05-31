@@ -14,6 +14,12 @@ use super::commands::CliArg;
 /// Parse command line arguments and set configuration
 pub fn parse_args(root_cmd: clap::App) -> Result<Config> {
     let mut config: Config = Default::default();
+    let hn = hostname::get()?;
+    let hn = hn
+        .to_str()
+        .ok_or(anyhow!("Hostname {:?} is not a valid UTF-8 string", hn))?;
+    config.hostname = hn.to_string();
+
     let matches = root_cmd.get_matches();
 
     if let Some(config_file) = matches.value_of("config") {
@@ -69,6 +75,9 @@ fn parse_config_file(config_file: &str, config: &mut Config) -> Result<()> {
     config.processors = get_str_arr(doc, "plugins.processors");
     config.interfaces = get_str_arr(doc, "interfaces");
 
+    // If there is a node in configuration file, use that, other wise use current machine's hostname
+    config.node = get_str(doc, "node", config.hostname.as_str());
+
     config.rx_stat_log_interval =
         get_integer(doc, "rx.stats.log.interval", 10000, 10000, i64::MAX) as u64;
 
@@ -91,21 +100,30 @@ fn parse_config_file(config_file: &str, config: &mut Config) -> Result<()> {
 
 /// Use command arguments overrides config file settings
 fn set_config_by_cli_args(config: &mut Config, matches: &clap::ArgMatches) {
-    config.delete = matches.is_present(CliArg::Delete.as_str());
-    config.dry_run = matches.is_present(CliArg::DryRun.as_str());
-    config.quiet = matches.is_present(CliArg::Quiet.as_str());
-    config.recursive = matches.is_present(CliArg::Recursive.as_str());
-    config.verbose_mode = matches.is_present(CliArg::Verbose.as_str());
+    config.delete = matches.is_present(CliArg::Delete.as_ref());
+    config.dry_run = matches.is_present(CliArg::DryRun.as_ref());
+    config.quiet = matches.is_present(CliArg::Quiet.as_ref());
+    config.recursive = matches.is_present(CliArg::Recursive.as_ref());
+    config.verbose_mode = matches.is_present(CliArg::Verbose.as_ref());
 
-    if let Some(pcap_file) = matches.value_of(CliArg::PcapFile.as_str()) {
+    if let Some(pcap_file) = matches.value_of(CliArg::PcapFile.as_ref()) {
         config.pcap_file = String::from(pcap_file);
     }
 
-    if let Some(pcap_dir) = matches.value_of(CliArg::PcapDir.as_str()) {
+    if let Some(pcap_dir) = matches.value_of(CliArg::PcapDir.as_ref()) {
         config.pcap_dir = String::from(pcap_dir);
     }
 
-    if let Some(tags) = matches.values_of(CliArg::Tags.as_str()) {
+    if let Some(tags) = matches.values_of(CliArg::Tags.as_ref()) {
         config.tags = tags.map(|x| String::from(x)).collect::<Vec<_>>();
+    }
+
+    if let Some(hostname) = matches.value_of(CliArg::Host.as_ref()) {
+        config.hostname = String::from(hostname);
+        config.node = config.hostname.clone();
+    }
+
+    if let Some(node) = matches.value_of(CliArg::Node.as_ref()) {
+        config.node = String::from(node);
     }
 }
