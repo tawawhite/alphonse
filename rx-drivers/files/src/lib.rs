@@ -66,6 +66,7 @@ impl RxDriver for Driver {
                 self.name()
             ));
         }
+
         let builder = std::thread::Builder::new().name(thread.name());
         let handle = builder.spawn(move || thread.spawn(cfg))?;
         handles.push(handle);

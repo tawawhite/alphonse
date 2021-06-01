@@ -56,7 +56,14 @@ impl PluginWarehouse {
     pub fn start_rx(&self, cfg: &Arc<Config>, sender: &Sender<Box<dyn Packet>>) -> Result<()> {
         match &self.rx_driver {
             None => return Err(anyhow!("alphonse hasn't load any rx driver plugin")),
-            Some(driver) => driver.start(cfg.clone(), sender.clone())?,
+            Some(driver) => {
+                match driver.start(cfg.clone(), sender.clone()) {
+                    // Try to fix some wired symbol lifetime problems, if use ? directly on Err,
+                    // it would raise a Segment Fault. Maybe someday in the future we would figure it out
+                    Err(e) => return Err(anyhow!("{}", e)),
+                    Ok(_) => {}
+                };
+            }
         }
         Ok(())
     }

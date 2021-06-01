@@ -10,7 +10,7 @@ name = "rxlibpcap"
 
 [dependencies]
 alphonse-api = { path = "../../api", optional = false }
-anyhow = "*"
+anyhow = "1.0"
 crossbeam-channel = "0.5"
 libc = "0.2"
 pcap = "0.8"
