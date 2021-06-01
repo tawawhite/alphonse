@@ -14,7 +14,6 @@ pub struct Config {
     pub dry_run: bool,
     pub node: String,
     pub hostname: String,
-    pub interfaces: Vec<String>,
     pub output_threads: u8,
     pub processors: Vec<String>,
     pub pcap_file: String,

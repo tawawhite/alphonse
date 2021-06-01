@@ -52,7 +52,15 @@ impl Plugin for Driver {
 impl RxDriver for Driver {
     fn start(&self, cfg: Arc<Config>, sender: Sender<Box<dyn PacketTrait>>) -> Result<()> {
         let mut handles = vec![];
-        for interface in cfg.interfaces.iter() {
+        let interfaces = cfg.get_str_arr(&"rx.libpcap.interfaces");
+        if interfaces.is_empty() {
+            return Err(anyhow!(
+                "{} launches without specifying any network interfaces",
+                self.name()
+            ));
+        }
+
+        for interface in interfaces.iter() {
             let cfg = cfg.clone();
             let mut thread = RxThread {
                 exit: cfg.exit.clone(),

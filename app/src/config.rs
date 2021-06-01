@@ -29,12 +29,6 @@ pub fn parse_args(root_cmd: clap::App) -> Result<Config> {
 
     set_config_by_cli_args(&mut config, &matches);
 
-    if (config.pcap_dir.is_empty() || config.pcap_file.is_empty()) && config.interfaces.is_empty() {
-        return Err(anyhow!(
-            "Launched without specify network interface nor pcap file/dir"
-        ));
-    }
-
     Ok(config)
 }
 
@@ -73,7 +67,6 @@ fn parse_config_file(config_file: &str, config: &mut Config) -> Result<()> {
 
     config.rx_driver = get_str(doc, "plugins.rx-driver", "rxlibpcap");
     config.processors = get_str_arr(doc, "plugins.processors");
-    config.interfaces = get_str_arr(doc, "interfaces");
 
     // If there is a node in configuration file, use that, other wise use current machine's hostname
     config.node = get_str(doc, "node", config.hostname.as_str());

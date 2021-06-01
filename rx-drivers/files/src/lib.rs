@@ -60,6 +60,12 @@ impl RxDriver for Driver {
             files: get_pcap_files(cfg.as_ref()),
             sender: sender.clone(),
         };
+        if thread.files.is_empty() {
+            return Err(anyhow!(
+                "{} launches without specifying any pcap file",
+                self.name()
+            ));
+        }
         let builder = std::thread::Builder::new().name(thread.name());
         let handle = builder.spawn(move || thread.spawn(cfg))?;
         handles.push(handle);
@@ -113,7 +119,7 @@ struct RxThread {
 }
 
 impl RxThread {
-    pub fn spawn(&mut self, cfg: Arc<Config>) -> Result<()> {
+    pub fn spawn(&mut self, _cfg: Arc<Config>) -> Result<()> {
         if self.files.is_empty() {
             return Ok(());
         }

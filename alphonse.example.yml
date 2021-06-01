@@ -1,7 +1,7 @@
 rx.stats.log.interval: 1
 channel.pkt.size: 2000000
 
-interfaces: ["eth0"]
+rx.libpcap.interfaces: ["eth0"]
 
 dpdk.eal.args: [
     "-l", "0-3",
