@@ -169,11 +169,11 @@ impl Session {
     ) -> Result<()> {
         let layer = match layer {
             ProtocolLayer::All => "protocol",
-            ProtocolLayer::Datalink => "protocol.datalink",
-            ProtocolLayer::Network => "protocol.network",
-            ProtocolLayer::Transport => "protocol.transport",
-            ProtocolLayer::Application => "protocol.app",
-            ProtocolLayer::Tunnel => "protocol.tunnel",
+            ProtocolLayer::Datalink => "protocols.datalink",
+            ProtocolLayer::Network => "protocols.network",
+            ProtocolLayer::Transport => "protocols.transport",
+            ProtocolLayer::Application => "protocols.app",
+            ProtocolLayer::Tunnel => "protocols.tunnel",
         };
         match self.fields.as_mut() {
             serde_json::Value::Object(obj) => match obj.get_mut(layer) {
