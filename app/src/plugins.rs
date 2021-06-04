@@ -78,6 +78,7 @@ pub fn load_plugins(cfg: &Config) -> Result<Plugins> {
     };
 
     let load_tmp_dir = cfg.get_str("plugins.load.dir", "/tmp/alphonse/plugins");
+    std::fs::create_dir_all(std::path::PathBuf::from(load_tmp_dir.clone()))?;
 
     let mut reload_handler = DynamicReload::new(
         Some(plugin_dirs),
