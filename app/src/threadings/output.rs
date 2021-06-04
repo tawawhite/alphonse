@@ -106,6 +106,7 @@ impl Thread {
                 if cfg.dry_run {
                     continue;
                 }
+
                 sessions.push(Arc::from(ses));
                 if sessions.len() == 5 {
                     let sessions_cloned = Box::new(sessions.clone());
@@ -121,6 +122,17 @@ impl Thread {
                     sessions.clear();
                 }
             }
+
+            let sessions_cloned = Box::new(sessions.clone());
+            let cfg = cfg.clone();
+            let es = es.clone();
+            tokio::spawn(async {
+                Thread::save_sessions(cfg, es, sessions_cloned)
+                    .await
+                    .unwrap();
+            })
+            .await
+            .unwrap();
         });
 
         println!("{} exit", self.name());
