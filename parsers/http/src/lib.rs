@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use anyhow::{anyhow, Result};
 use once_cell::sync::OnceCell;
 
@@ -26,13 +28,13 @@ fn on_url(parser: &mut llhttp::Parser, at: *const libc::c_char, length: usize) -
     };
 
     let url = unsafe { std::slice::from_raw_parts(at as *const u8, length) };
-    http.url.push(String::from_utf8_lossy(url).to_string());
+    http.url.insert(String::from_utf8_lossy(url).to_string());
     0
 }
 
 #[derive(Clone, Default)]
 struct HTTP {
-    url: Vec<String>,
+    url: HashSet<String>,
     host: String,
     cookie: String,
     auth: String,
