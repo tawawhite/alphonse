@@ -92,7 +92,7 @@ async fn get_sequence_number(es: &Elasticsearch) -> Result<u64> {
     };
 
     match resp.status_code().as_u16() {
-        200 => {
+        code if code >= 200 && code < 300 => {
             let text = resp.text().await.unwrap();
             let a: serde_json::Value = serde_json::from_str(text.as_str()).unwrap();
             let version = a.get("_version").unwrap().as_u64().unwrap();

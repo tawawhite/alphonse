@@ -173,7 +173,7 @@ impl Thread {
             .await?;
         let code = resp.status_code();
         match code.as_u16() {
-            200 => {}
+            code if code >= 200 && code < 300 => {}
             c => {
                 println!("status code: {}", c);
                 println!("response message: {}", resp.text().await.unwrap());
