@@ -84,58 +84,69 @@ impl Thread {
             .worker_threads(4)
             .thread_name("alphonse-output-tokio")
             .enable_all()
-            .build()
-            .unwrap();
+            .build()?;
         let host = cfg.get_str("elasticsearch", "http://localhost:9200");
         let es = Arc::new(Elasticsearch::new(Transport::single_node(host.as_str())?));
 
         println!("{} started", self.name());
 
-        let mut sessions = vec![];
-
         rt.block_on(async {
-            loop {
-                let ses = match self.receiver.try_recv() {
-                    Ok(ses) => ses,
-                    Err(err) => match err {
-                        crossbeam_channel::TryRecvError::Disconnected => break,
-                        _ => continue,
-                    },
-                };
-
-                if cfg.dry_run {
-                    continue;
-                }
-
-                sessions.push(Arc::from(ses));
-                if sessions.len() == 5 {
-                    let sessions_cloned = Box::new(sessions.clone());
-                    let cfg = cfg.clone();
-                    let es = es.clone();
-                    tokio::spawn(async {
-                        Thread::save_sessions(cfg, es, sessions_cloned)
-                            .await
-                            .unwrap();
-                    })
-                    .await
-                    .unwrap();
-                    sessions.clear();
-                }
+            match self.main_loop(&cfg, &es).await {
+                Ok(_) => {}
+                Err(e) => eprintln!("{}", e),
             }
-
-            let sessions_cloned = Box::new(sessions.clone());
-            let cfg = cfg.clone();
-            let es = es.clone();
-            tokio::spawn(async {
-                Thread::save_sessions(cfg, es, sessions_cloned)
-                    .await
-                    .unwrap();
-            })
-            .await
-            .unwrap();
         });
 
         println!("{} exit", self.name());
+
+        Ok(())
+    }
+
+    async fn main_loop(&mut self, cfg: &Arc<Config>, es: &Arc<Elasticsearch>) -> Result<()> {
+        let mut sessions = vec![];
+        loop {
+            let ses = match self.receiver.try_recv() {
+                Ok(ses) => ses,
+                Err(err) => match err {
+                    crossbeam_channel::TryRecvError::Disconnected => break,
+                    _ => continue,
+                },
+            };
+
+            if cfg.dry_run {
+                continue;
+            }
+
+            sessions.push(Arc::from(ses));
+            if sessions.len() == 5 {
+                let sessions_cloned = Box::new(sessions.clone());
+                let cfg = cfg.clone();
+                let es = es.clone();
+                tokio::spawn(async {
+                    match Thread::save_sessions(cfg, es, sessions_cloned).await {
+                        Ok(_) => {}
+                        Err(e) => eprintln!("{}", e),
+                    };
+                })
+                .await?;
+                sessions.clear();
+            }
+        }
+
+        if sessions.len() == 0 {
+            return Ok(());
+        }
+
+        let sessions_cloned = Box::new(sessions.clone());
+        let cfg = cfg.clone();
+        let es = es.clone();
+        tokio::spawn(async {
+            match Thread::save_sessions(cfg, es, sessions_cloned).await {
+                Ok(_) => {}
+                Err(e) => eprintln!("{}", e),
+            };
+        })
+        .await?;
 
         Ok(())
     }
@@ -145,15 +156,6 @@ impl Thread {
         es: Arc<Elasticsearch>,
         sessions: Box<Vec<Arc<Session>>>,
     ) -> Result<()> {
-        let mut body = vec![];
-        for ses in sessions.iter() {
-            let index = format!(
-                "sessions2-{}",
-                to_index_suffix(Rotate::Daily, &ses.start_time)
-            );
-            let bulk_op = elasticsearch::BulkOperation::index(ses.clone()).index(index);
-            body.push(bulk_op);
-        }
         let body = sessions
             .iter()
             .map(|ses| {
@@ -171,6 +173,7 @@ impl Thread {
             .body(body)
             .send()
             .await?;
+
         let code = resp.status_code();
         match code.as_u16() {
             code if code >= 200 && code < 300 => {}
