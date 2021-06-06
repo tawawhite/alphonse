@@ -28,6 +28,15 @@ impl Default for Direction {
     }
 }
 
+impl Direction {
+    pub fn reverse(&self) -> Direction {
+        match self {
+            Direction::Left => Direction::Right,
+            Direction::Right => Direction::Left,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Default)]
 /// Packet protocol layer
 pub struct Layer {
