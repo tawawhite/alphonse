@@ -1,15 +1,22 @@
+use std::cell::RefCell;
 use std::collections::HashSet;
+use std::rc::Rc;
 
 use anyhow::{anyhow, Result};
 use once_cell::sync::OnceCell;
+use serde_json::json;
 
 use alphonse_api as api;
 use api::classifiers;
-use api::classifiers::dpi;
+use api::classifiers::{dpi, RuleID};
 use api::config::Config;
+use api::packet::Direction;
 use api::plugins::processor::{Processor, ProcessorID};
 use api::plugins::{Plugin, PluginType};
 use api::session::{ProtocolLayer, Session};
+
+mod parse;
+use parse::*;
 
 static SETTINGS: OnceCell<llhttp::Settings> = OnceCell::new();
 
@@ -19,28 +26,36 @@ struct HttpProcessor<'a> {
     name: String,
     classified: bool,
     parsers: [llhttp::Parser<'a>; 2],
+    resp_rule_id: RuleID,
+    client_direction: Direction,
 }
 
-fn on_url(parser: &mut llhttp::Parser, at: *const libc::c_char, length: usize) -> libc::c_int {
-    let http = match parser.data::<HTTP>() {
-        Some(h) => h,
-        None => return 0,
-    };
+#[derive(Clone)]
+struct Md5Context(md5::Context);
 
-    let url = unsafe { std::slice::from_raw_parts(at as *const u8, length) };
-    http.url.insert(String::from_utf8_lossy(url).to_string());
-    0
+impl Default for Md5Context {
+    fn default() -> Self {
+        Self(md5::Context::new())
+    }
+}
+
+impl AsMut<md5::Context> for Md5Context {
+    fn as_mut(&mut self) -> &mut md5::Context {
+        &mut self.0
+    }
 }
 
 #[derive(Clone, Default)]
 struct HTTP {
-    url: HashSet<String>,
-    host: String,
-    cookie: String,
     auth: String,
+    body_magic: String,
+    cookie: String,
+    direction: Direction,
+    host: String,
+    md5: [Md5Context; 2],
+    md5_digest: HashSet<md5::Digest>,
+    url: HashSet<String>,
     value: [String; 2],
-    header: [String; 2],
-    checksum: String,
 }
 
 unsafe impl Send for HttpProcessor<'_> {}
@@ -53,6 +68,8 @@ impl<'a> HttpProcessor<'a> {
             name: String::from("http"),
             classified: false,
             parsers: [llhttp::Parser::default(), llhttp::Parser::default()],
+            resp_rule_id: 0,
+            client_direction: Direction::Left,
         }
     }
 }
@@ -70,8 +87,17 @@ impl<'a> Plugin for HttpProcessor<'static> {
         // initialize global llhttp settings
         let mut settings = llhttp::Settings::default();
 
+        llhttp::cb_wrapper!(_on_message_begin, on_message_begin);
+        settings.on_message_begin(Some(_on_message_begin));
+
         llhttp::data_cb_wrapper!(_on_url, on_url);
         settings.on_url(Some(_on_url));
+
+        llhttp::data_cb_wrapper!(_on_body, on_body);
+        settings.on_body(Some(_on_body));
+
+        llhttp::cb_wrapper!(_on_message_complete, on_message_complete);
+        settings.on_message_complete(Some(_on_message_complete));
 
         SETTINGS.set(settings).unwrap();
         Ok(())
@@ -158,7 +184,8 @@ impl<'a> Processor for HttpProcessor<'static> {
             manager.add_dpi_rule(self.id(), &pattern, dpi::Protocol::all())?;
         }
 
-        manager.add_simple_dpi_rule(self.id(), "^HTTP", dpi::Protocol::all())?;
+        self.resp_rule_id =
+            manager.add_simple_dpi_rule(self.id(), "^HTTP", dpi::Protocol::all())?;
 
         Ok(())
     }
@@ -175,9 +202,23 @@ impl<'a> Processor for HttpProcessor<'static> {
     fn parse_pkt(
         &mut self,
         pkt: &dyn api::packet::Packet,
-        _rule: Option<&api::classifiers::matched::Rule>,
+        rule: Option<&api::classifiers::matched::Rule>,
         ses: &mut Session,
     ) -> Result<()> {
+        let direction = pkt.direction() as u8 as usize;
+
+        // update client direction
+        match rule {
+            Some(rule) => {
+                if rule.id() != self.resp_rule_id {
+                    self.client_direction = pkt.direction()
+                } else {
+                    self.client_direction = pkt.direction().reverse()
+                }
+            }
+            None => {}
+        };
+
         if !self.is_classified() {
             // If this session is already classified as this protocol, skip
             self.classified_as_this_protocol()?;
@@ -187,14 +228,14 @@ impl<'a> Processor for HttpProcessor<'static> {
                 Some(s) => s,
                 None => return Err(anyhow!("Global llhttp sttings is empty or initializing")),
             };
-            let http = Box::into_raw(Box::new(HTTP::default()));
+
+            let http = Rc::new(RefCell::new(HTTP::default()));
+            http.borrow_mut().direction = pkt.direction();
             for parser in &mut self.parsers {
                 parser.init(settings, llhttp::Type::HTTP_BOTH);
-                parser.set_data(http);
+                parser.set_data(Some(Box::new(http.clone())));
             }
         }
-
-        let direction = pkt.direction() as u8 as usize;
 
         match self.parsers[direction].parse(pkt.payload()) {
             llhttp::Error::HPE_OK => {}
@@ -202,7 +243,7 @@ impl<'a> Processor for HttpProcessor<'static> {
             | llhttp::Error::HPE_PAUSED_UPGRADE
             | llhttp::Error::HPE_PAUSED_H2_UPGRADE => {}
             _ => {
-                let data = self.parsers[direction].set_data::<HTTP>(std::ptr::null_mut());
+                let data = self.parsers[direction].set_data::<Rc<RefCell<HTTP>>>(None);
                 let settings = match SETTINGS.get() {
                     Some(s) => s,
                     None => {
@@ -220,15 +261,35 @@ impl<'a> Processor for HttpProcessor<'static> {
     }
 
     fn finish(&mut self, ses: &mut Session) {
-        self.parsers[0].set_data::<HTTP>(std::ptr::null_mut());
-        let http = self.parsers[1].set_data::<HTTP>(std::ptr::null_mut());
-        let http = if http.is_null() {
-            return;
-        } else {
-            unsafe { Box::from_raw(http) }
+        self.parsers[0].set_data::<Rc<RefCell<HTTP>>>(None);
+        let http = self.parsers[1].set_data::<Rc<RefCell<HTTP>>>(None);
+        let http = match http {
+            None => return,
+            Some(http) => http,
         };
+        let http = http.borrow();
 
-        ses.add_field(&"http.uri", &serde_json::json!(http.url));
+        // uri
+        if !http.url.is_empty() {
+            ses.add_field(&"http.uri", &serde_json::json!(http.url));
+        }
+
+        // body md5
+        let digests: Vec<String> = http
+            .md5_digest
+            .iter()
+            .filter_map(|digest| {
+                let s = format!("{:x}", digest);
+                if s == "d41d8cd98f00b204e9800998ecf8427e" {
+                    None
+                } else {
+                    Some(s)
+                }
+            })
+            .collect();
+        ses.add_field(&"http.md5", &json!(digests));
+
+        println!("{}", serde_json::to_string_pretty(&ses).unwrap());
     }
 }
 
