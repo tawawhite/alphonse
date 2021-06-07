@@ -1,5 +1,6 @@
 use std::convert::TryFrom;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
+use std::thread::JoinHandle;
 
 use anyhow::{anyhow, Result};
 use chrono::{Datelike, Timelike};
@@ -8,6 +9,8 @@ use elasticsearch::{http::transport::Transport, Elasticsearch};
 
 use alphonse_api as api;
 use api::config::Config;
+use api::plugins::output::OutputPlugin;
+use api::plugins::{Plugin, PluginType};
 use api::session::Session;
 use api::utils::timeval::{precision::Millisecond, TimeVal};
 
@@ -66,17 +69,71 @@ fn to_index_suffix(rotate: Rotate, ts: &TimeVal<Millisecond>) -> String {
     }
 }
 
-pub struct Thread {
+#[derive(Clone, Default)]
+struct Output {
+    handles: Arc<RwLock<Vec<JoinHandle<Result<()>>>>>,
+}
+
+impl Plugin for Output {
+    fn plugin_type(&self) -> PluginType {
+        PluginType::RxDriver
+    }
+
+    fn name(&self) -> &str {
+        "output-es"
+    }
+
+    fn cleanup(&self) -> Result<()> {
+        let mut handles = match self.handles.write() {
+            Ok(h) => h,
+            Err(e) => return Err(anyhow!("{}", e)),
+        };
+
+        while handles.len() > 0 {
+            let hdl = handles.pop();
+            match hdl {
+                None => continue,
+                Some(hdl) => match hdl.join() {
+                    Ok(_) => {}
+                    Err(e) => eprintln!("{:?}", e),
+                },
+            }
+        }
+
+        Ok(())
+    }
+}
+
+impl OutputPlugin for Output {
+    fn clone_output_plugin(&self) -> Box<dyn OutputPlugin> {
+        Box::new(self.clone())
+    }
+
+    fn start(&self, cfg: Arc<Config>, receiver: &Receiver<Box<Session>>) -> Result<()> {
+        let mut handles = vec![];
+        let cfg = cfg.clone();
+        let mut thread = OutputThread::new(receiver.clone());
+        let builder = std::thread::Builder::new().name(thread.name());
+        let handle = builder.spawn(move || thread.spawn(cfg)).unwrap();
+        handles.push(handle);
+
+        match self.handles.write() {
+            Ok(mut h) => {
+                *h.as_mut() = handles;
+            }
+            Err(e) => return Err(anyhow!("{}", e)),
+        };
+        Ok(())
+    }
+}
+
+struct OutputThread {
     receiver: Receiver<Box<Session>>,
 }
 
-impl Thread {
+impl OutputThread {
     pub fn new(receiver: Receiver<Box<Session>>) -> Self {
-        Thread { receiver }
-    }
-
-    pub fn name(&self) -> String {
-        format!("alphonse-output")
+        OutputThread { receiver }
     }
 
     pub fn spawn(&mut self, cfg: Arc<Config>) -> Result<()> {
@@ -84,7 +141,8 @@ impl Thread {
             .worker_threads(4)
             .thread_name("alphonse-output-tokio")
             .enable_all()
-            .build()?;
+            .build()
+            .unwrap();
         let host = cfg.get_str("elasticsearch", "http://localhost:9200");
         let es = Arc::new(Elasticsearch::new(Transport::single_node(host.as_str())?));
 
@@ -123,7 +181,7 @@ impl Thread {
                 let cfg = cfg.clone();
                 let es = es.clone();
                 tokio::spawn(async {
-                    match Thread::save_sessions(cfg, es, sessions_cloned).await {
+                    match Self::save_sessions(cfg, es, sessions_cloned).await {
                         Ok(_) => {}
                         Err(e) => eprintln!("{}", e),
                     };
@@ -141,7 +199,7 @@ impl Thread {
         let cfg = cfg.clone();
         let es = es.clone();
         tokio::spawn(async {
-            match Thread::save_sessions(cfg, es, sessions_cloned).await {
+            match Self::save_sessions(cfg, es, sessions_cloned).await {
                 Ok(_) => {}
                 Err(e) => eprintln!("{}", e),
             };
@@ -173,7 +231,6 @@ impl Thread {
             .body(body)
             .send()
             .await?;
-
         let code = resp.status_code();
         match code.as_u16() {
             code if code >= 200 && code < 300 => {}
@@ -185,4 +242,18 @@ impl Thread {
 
         Ok(())
     }
+
+    pub fn name(&self) -> String {
+        format!("alphonse-output-es")
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn al_new_output_plugin() -> Box<Box<dyn OutputPlugin>> {
+    Box::new(Box::new(Output::default()))
+}
+
+#[no_mangle]
+pub extern "C" fn al_plugin_type() -> PluginType {
+    PluginType::OutputPlugin
 }

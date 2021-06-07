@@ -1,4 +1,3 @@
-pub mod output;
 mod pkt;
 mod timeout;
 

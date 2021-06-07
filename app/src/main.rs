@@ -38,8 +38,8 @@ fn main() -> Result<()> {
     plugins::init_plugins(&plugins, &mut warehouse, &cfg)?;
 
     let mut classifier_manager = classifiers::ClassifierManager::new();
-    for parser in &mut warehouse.pkt_processors {
-        parser.register_classify_rules(&mut classifier_manager)?;
+    for processor in &mut warehouse.pkt_processors {
+        processor.register_classify_rules(&mut classifier_manager)?;
     }
 
     classifier_manager.prepare()?;
@@ -47,12 +47,10 @@ fn main() -> Result<()> {
 
     let mut handles = vec![];
     let (ses_sender, ses_receiver) = bounded(cfg.pkt_channel_size as usize);
-    let mut output_thread = threadings::output::Thread::new(ses_receiver.clone());
 
     // initialize pkt threads
     let (pkt_sender, pkt_receiver) = bounded(cfg.pkt_channel_size as usize);
     let mut pkt_threads = Vec::new();
-    warehouse.start_rx(&cfg, &pkt_sender)?;
 
     for i in 0..cfg.pkt_threads {
         let thread = threadings::PktThread::new(
@@ -66,13 +64,7 @@ fn main() -> Result<()> {
 
     let timeout_thread = threadings::TimeoutThread::new(cfg.exit.clone(), ses_sender.clone());
 
-    // start all output threads
-    {
-        let cfg = cfg.clone();
-        let builder = std::thread::Builder::new().name(output_thread.name());
-        let handle = builder.spawn(move || output_thread.spawn(cfg)).unwrap();
-        handles.push(handle);
-    }
+    warehouse.start_output_plugins(&cfg, &ses_receiver)?;
 
     // start all pkt threads
     for thread in pkt_threads {
@@ -99,6 +91,8 @@ fn main() -> Result<()> {
             .unwrap();
         handles.push(handle);
     }
+
+    warehouse.start_rx(&cfg, &pkt_sender)?;
 
     drop(pkt_sender);
     drop(pkt_receiver);

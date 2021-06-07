@@ -2,6 +2,7 @@ use anyhow::Result;
 
 use crate::config::Config;
 
+pub mod output;
 pub mod processor;
 pub mod rx;
 
@@ -14,7 +15,7 @@ pub enum PluginType {
     PacketProcessor = 1,
 
     /// An output plugin (Elasticsearch, Kafka, Disk, etc.)
-    Output = 2,
+    OutputPlugin = 2,
 }
 
 /// General Plugin trait

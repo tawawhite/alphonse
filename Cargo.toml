@@ -2,6 +2,7 @@
 members = [
     "app",
     "api",
+    "output/elasticsearch",
     "parsers/http",
     "parsers/misc",
     "parsers/simple-writer",

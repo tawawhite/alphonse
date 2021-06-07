@@ -3,16 +3,17 @@
 use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
-use crossbeam_channel::Sender;
+use crossbeam_channel::{Receiver, Sender};
 use dynamic_reload::{DynamicReload, Lib, PlatformName, Search, UpdateState};
 
 use alphonse_api as api;
 use api::config::Config;
 use api::packet::Packet;
 use api::plugins::{
-    processor, processor::Processor, rx, rx::RxDriver, PluginType, PluginTypeFunc,
-    PLUGIN_TYPE_FUNC_NAME,
+    output, output::OutputPlugin, processor, processor::Processor, rx, rx::RxDriver, PluginType,
+    PluginTypeFunc, PLUGIN_TYPE_FUNC_NAME,
 };
+use api::session::Session;
 
 #[derive(Default)]
 pub struct Plugins {
@@ -50,6 +51,7 @@ impl Plugins {
 pub struct PluginWarehouse {
     pub rx_driver: Option<Box<dyn RxDriver>>,
     pub pkt_processors: Vec<Box<dyn Processor>>,
+    pub output_plugins: Vec<Box<dyn OutputPlugin>>,
 }
 
 impl PluginWarehouse {
@@ -63,6 +65,20 @@ impl PluginWarehouse {
                     Err(e) => return Err(anyhow!("{}", e)),
                     Ok(_) => {}
                 };
+            }
+        }
+        Ok(())
+    }
+
+    pub fn start_output_plugins(
+        &self,
+        cfg: &Arc<Config>,
+        receiver: &Receiver<Box<Session>>,
+    ) -> Result<()> {
+        for plugin in &self.output_plugins {
+            match plugin.start(cfg.clone(), receiver) {
+                Err(e) => return Err(anyhow!("{}", e)),
+                Ok(_) => println!("output plugin {} started", plugin.name()),
             }
         }
         Ok(())
@@ -168,6 +184,18 @@ pub fn init_plugins(
                     processor.set_id(pkt_processor_cnt);
                     warehouse.pkt_processors.push(processor);
                     pkt_processor_cnt += 1;
+                }
+                PluginType::OutputPlugin => {
+                    let func = plugin
+                        .lib
+                        .get::<output::NewOutputPluginFunc>(
+                            output::NEW_OUTPUT_PLUGIN_FUNC_NAME.as_bytes(),
+                        )
+                        .map_err(|e| anyhow!("{}", e))?;
+                    let plugin = *func();
+                    println!("Initializing {} output plugin", plugin.name());
+                    plugin.init(cfg)?;
+                    warehouse.output_plugins.push(plugin)
                 }
                 _ => {}
             };
