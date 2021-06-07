@@ -21,7 +21,7 @@ tinyvec = { version = "1.1", features = ["alloc"] }
 yaml-rust = ">=0.4.1"
 
 [build-dependencies]
-rustc_version = "0.3"
+rustc_version = "0.4"
 
 [dev-dependencies]
 twox-hash = "*"
