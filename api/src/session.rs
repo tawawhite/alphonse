@@ -185,7 +185,7 @@ impl Session {
                         Some(p) => p == protocol.as_ref(),
                         None => false,
                     }) {
-                        Some(p) => {}
+                        Some(_) => {}
                         None => protocols.push(json!(protocol.as_ref())),
                     };
                 }
@@ -205,11 +205,11 @@ impl Session {
     ) -> Result<bool> {
         let layer = match layer {
             ProtocolLayer::All => "protocol",
-            ProtocolLayer::Datalink => "protocol.datalink",
-            ProtocolLayer::Network => "protocol.network",
-            ProtocolLayer::Transport => "protocol.transport",
-            ProtocolLayer::Application => "protocol.app",
-            ProtocolLayer::Tunnel => "protocol.tunnel",
+            ProtocolLayer::Datalink => "protocols.datalink",
+            ProtocolLayer::Network => "protocols.network",
+            ProtocolLayer::Transport => "protocols.transport",
+            ProtocolLayer::Application => "protocols.app",
+            ProtocolLayer::Tunnel => "protocols.tunnel",
         };
         match self.fields.as_mut() {
             serde_json::Value::Object(obj) => match obj.get_mut(layer) {
@@ -274,7 +274,6 @@ mod tests {
     #[test]
     fn add_protocol() -> Result<()> {
         let mut ses = Session::new();
-        ses.add_protocol(&"protocol", ProtocolLayer::All)?;
         ses.add_protocol(&"protocol", ProtocolLayer::All)?;
         assert_eq!(
             ses.has_protocol(&"protocol", ProtocolLayer::All).unwrap(),
