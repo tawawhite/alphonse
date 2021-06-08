@@ -19,14 +19,11 @@ mod plugins;
 mod stats;
 mod threadings;
 
+use threadings::SessionTable;
+
 fn main() -> Result<()> {
     let root_cmd = commands::new_root_command();
     let cfg = config::parse_args(root_cmd)?;
-
-    let session_table = Arc::new(dashmap::DashMap::with_capacity_and_hasher(
-        1000000,
-        fnv::FnvBuildHasher::default(),
-    ));
 
     signal_hook::flag::register(signal_hook::consts::SIGTERM, cfg.exit.clone())?;
     signal_hook::flag::register(signal_hook::consts::SIGINT, cfg.exit.clone())?;
@@ -46,30 +43,61 @@ fn main() -> Result<()> {
     let classifier_manager = Arc::new(classifier_manager);
 
     let mut handles = vec![];
-    let (ses_sender, ses_receiver) = bounded(cfg.pkt_channel_size as usize);
+    let mut ses_senders = vec![];
+    let mut ses_receivers = vec![];
+    for i in 0..warehouse.output_plugins.len() {
+        let (sender, receiver) = bounded(cfg.pkt_channel_size as usize);
+        ses_senders.push(sender);
+        ses_receivers.push(receiver);
+    }
 
-    // initialize pkt threads
-    let (pkt_sender, pkt_receiver) = bounded(cfg.pkt_channel_size as usize);
-    let mut pkt_threads = Vec::new();
+    // initialize pkt threads and timeout threads
+    let mut pkt_senders = vec![];
+    let mut pkt_receivers = vec![];
+    let mut pkt_threads = vec![];
+    let mut timeout_threads = vec![];
+    let mut session_tables = vec![];
 
     for i in 0..cfg.pkt_threads {
+        let (sender, receiver) = bounded(cfg.pkt_channel_size as usize);
+        let session_table: Arc<SessionTable> = Arc::new(
+            dashmap::DashMap::with_capacity_and_hasher(1000000, fnv::FnvBuildHasher::default()),
+        );
         let thread = threadings::PktThread::new(
             i,
             cfg.exit.clone(),
             classifier_manager.clone(),
-            pkt_receiver.clone(),
+            receiver.clone(),
+            session_table.clone(),
         );
+        pkt_senders.push(sender);
+        pkt_receivers.push(receiver);
         pkt_threads.push(thread);
+
+        let thread = threadings::TimeoutThread::new(
+            i,
+            cfg.exit.clone(),
+            ses_senders.clone(),
+            session_table.clone(),
+        );
+        timeout_threads.push(thread);
+
+        session_tables.push(session_table);
     }
 
-    let timeout_thread = threadings::TimeoutThread::new(cfg.exit.clone(), ses_sender.clone());
+    warehouse.start_output_plugins(&cfg, &ses_receivers)?;
 
-    warehouse.start_output_plugins(&cfg, &ses_receiver)?;
+    // start all session timeout threads
+    for thread in timeout_threads {
+        let cfg = cfg.clone();
+        let builder = std::thread::Builder::new().name(thread.name());
+        let handle = builder.spawn(move || thread.spawn(cfg)).unwrap();
+        handles.push(handle);
+    }
 
     // start all pkt threads
     for thread in pkt_threads {
         let cfg = cfg.clone();
-        let session_table = session_table.clone();
         let parsers = Box::new(
             warehouse
                 .pkt_processors
@@ -78,26 +106,16 @@ fn main() -> Result<()> {
                 .collect(),
         );
         let builder = std::thread::Builder::new().name(thread.name());
-        let handle = builder.spawn(move || thread.spawn(cfg, session_table, parsers))?;
+        let handle = builder.spawn(move || thread.spawn(cfg, parsers))?;
         handles.push(handle);
     }
 
-    // start session timeout thread
-    {
-        let cfg = cfg.clone();
-        let builder = std::thread::Builder::new().name(timeout_thread.name());
-        let handle = builder
-            .spawn(move || timeout_thread.spawn(cfg, session_table.clone()))
-            .unwrap();
-        handles.push(handle);
-    }
+    warehouse.start_rx(&cfg, &pkt_senders)?;
 
-    warehouse.start_rx(&cfg, &pkt_sender)?;
-
-    drop(pkt_sender);
-    drop(pkt_receiver);
-    drop(ses_sender);
-    drop(ses_receiver);
+    drop(pkt_senders);
+    drop(pkt_receivers);
+    drop(ses_senders);
+    drop(ses_receivers);
 
     for handle in handles {
         match handle.join() {

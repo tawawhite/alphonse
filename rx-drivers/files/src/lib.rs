@@ -1,4 +1,5 @@
 use std::ffi::OsString;
+use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, RwLock};
@@ -6,13 +7,14 @@ use std::thread::JoinHandle;
 
 use anyhow::{anyhow, Result};
 use crossbeam_channel::Sender;
+use fnv::FnvHasher;
 use path_absolutize::Absolutize;
 
 use alphonse_api as api;
 use api::classifiers::matched::Rule;
 use api::config::Config;
 use api::packet::Packet as PacketTrait;
-use api::packet::{Layers, Rules, Tunnel};
+use api::packet::{Layers, PacketHashKey, Rules, Tunnel};
 use api::plugins::rx::{RxDriver, RxStat};
 use api::plugins::{Plugin, PluginType};
 
@@ -53,12 +55,17 @@ impl Plugin for Driver {
 }
 
 impl RxDriver for Driver {
-    fn start(&self, cfg: Arc<Config>, sender: Sender<Box<dyn PacketTrait>>) -> Result<()> {
+    fn clone_driver(&self) -> Box<dyn RxDriver> {
+        Box::new(self.clone())
+    }
+
+    fn start(&self, cfg: Arc<Config>, senders: &[Sender<Box<dyn PacketTrait>>]) -> Result<()> {
         let mut handles = vec![];
         let mut thread = RxThread {
             exit: cfg.exit.clone(),
             files: get_pcap_files(cfg.as_ref()),
-            sender: sender.clone(),
+            senders: senders.iter().map(|s| s.clone()).collect(),
+            hasher: FnvHasher::default(),
         };
         if thread.files.is_empty() {
             return Err(anyhow!(
@@ -115,8 +122,9 @@ fn get_pcap_files(cfg: &Config) -> Vec<PathBuf> {
 
 struct RxThread {
     exit: Arc<AtomicBool>,
-    sender: Sender<Box<dyn PacketTrait>>,
+    senders: Vec<Sender<Box<dyn PacketTrait>>>,
     files: Vec<PathBuf>,
+    hasher: FnvHasher,
 }
 
 impl RxThread {
@@ -147,7 +155,11 @@ impl RxThread {
                     }
                 };
 
-                match self.sender.try_send(pkt) {
+                PacketHashKey::from(pkt.as_ref()).hash(&mut self.hasher);
+                let i = self.hasher.finish() as usize % self.senders.len();
+                let sender = &mut self.senders[i];
+
+                match sender.try_send(pkt) {
                     Ok(_) => {}
                     Err(err) => match err {
                         crossbeam_channel::TrySendError::Full(_) => {
@@ -170,7 +182,7 @@ impl RxThread {
         }
 
         // terminate alphonse after all packets are send to packet processing thread
-        while self.sender.len() != 0 {}
+        while self.senders.iter().any(|s| s.len() != 0) {}
         self.exit.swap(true, Ordering::Relaxed);
 
         println!("{} exit", self.name());

@@ -18,6 +18,7 @@ pub struct PktThread {
     exit: Arc<AtomicBool>,
     classifier: Arc<ClassifierManager>,
     receiver: Receiver<Box<dyn Packet>>,
+    session_table: Arc<SessionTable>,
 }
 
 impl PktThread {
@@ -26,12 +27,14 @@ impl PktThread {
         exit: Arc<AtomicBool>,
         classifier: Arc<ClassifierManager>,
         receiver: Receiver<Box<dyn Packet>>,
+        session_table: Arc<SessionTable>,
     ) -> Self {
         Self {
             id,
             exit,
             classifier,
             receiver,
+            session_table,
         }
     }
 
@@ -85,7 +88,6 @@ impl PktThread {
     pub fn spawn(
         &self,
         cfg: Arc<Config>,
-        session_table: Arc<SessionTable>,
         mut processors: Box<Vec<Box<dyn Processor>>>,
     ) -> Result<()> {
         let parser = crate::packet::Parser::new(crate::packet::link::ETHERNET);
@@ -113,7 +115,7 @@ impl PktThread {
             };
 
             let key = PacketHashKey::from(pkt.as_ref());
-            match session_table.get_mut(&key) {
+            match self.session_table.get_mut(&key) {
                 Some(mut ses) => {
                     ses.info.update(pkt.as_ref());
                     self.parse_pkt(
@@ -138,7 +140,7 @@ impl PktThread {
                     )
                     .unwrap();
 
-                    &mut session_table.insert(key, ses);
+                    self.session_table.insert(key, ses);
                 }
             };
         }

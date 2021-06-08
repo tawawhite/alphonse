@@ -26,6 +26,6 @@ pub struct RxStat {
 }
 
 pub trait RxDriver: Plugin {
-    fn start(&self, cfg: Arc<Config>, sender: Sender<Box<dyn Packet>>) -> Result<()>;
+    fn start(&self, cfg: Arc<Config>, senders: &[Sender<Box<dyn Packet>>]) -> Result<()>;
     fn stats(&self) -> RxStat;
 }

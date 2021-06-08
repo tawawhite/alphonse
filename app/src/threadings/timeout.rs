@@ -34,20 +34,32 @@ pub type SessionTable = DashMap<PacketHashKey, Box<SessionData>, FnvBuildHasher>
 
 /// Session table timeout thread
 pub struct TimeoutThread {
+    id: u8,
     exit: Arc<AtomicBool>,
-    sender: Sender<Box<Session>>,
+    senders: Vec<Sender<Box<Session>>>,
+    session_table: Arc<SessionTable>,
 }
 
 impl TimeoutThread {
-    pub fn new(exit: Arc<AtomicBool>, sender: Sender<Box<Session>>) -> Self {
-        Self { exit, sender }
+    pub fn new(
+        id: u8,
+        exit: Arc<AtomicBool>,
+        senders: Vec<Sender<Box<Session>>>,
+        session_table: Arc<SessionTable>,
+    ) -> Self {
+        Self {
+            id,
+            exit,
+            senders,
+            session_table,
+        }
     }
 
     pub fn name(&self) -> String {
-        "alphonse-timeout".to_string()
+        format!("alphonse-timeout{}", self.id)
     }
 
-    pub fn spawn(&self, cfg: Arc<Config>, session_table: Arc<SessionTable>) -> Result<()> {
+    pub fn spawn(&self, cfg: Arc<Config>) -> Result<()> {
         let now: u64 = SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
@@ -65,7 +77,7 @@ impl TimeoutThread {
             }
 
             next_timeout_check_time = now + cfg.timeout_interval;
-            session_table
+            self.session_table
                 .shards()
                 .iter()
                 .par_bridge()
@@ -91,20 +103,24 @@ impl TimeoutThread {
                             for (_, processor) in ses.processors.iter_mut() {
                                 processor.finish(ses.info.as_mut());
                             }
-                            self.sender.try_send(ses.info.clone()).unwrap();
+                            for sender in &self.senders {
+                                sender.try_send(ses.info.clone()).unwrap();
+                            }
                             ses.info.mid_save_reset(now + cfg.ses_save_timeout as u64);
                         } else if timeout {
                             for (_, processor) in ses.processors.iter_mut() {
                                 processor.finish(ses.info.as_mut());
                             }
-                            self.sender.try_send(ses.info.clone()).unwrap();
+                            for sender in &self.senders {
+                                sender.try_send(ses.info.clone()).unwrap();
+                            }
                         }
                         !timeout
                     })
                 });
         }
 
-        session_table
+        self.session_table
             .shards()
             .iter()
             .par_bridge()
@@ -114,7 +130,9 @@ impl TimeoutThread {
                     for (_, processor) in ses.processors.iter_mut() {
                         processor.finish(ses.info.as_mut());
                     }
-                    self.sender.try_send(ses.info.clone()).unwrap();
+                    for sender in &self.senders {
+                        sender.try_send(ses.info.clone()).unwrap();
+                    }
                     false
                 })
             });

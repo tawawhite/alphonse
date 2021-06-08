@@ -55,11 +55,11 @@ pub struct PluginWarehouse {
 }
 
 impl PluginWarehouse {
-    pub fn start_rx(&self, cfg: &Arc<Config>, sender: &Sender<Box<dyn Packet>>) -> Result<()> {
+    pub fn start_rx(&self, cfg: &Arc<Config>, senders: &[Sender<Box<dyn Packet>>]) -> Result<()> {
         match &self.rx_driver {
             None => return Err(anyhow!("alphonse hasn't load any rx driver plugin")),
             Some(driver) => {
-                match driver.start(cfg.clone(), sender.clone()) {
+                match driver.start(cfg.clone(), senders) {
                     // Try to fix some wired symbol lifetime problems, if use ? directly on Err,
                     // it would raise a Segment Fault. Maybe someday in the future we would figure it out
                     Err(e) => return Err(anyhow!("{}", e)),
@@ -73,10 +73,10 @@ impl PluginWarehouse {
     pub fn start_output_plugins(
         &self,
         cfg: &Arc<Config>,
-        receiver: &Receiver<Box<Session>>,
+        receivers: &[Receiver<Box<Session>>],
     ) -> Result<()> {
-        for plugin in &self.output_plugins {
-            match plugin.start(cfg.clone(), receiver) {
+        for (i, plugin) in self.output_plugins.iter().enumerate() {
+            match plugin.start(cfg.clone(), &receivers[i]) {
                 Err(e) => return Err(anyhow!("{}", e)),
                 Ok(_) => println!("output plugin {} started", plugin.name()),
             }

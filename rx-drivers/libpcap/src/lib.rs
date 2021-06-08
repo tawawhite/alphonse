@@ -1,15 +1,17 @@
+use std::hash::{Hash, Hasher};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, RwLock};
 use std::thread::JoinHandle;
 
 use anyhow::{anyhow, Result};
 use crossbeam_channel::Sender;
+use fnv::FnvHasher;
 
 use alphonse_api as api;
 use api::classifiers::matched::Rule;
 use api::config::Config;
 use api::packet::Packet as PacketTrait;
-use api::packet::{Layers, Rules, Tunnel};
+use api::packet::{Layers, PacketHashKey, Rules, Tunnel};
 use api::plugins::rx::{RxDriver, RxStat};
 use api::plugins::{Plugin, PluginType};
 
@@ -50,7 +52,11 @@ impl Plugin for Driver {
 }
 
 impl RxDriver for Driver {
-    fn start(&self, cfg: Arc<Config>, sender: Sender<Box<dyn PacketTrait>>) -> Result<()> {
+    fn clone_driver(&self) -> Box<dyn RxDriver> {
+        Box::new(self.clone())
+    }
+
+    fn start(&self, cfg: Arc<Config>, senders: &[Sender<Box<dyn PacketTrait>>]) -> Result<()> {
         let mut handles = vec![];
         let interfaces = cfg.get_str_arr(&"rx.libpcap.interfaces");
         if interfaces.is_empty() {
@@ -64,8 +70,9 @@ impl RxDriver for Driver {
             let cfg = cfg.clone();
             let mut thread = RxThread {
                 exit: cfg.exit.clone(),
-                sender: sender.clone(),
+                senders: senders.iter().map(|s| s.clone()).collect(),
                 interface: interface.clone(),
+                hasher: FnvHasher::default(),
             };
             let builder = std::thread::Builder::new().name(thread.name());
             let handle = builder.spawn(move || thread.spawn(cfg))?;
@@ -88,8 +95,9 @@ impl RxDriver for Driver {
 
 struct RxThread {
     exit: Arc<AtomicBool>,
-    sender: Sender<Box<dyn PacketTrait>>,
+    senders: Vec<Sender<Box<dyn PacketTrait>>>,
     interface: String,
+    hasher: FnvHasher,
 }
 
 impl RxThread {
@@ -130,7 +138,11 @@ impl RxThread {
                 };
             }
 
-            match self.sender.try_send(pkt) {
+            PacketHashKey::from(pkt.as_ref()).hash(&mut self.hasher);
+            let i = self.hasher.finish() as usize % self.senders.len();
+            let sender = &mut self.senders[i];
+
+            match sender.try_send(pkt) {
                 Ok(_) => {}
                 Err(err) => match err {
                     crossbeam_channel::TrySendError::Full(_) => {
