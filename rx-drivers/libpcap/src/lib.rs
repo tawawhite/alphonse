@@ -52,10 +52,6 @@ impl Plugin for Driver {
 }
 
 impl RxDriver for Driver {
-    fn clone_driver(&self) -> Box<dyn RxDriver> {
-        Box::new(self.clone())
-    }
-
     fn start(&self, cfg: Arc<Config>, senders: &[Sender<Box<dyn PacketTrait>>]) -> Result<()> {
         let mut handles = vec![];
         let interfaces = cfg.get_str_arr(&"rx.libpcap.interfaces");
