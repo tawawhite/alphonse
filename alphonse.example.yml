@@ -27,9 +27,6 @@ timeout.sctp: 60
 timeout.ses.save: 180
 ses.max.packets: 10000
 threads.pkt: 1
-threads.rx: 1
-threads.session: 1
-threads.output: 1
 plugins.processors: ["http", "ip", "misc", "tls"]
 plugins.rx-driver: rxfiles
 plugins.dirs: ["target/debug"]

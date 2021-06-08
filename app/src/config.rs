@@ -61,9 +61,6 @@ fn parse_config_file(config_file: &str, config: &mut Config) -> Result<()> {
         get_integer(doc, "ses.max.packets", 10000, 1000, u16::MAX as i64) as u16;
 
     config.pkt_threads = get_integer(doc, "threads.pkt", 1, 1, 24) as u8;
-    config.rx_threads = get_integer(doc, "threads.rx", 1, 1, 24) as u8;
-    config.ses_threads = get_integer(doc, "threads.session", 1, 1, 24) as u8;
-    config.output_threads = get_integer(doc, "threads.output", 1, 1, 24) as u8;
 
     config.rx_driver = get_str(doc, "plugins.rx-driver", "rxlibpcap");
     config.processors = get_str_arr(doc, "plugins.processors");

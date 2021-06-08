@@ -14,7 +14,6 @@ pub struct Config {
     pub dry_run: bool,
     pub node: String,
     pub hostname: String,
-    pub output_threads: u8,
     pub processors: Vec<String>,
     pub pcap_file: String,
     pub pcap_dir: String,
@@ -22,12 +21,10 @@ pub struct Config {
     pub quiet: bool,
     pub recursive: bool,
     pub rx_stat_log_interval: u64,
-    pub rx_threads: u8,
     /// Max single session packets
     pub ses_max_packets: u16,
     /// Max session connection duration
     pub ses_save_timeout: u16,
-    pub ses_threads: u8,
     pub sctp_timeout: u16,
     pub tags: Vec<String>,
     pub tcp_timeout: u16,
