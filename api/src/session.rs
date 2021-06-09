@@ -114,7 +114,7 @@ pub struct Session {
 impl Session {
     pub fn new() -> Session {
         let mut ses = Session::default();
-        ses.fields = Box::new(serde_json::json!({}));
+        ses.fields = Box::new(json!({}));
         ses
     }
 
@@ -263,6 +263,7 @@ impl Session {
         self.bytes = [0, 0];
         self.data_bytes = [0, 0];
         self.save_time = save_time;
+        self.fields = Box::new(json!({}));
     }
 }
 
