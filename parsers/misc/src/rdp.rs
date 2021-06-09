@@ -20,7 +20,8 @@ fn classify(ses: &mut Session, pkt: &dyn Packet) -> Result<()> {
     let payload = pkt.payload();
     if payload.len() > 5
         && payload[3] < payload.len() as u8
-        && payload[4] == payload[3] - 5
+        && payload[3] >= 5
+        && payload[4] == (payload[3] - 5)
         && payload[5] == 0xe0
     {
         add_protocol!(ses, "rdp");
