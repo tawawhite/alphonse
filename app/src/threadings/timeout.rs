@@ -101,7 +101,7 @@ impl TimeoutThread {
 
                         if ses.info.need_mid_save(cfg.ses_max_packets as u32, now) {
                             for (_, processor) in ses.processors.iter_mut() {
-                                processor.finish(ses.info.as_mut());
+                                processor.mid_save(ses.info.as_mut());
                             }
                             for sender in &self.senders {
                                 sender.try_send(ses.info.clone()).unwrap();

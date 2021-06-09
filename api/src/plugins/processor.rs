@@ -46,6 +46,12 @@ pub trait Processor: Send + Sync + Plugin {
     /// Change this protocol processor's internal state to indicate this session is classfied as this protocol
     fn classified_as_this_protocol(&mut self) -> Result<()>;
 
-    /// Cleanup operations
-    fn finish(&mut self, _: &mut session::Session) {}
+    /// Called when this session is timeout, add fields to this sessions
+    fn finish(&mut self, _ses: &mut session::Session) {}
+
+    #[inline]
+    /// Called when this session needs to mid save, by default call finish method
+    fn mid_save(&mut self, ses: &mut session::Session) {
+        self.finish(ses)
+    }
 }
