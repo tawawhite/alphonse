@@ -28,6 +28,7 @@ yaml-rust = ">=0.4.1"
 
 [features]
 arkime = ["alphonse-api/arkime"]
-default = ["arkime", "heuristic-mpls", "use-tcmalloc"]
+default = ["arkime", "heuristic-mpls", "use-mimalloc"]
 heuristic-mpls = []
 use-tcmalloc = ["alphonse-api/tcmalloc"]
+use-mimalloc = ["alphonse-api/mimalloc"]
