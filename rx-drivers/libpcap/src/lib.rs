@@ -10,6 +10,7 @@ use fnv::FnvHasher;
 use alphonse_api as api;
 use api::classifiers::matched::Rule;
 use api::config::Config;
+use api::dissectors::{link::LinkType, ProtocolDessector};
 use api::packet::Packet as PacketTrait;
 use api::packet::{Layers, PacketHashKey, Rules, Tunnel};
 use api::plugins::rx::{RxDriver, RxStat};
@@ -98,6 +99,7 @@ struct RxThread {
 
 impl RxThread {
     pub fn spawn(&mut self, cfg: Arc<Config>) -> Result<()> {
+        let parser = ProtocolDessector::new(LinkType::ETHERNET);
         let mut cap = NetworkInterface::try_from_str(self.interface.as_str())?;
         let mut overflow_cnt: u64 = 0;
         let mut rx_cnt: u64 = 0;
@@ -105,7 +107,7 @@ impl RxThread {
         println!("{} started", self.name());
 
         while !self.exit.load(Ordering::Relaxed) {
-            let pkt = match cap.next() {
+            let mut pkt = match cap.next() {
                 Ok(p) => p,
                 Err(e) => {
                     match e {
@@ -116,6 +118,14 @@ impl RxThread {
                         _ => return Err(anyhow!("{}", e)),
                     };
                 }
+            };
+
+            match parser.parse_pkt(pkt.as_mut()) {
+                Ok(_) => {}
+                Err(e) => match e {
+                    api::dissectors::Error::UnsupportProtocol(_) => {}
+                    _ => todo!(),
+                },
             };
 
             rx_cnt += 1;

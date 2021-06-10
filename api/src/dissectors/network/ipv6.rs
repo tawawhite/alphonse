@@ -1,11 +1,11 @@
-use super::{ip_proto, Error, Layer, Protocol, SimpleProtocolParser};
+use super::{ip_proto, Error, Layer, Protocol};
 
 #[derive(Default)]
-pub struct Parser {}
+pub struct Dissector {}
 
-impl SimpleProtocolParser for Parser {
+impl super::Dissector for Dissector {
     #[inline]
-    fn parse(&self, buf: &[u8], offset: u16) -> Result<Option<Layer>, Error> {
+    fn dissect(&self, buf: &[u8], offset: u16) -> Result<Option<Layer>, Error> {
         if buf.len() < 40 {
             return Err(Error::CorruptPacket(format!(
                 "Corrupted IPV6 packet, packet too short ({} bytes)",
@@ -59,8 +59,9 @@ impl SimpleProtocolParser for Parser {
 
 #[cfg(test)]
 mod tests {
+    use crate::dissectors::Dissector as D;
+
     use super::*;
-    const PARSER: Parser = Parser {};
 
     #[test]
     fn test_ok() {
@@ -94,14 +95,16 @@ mod tests {
             0x00, 0x25, 0x00, 0x04, 0x0a, 0x01, 0xe0, 0x56, 0xc0, 0x51, 0x00, 0x01, 0x00, 0x01,
             0x00, 0x00, 0x00, 0x25, 0x00, 0x04, 0x0a, 0x01, 0x09, 0x96, //dns
         ];
-        let result = PARSER.parse(&buf, 0);
+        let dissector = Dissector::default();
+        let result = dissector.dissect(&buf, 0);
         assert!(matches!(result, Ok(_)));
     }
 
     #[test]
     fn test_err_pkt_too_short() {
         let buf = [0x60];
-        let result = PARSER.parse(&buf, 0);
+        let dissector = Dissector::default();
+        let result = dissector.dissect(&buf, 0);
         assert!(matches!(result.unwrap_err(), Error::CorruptPacket(_)));
     }
 
@@ -111,7 +114,8 @@ mod tests {
             0x45, 0x00, 0x00, 0x64, 0x00, 0x0a, 0x00, 0x00, 0xff, 0x01, 0xa5, 0x6a, 0x0a, 0x01,
             0x02, 0x01, 0x0a, 0x22, 0x00, 0x01,
         ];
-        let result = PARSER.parse(&buf, 0);
+        let dissector = Dissector::default();
+        let result = dissector.dissect(&buf, 0);
         assert!(matches!(result.unwrap_err(), Error::CorruptPacket(_)));
     }
 
@@ -122,7 +126,8 @@ mod tests {
             0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x20, 0x01, 0x0d, 0xb8,
             0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02,
         ];
-        let result = PARSER.parse(&buf, 0);
+        let dissector = Dissector::default();
+        let result = dissector.dissect(&buf, 0);
         assert!(matches!(result.unwrap_err(), Error::CorruptPacket(_)));
     }
 
@@ -139,7 +144,8 @@ mod tests {
             0xab, 0xcd, 0xab, 0xcd, 0xab, 0xcd, 0xab, 0xcd, 0xab, 0xcd, 0xab, 0xcd, 0xab, 0xcd,
             0xab, 0xcd, 0xab, 0xcd, 0xab, 0xcd, 0xab, 0xcd, 0xab, 0xcd, // icmpv6
         ];
-        let result = PARSER.parse(&buf, 0);
+        let dissector = Dissector::default();
+        let result = dissector.dissect(&buf, 0);
         assert!(matches!(result, Err(_)));
         assert!(matches!(result.unwrap_err(), Error::UnsupportProtocol(_)));
     }

@@ -1,4 +1,4 @@
-use super::{Error, Layer, Protocol, SimpleProtocolParser};
+use super::{Error, Layer, Protocol};
 
 const DATAMESSAGE: u16 = 0b0000000000000000;
 const CONTROLMESSAGE: u16 = 0b1000000000000000;
@@ -36,9 +36,9 @@ impl PacketType {
 }
 
 #[derive(Default)]
-pub struct Parser {}
+pub struct Dissector {}
 
-impl Parser {
+impl Dissector {
     #[inline]
     /// Get L2TP protocol version number
     fn l2tp_version(control: u16) -> u16 {
@@ -46,9 +46,9 @@ impl Parser {
     }
 }
 
-impl SimpleProtocolParser for Parser {
+impl super::Dissector for Dissector {
     #[inline]
-    fn parse(&self, buf: &[u8], offset: u16) -> Result<Option<Layer>, Error> {
+    fn dissect(&self, buf: &[u8], offset: u16) -> Result<Option<Layer>, Error> {
         if buf.len() < 2 {
             return Err(Error::CorruptPacket(format!(
                 "Corrupted L2TP packet, packet too short ({} bytes)",
@@ -57,7 +57,7 @@ impl SimpleProtocolParser for Parser {
         }
 
         let control = unsafe { (*(buf.as_ptr() as *const u16)).to_be() };
-        match Parser::l2tp_version(control) {
+        match Dissector::l2tp_version(control) {
             2 | 3 => {}
             ver => {
                 return Err(Error::CorruptPacket(format!(
@@ -95,15 +95,17 @@ impl SimpleProtocolParser for Parser {
 
 #[cfg(test)]
 mod test {
+    use crate::dissectors::Dissector as D;
+
     use super::*;
-    const PARSER: Parser = Parser {};
 
     #[test]
     fn test_offset_bit_present() {
         let buf = [
             0x02, 0x02, 0x4a, 0x32, 0xd3, 0x5e, 0x00, 0x00, 0xff, 0x03, 0x00, 0x57,
         ];
-        let result = PARSER.parse(&buf, 0);
+        let dissector = Dissector::default();
+        let result = dissector.dissect(&buf, 0);
         assert!(matches!(result, Ok(_)));
 
         let layer = result.unwrap();
@@ -117,7 +119,8 @@ mod test {
             0xc8, 0x02, 0x00, 0x14, 0x05, 0xf7, 0x00, 0x00, 0x00, 0x0f, 0x00, 0x02, 0x80, 0x08,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x06,
         ];
-        let result = PARSER.parse(&buf, 0);
+        let dissector = Dissector::default();
+        let result = dissector.dissect(&buf, 0);
         assert!(matches!(result, Ok(_)));
 
         let layer = result.unwrap();
@@ -128,7 +131,8 @@ mod test {
     #[test]
     fn test_sequence_bit_present() {
         let buf = [0x08, 0x02, 0x05, 0xf7, 0x00, 0x00, 0x00, 0x0f, 0x00, 0x02];
-        let result = PARSER.parse(&buf, 0);
+        let dissector = Dissector::default();
+        let result = dissector.dissect(&buf, 0);
         assert!(matches!(result, Ok(_)));
 
         let layer = result.unwrap();

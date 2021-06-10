@@ -1,11 +1,11 @@
-use super::{Error, Layer, Protocol, SimpleProtocolParser};
+use super::{Error, Layer, Protocol};
 
 #[derive(Default)]
-pub struct Parser;
+pub struct Dissector;
 
-impl SimpleProtocolParser for Parser {
+impl super::Dissector for Dissector {
     #[inline]
-    fn parse(&self, buf: &[u8], offset: u16) -> Result<Option<Layer>, Error> {
+    fn dissect(&self, buf: &[u8], offset: u16) -> Result<Option<Layer>, Error> {
         if buf.len() < 8 {
             // 如果报文内容长度小于IP报文最短长度(IP协议头长度)
             // 数据包有错误
@@ -36,8 +36,9 @@ impl SimpleProtocolParser for Parser {
 
 #[cfg(test)]
 mod test {
+    use crate::dissectors::Dissector as D;
+
     use super::*;
-    const PARSER: Parser = Parser {};
 
     #[test]
     fn test_ok() {
@@ -46,7 +47,8 @@ mod test {
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x77, 0x77, 0x77, 0x06, 0x67, 0x69, 0x74,
             0x68, 0x75, 0x62, 0x03, 0x63, 0x6f, 0x6d, 0x00, 0x00, 0x01, 0x00, 0x01,
         ];
-        let result = PARSER.parse(&buf, 0);
+        let dissector = Dissector::default();
+        let result = dissector.dissect(&buf, 0);
         assert!(matches!(result, Ok(_)));
 
         let layer = result.unwrap();
@@ -58,7 +60,8 @@ mod test {
     #[test]
     fn test_pkt_too_short() {
         let buf = [0xf4];
-        let result = PARSER.parse(&buf, 0);
+        let dissector = Dissector::default();
+        let result = dissector.dissect(&buf, 0);
         assert!(matches!(result, Err(_)));
 
         let err = result.unwrap_err();
@@ -68,7 +71,8 @@ mod test {
     #[test]
     fn l2tp() {
         let buf = [0x06, 0xa5, 0x06, 0xa5, 0x00, 0x54, 0x00, 0x00];
-        let result = PARSER.parse(&buf, 0);
+        let dissector = Dissector::default();
+        let result = dissector.dissect(&buf, 0);
         assert!(matches!(result, Ok(_)));
 
         let layer = result.unwrap();

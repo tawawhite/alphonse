@@ -1,11 +1,11 @@
-use super::{Error, Layer, Protocol, SimpleProtocolParser};
+use super::{Error, Layer, Protocol};
 
 #[derive(Default)]
-pub struct Parser;
+pub struct Dissector;
 
-impl SimpleProtocolParser for Parser {
+impl super::Dissector for Dissector {
     #[inline]
-    fn parse(&self, buf: &[u8], offset: u16) -> Result<Option<Layer>, Error> {
+    fn dissect(&self, buf: &[u8], offset: u16) -> Result<Option<Layer>, Error> {
         if buf.len() < 8 || buf[0] != 0x11 || buf[1] != 0 {
             return Err(Error::CorruptPacket(format!("Corrupted PPPOE packet")));
         }

@@ -1,5 +1,5 @@
 use super::Error;
-use super::{Layer, Protocol, SimpleProtocolParser};
+use super::{Layer, Protocol};
 
 /// ETHER TYPES
 ///
@@ -189,11 +189,11 @@ pub const _3GPP2: u16 = 0x88D2;
 // const ROCE: u16 = 0x8915;
 
 #[derive(Default)]
-pub struct Parser {}
+pub struct Dissector {}
 
-impl SimpleProtocolParser for Parser {
+impl super::Dissector for Dissector {
     #[inline]
-    fn parse(&self, buf: &[u8], offset: u16) -> Result<Option<Layer>, Error> {
+    fn dissect(&self, buf: &[u8], offset: u16) -> Result<Option<Layer>, Error> {
         if buf.len() < 14 {
             return Err(Error::CorruptPacket(format!(
                 "The ethernet packet is corrupted, packet too short ({} bytes)",
@@ -232,15 +232,17 @@ impl SimpleProtocolParser for Parser {
 
 #[cfg(test)]
 mod tests {
+    use crate::dissectors::Dissector as D;
+
     use super::*;
-    const PARSER: Parser = Parser {};
 
     #[test]
     fn ok() {
         let buf = [
             0x01, 0x80, 0xc2, 0x00, 0x00, 0x00, 0xcc, 0x04, 0x0d, 0x5c, 0xf0, 0x00, 0x08, 0x00,
         ];
-        assert!(matches!(PARSER.parse(&buf, 0), Ok(_)));
+        let dissector = Dissector::default();
+        assert!(matches!(dissector.dissect(&buf, 0), Ok(_)));
     }
 
     #[test]
@@ -248,7 +250,8 @@ mod tests {
         let buf = [
             0x01, 0x80, 0xc2, 0x00, 0x00, 0x00, 0xcc, 0x04, 0x0d, 0x5c, 0xf0, 0x00,
         ];
-        let result = PARSER.parse(&buf, 0);
+        let dissector = Dissector::default();
+        let result = dissector.dissect(&buf, 0);
         assert!(matches!(result, Err(_)));
         assert!(matches!(result.unwrap_err(), Error::CorruptPacket(_)));
     }
@@ -258,7 +261,8 @@ mod tests {
         let buf = [
             0x01, 0x80, 0xc2, 0x00, 0x00, 0x00, 0xcc, 0x04, 0x0d, 0x5c, 0xf0, 0x00, 0x06, 0x00,
         ];
-        let result = PARSER.parse(&buf, 0);
+        let dissector = Dissector::default();
+        let result = dissector.dissect(&buf, 0);
         assert!(matches!(result, Err(_)));
         assert!(matches!(result.unwrap_err(), Error::UnsupportProtocol(_)));
     }

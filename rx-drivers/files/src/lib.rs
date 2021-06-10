@@ -8,6 +8,7 @@ use std::thread::JoinHandle;
 use anyhow::{anyhow, Result};
 use crossbeam_channel::Sender;
 use fnv::FnvHasher;
+use num_traits::cast::FromPrimitive;
 use path_absolutize::Absolutize;
 
 use alphonse_api as api;
@@ -137,10 +138,14 @@ impl RxThread {
             }
 
             let mut cap = Offline::try_from_path(file)?;
+            let link_type =
+                api::dissectors::link::LinkType::from_u16(cap.cap.get_datalink().0 as u16)
+                    .ok_or_else(|| anyhow!("Unrecognized link type"))?;
+            let parser = api::dissectors::ProtocolDessector::new(link_type);
             let mut overflow_cnt = 0;
 
             while !self.exit.load(Ordering::Relaxed) {
-                let pkt = match cap.next() {
+                let mut pkt = match cap.next() {
                     Ok(pkt) => pkt,
                     Err(err) => {
                         if err.to_string().as_str() == "no more packets to read from the file" {
@@ -149,6 +154,14 @@ impl RxThread {
                         }
                         break;
                     }
+                };
+
+                match parser.parse_pkt(pkt.as_mut()) {
+                    Ok(_) => {}
+                    Err(e) => match e {
+                        api::dissectors::Error::UnsupportProtocol(_) => {}
+                        _ => todo!(),
+                    },
                 };
 
                 PacketHashKey::from(pkt.as_ref()).hash(&mut self.hasher);

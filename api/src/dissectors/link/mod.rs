@@ -1,10 +1,26 @@
 #![allow(non_camel_case_types)]
 
-use super::parser::{Error, SimpleProtocolParser};
+use super::{Dissector, Error};
 use super::{Layer, Protocol};
 
 pub mod ethernet;
 pub mod null;
+
+#[repr(u16)]
+#[derive(Debug, Primitive)]
+pub enum LinkType {
+    NULL = 0,
+    ETHERNET = 1,
+    RAW = 101,
+    IPV4 = 228,
+    IPV6 = 229,
+}
+
+impl Default for LinkType {
+    fn default() -> Self {
+        Self::ETHERNET
+    }
+}
 
 /// From https://www.tcpdump.org/linktypes.html
 pub const NULL: u16 = 0;
