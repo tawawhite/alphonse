@@ -4,6 +4,7 @@ use std::rc::Rc;
 
 use anyhow::{anyhow, Result};
 use once_cell::sync::OnceCell;
+use serde::Serialize;
 use serde_json::json;
 
 use alphonse_api as api;
@@ -25,7 +26,7 @@ struct HttpProcessor<'a> {
     id: ProcessorID,
     name: String,
     classified: bool,
-    parsers: [llhttp::Parser<'a>; 2],
+    parsers: [llhttp::Parser<'a, Rc<RefCell<HTTP>>>; 2],
     resp_rule_id: RuleID,
     client_direction: Direction,
 }
@@ -45,17 +46,63 @@ impl AsMut<md5::Context> for Md5Context {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct HTTP {
-    auth: String,
-    body_magic: String,
-    cookie: String,
+    #[serde(skip_serializing_if = "HashSet::is_empty")]
+    auth_type: HashSet<String>,
+    #[serde(skip_serializing_if = "HashSet::is_empty")]
+    body_magic: HashSet<String>,
+    #[serde(skip_serializing_if = "HashSet::is_empty")]
+    client_version: HashSet<String>,
+    #[serde(skip_serializing_if = "HashSet::is_empty")]
+    server_version: HashSet<String>,
+    #[serde(skip_serializing_if = "HashSet::is_empty")]
+    cookie_key: HashSet<String>,
+    #[serde(skip_serializing_if = "HashSet::is_empty")]
+    cookie_value: HashSet<String>,
+    #[serde(skip_serializing)]
+    client_direction: Direction,
+    #[serde(skip_serializing)]
     direction: Direction,
-    host: String,
+    #[serde(skip_serializing_if = "HashSet::is_empty")]
+    host: HashSet<String>,
+    #[serde(skip_serializing_if = "HashSet::is_empty")]
+    key: HashSet<String>,
+    #[serde(skip_serializing)]
+    last_header: String,
+    #[serde(skip_serializing_if = "HashSet::is_empty")]
+    method: HashSet<String>,
+    #[serde(skip_serializing)]
     md5: [Md5Context; 2],
+    #[serde(skip_serializing)]
     md5_digest: HashSet<md5::Digest>,
-    url: HashSet<String>,
-    value: [String; 2],
+    #[serde(skip_serializing_if = "HashSet::is_empty")]
+    path: HashSet<String>,
+    #[serde(skip_serializing_if = "HashSet::is_empty")]
+    request_body: HashSet<String>,
+    #[serde(skip_serializing_if = "HashSet::is_empty")]
+    request_header: HashSet<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    request_header_field: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    request_header_value: Vec<String>,
+    #[serde(skip_serializing_if = "HashSet::is_empty")]
+    response_header: HashSet<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    response_header_field: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    response_header_value: Vec<String>,
+    #[serde(skip_serializing_if = "HashSet::is_empty")]
+    status_code: HashSet<u16>,
+    #[serde(skip_serializing_if = "HashSet::is_empty")]
+    uri: HashSet<String>,
+    #[serde(skip_serializing_if = "HashSet::is_empty")]
+    user: HashSet<String>,
+    #[serde(skip_serializing_if = "HashSet::is_empty")]
+    user_agent: HashSet<String>,
+    #[serde(skip_serializing_if = "HashSet::is_empty")]
+    value: HashSet<String>,
 }
 
 unsafe impl Send for HttpProcessor<'_> {}
@@ -87,16 +134,25 @@ impl<'a> Plugin for HttpProcessor<'static> {
         // initialize global llhttp settings
         let mut settings = llhttp::Settings::default();
 
-        llhttp::cb_wrapper!(_on_message_begin, on_message_begin);
+        llhttp::cb_wrapper!(_on_message_begin, on_message_begin, Data);
         settings.on_message_begin(Some(_on_message_begin));
 
-        llhttp::data_cb_wrapper!(_on_url, on_url);
+        llhttp::data_cb_wrapper!(_on_url, on_url, Data);
         settings.on_url(Some(_on_url));
 
-        llhttp::data_cb_wrapper!(_on_body, on_body);
+        llhttp::data_cb_wrapper!(_on_header_field, on_header_field, Data);
+        settings.on_header_field(Some(_on_header_field));
+
+        llhttp::data_cb_wrapper!(_on_header_value, on_header_value, Data);
+        settings.on_header_value(Some(_on_header_value));
+
+        llhttp::cb_wrapper!(_on_header_complete, on_headers_complete, Data);
+        settings.on_headers_complete(Some(_on_header_complete));
+
+        llhttp::data_cb_wrapper!(_on_body, on_body, Data);
         settings.on_body(Some(_on_body));
 
-        llhttp::cb_wrapper!(_on_message_complete, on_message_complete);
+        llhttp::cb_wrapper!(_on_message_complete, on_message_complete, Data);
         settings.on_message_complete(Some(_on_message_complete));
 
         SETTINGS.set(settings).unwrap();
@@ -230,12 +286,19 @@ impl<'a> Processor for HttpProcessor<'static> {
             };
 
             let http = Rc::new(RefCell::new(HTTP::default()));
-            http.borrow_mut().direction = pkt.direction();
+            let mut h = http.borrow_mut();
+            h.direction = pkt.direction();
+            h.client_direction = self.client_direction;
             for parser in &mut self.parsers {
                 parser.init(settings, llhttp::Type::HTTP_BOTH);
                 parser.set_data(Some(Box::new(http.clone())));
             }
         }
+
+        match self.parsers[direction].data() {
+            None => {}
+            Some(http) => http.borrow_mut().direction = pkt.direction(),
+        };
 
         match self.parsers[direction].parse(pkt.payload()) {
             llhttp::Error::HPE_OK => {}
@@ -243,7 +306,7 @@ impl<'a> Processor for HttpProcessor<'static> {
             | llhttp::Error::HPE_PAUSED_UPGRADE
             | llhttp::Error::HPE_PAUSED_H2_UPGRADE => {}
             _ => {
-                let data = self.parsers[direction].set_data::<Rc<RefCell<HTTP>>>(None);
+                let data = self.parsers[direction].set_data(None);
                 let settings = match SETTINGS.get() {
                     Some(s) => s,
                     None => {
@@ -261,33 +324,28 @@ impl<'a> Processor for HttpProcessor<'static> {
     }
 
     fn finish(&mut self, ses: &mut Session) {
-        self.parsers[0].set_data::<Rc<RefCell<HTTP>>>(None);
-        let http = self.parsers[1].set_data::<Rc<RefCell<HTTP>>>(None);
+        self.parsers[0].set_data(None);
+        let http = self.parsers[1].set_data(None);
         let http = match http {
             None => return,
             Some(http) => http,
         };
-        let http = http.borrow();
-
-        // uri
-        if !http.url.is_empty() {
-            ses.add_field(&"http.uri", &serde_json::json!(http.url));
-        }
+        ses.add_field(&"http", json!(http));
 
         // body md5
-        let digests: Vec<String> = http
-            .md5_digest
-            .iter()
-            .filter_map(|digest| {
-                let s = format!("{:x}", digest);
-                if s == "d41d8cd98f00b204e9800998ecf8427e" {
-                    None
-                } else {
-                    Some(s)
-                }
-            })
-            .collect();
-        ses.add_field(&"http.md5", &json!(digests));
+        // let digests: Vec<String> = http
+        //     .md5_digest
+        //     .iter()
+        //     .filter_map(|digest| {
+        //         let s = format!("{:x}", digest);
+        //         if s == "d41d8cd98f00b204e9800998ecf8427e" {
+        //             None
+        //         } else {
+        //             Some(s)
+        //         }
+        //     })
+        //     .collect();
+        // ses.add_field(&"http.md5", &json!(digests));
 
         println!("{}", serde_json::to_string_pretty(&ses).unwrap());
     }
