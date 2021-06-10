@@ -14,7 +14,6 @@ use api::classifiers;
 
 mod commands;
 mod config;
-mod packet;
 mod plugins;
 mod stats;
 mod threadings;
