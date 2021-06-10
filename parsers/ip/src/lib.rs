@@ -41,7 +41,6 @@ impl Default for IpInfo {
 #[derive(Default)]
 struct IPProcessor {
     id: ProcessorID,
-    name: String,
     classified: bool,
     processed: bool,
     src_ip: IpInfo,
@@ -52,7 +51,6 @@ impl Clone for IPProcessor {
     fn clone(&self) -> Self {
         Self {
             id: self.id,
-            name: self.name.clone(),
             classified: self.classified,
             processed: self.processed,
             src_ip: self.src_ip.clone(),
@@ -68,7 +66,7 @@ impl Plugin for IPProcessor {
 
     /// Get parser name
     fn name(&self) -> &str {
-        &self.name.as_str()
+        "ip"
     }
 
     fn init(&self, alcfg: &api::config::Config) -> Result<()> {
@@ -202,26 +200,26 @@ impl Processor for IPProcessor {
     }
 
     fn finish(&mut self, ses: &mut Session) {
-        ses.add_field(&"srcIp", &json!(self.src_ip.addr));
+        ses.add_field(&"srcIp", json!(self.src_ip.addr));
         if !self.src_ip.asn.is_empty() {
-            ses.add_field(&"src.ASN", &json!(self.src_ip.asn));
+            ses.add_field(&"src.ASN", json!(self.src_ip.asn));
         }
         if !self.src_ip.country.is_empty() {
-            ses.add_field(&"src.GEO", &json!(self.src_ip.country));
+            ses.add_field(&"src.GEO", json!(self.src_ip.country));
         }
         if !self.src_ip.city.is_empty() {
-            ses.add_field(&"src.GEOCity", &json!(self.src_ip.city));
+            ses.add_field(&"src.GEOCity", json!(self.src_ip.city));
         }
 
-        ses.add_field(&"dstIp", &json!(self.dst_ip.addr));
+        ses.add_field(&"dstIp", json!(self.dst_ip.addr));
         if !self.src_ip.asn.is_empty() {
-            ses.add_field(&"dst.ASN", &json!(self.src_ip.asn));
+            ses.add_field(&"dst.ASN", json!(self.src_ip.asn));
         }
         if !self.src_ip.country.is_empty() {
-            ses.add_field(&"dst.GEO", &json!(self.src_ip.country));
+            ses.add_field(&"dst.GEO", json!(self.src_ip.country));
         }
         if !self.src_ip.city.is_empty() {
-            ses.add_field(&"dst.GEOCity", &json!(self.src_ip.city));
+            ses.add_field(&"dst.GEOCity", json!(self.src_ip.city));
         }
     }
 }

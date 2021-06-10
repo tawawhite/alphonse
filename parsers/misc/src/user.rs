@@ -47,7 +47,7 @@ fn classify(ses: &mut Session, pkt: &dyn Packet) -> Result<()> {
                 String::from_utf8_lossy(&user).to_string()
             }
         };
-    ses.add_field(&"user", &serde_json::json!(user));
+    ses.add_field(&"user", serde_json::json!(user));
     Ok(())
 }
 

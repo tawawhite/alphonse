@@ -34,9 +34,9 @@ fn classify(ses: &mut Session, pkt: &dyn Packet) -> Result<()> {
 
     let msg_type = pkt.payload()[18] as usize;
     if msg_type < TYPE.len() {
-        ses.add_field(&"bgp.type", &json!(TYPE[msg_type]));
+        ses.add_field(&"bgp.type", json!(TYPE[msg_type]));
     } else {
-        ses.add_field(&"bgp.type", &json!("Unassigned"));
+        ses.add_field(&"bgp.type", json!("Unassigned"));
     }
 
     Ok(())

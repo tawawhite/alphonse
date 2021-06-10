@@ -311,7 +311,7 @@ impl Processor for SimpleWriterProcessor {
                 .map(|pos| serde_json::json!(pos))
                 .collect(),
         );
-        ses.add_field(&"packetPos", &value);
+        ses.add_field(&"packetPos", value);
     }
 }
 

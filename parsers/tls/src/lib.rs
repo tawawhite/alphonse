@@ -129,7 +129,7 @@ impl Processor for TlsProcessor {
     }
 
     fn finish(&mut self, ses: &mut Session) {
-        ses.add_field(&"cert", &json!(self.certs));
+        ses.add_field(&"cert", json!(self.certs));
         for side in &self.side_data {
             match side.side {
                 Side::Client => {}

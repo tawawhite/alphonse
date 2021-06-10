@@ -53,7 +53,7 @@ fn classify<'a>(ses: &'a mut Session, pkt: &'a dyn Packet) -> IResult<&'a [u8], 
         let (payload, user_len) = be_u16(payload)?;
         let (payload, _) = take(user_len)(payload)?;
         match std::str::from_utf8(payload.to_ascii_lowercase().as_slice()) {
-            Ok(name) => ses.add_field(&"user", &json!(name)),
+            Ok(name) => ses.add_field(&"user", json!(name)),
             Err(_) => {}
         };
     }
