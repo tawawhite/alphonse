@@ -90,7 +90,6 @@ impl PktThread {
         cfg: Arc<Config>,
         mut processors: Box<Vec<Box<dyn Processor>>>,
     ) -> Result<()> {
-        let parser = crate::packet::Parser::new(crate::packet::link::ETHERNET);
         let mut classify_scratch = match self.classifier.alloc_scratch() {
             Ok(scratch) => scratch,
             Err(_) => todo!(),
@@ -104,14 +103,6 @@ impl PktThread {
                     break;
                 }
                 Ok(s) => s,
-            };
-
-            match parser.parse_pkt(pkt.as_mut()) {
-                Ok(_) => {}
-                Err(e) => match e {
-                    crate::packet::parser::Error::UnsupportProtocol(_) => {}
-                    _ => todo!(),
-                },
             };
 
             let key = PacketHashKey::from(pkt.as_ref());
