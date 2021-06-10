@@ -15,6 +15,7 @@ pub static RUSTC_VERSION: &str = env!("RUSTC_VERSION");
 
 pub mod classifiers;
 pub mod config;
+pub mod dissectors;
 pub mod packet;
 pub mod plugins;
 pub mod session;
