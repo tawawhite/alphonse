@@ -152,10 +152,10 @@ impl Session {
 
     /// Add field
     #[inline]
-    pub fn add_field<S: AsRef<str>>(&mut self, key: &S, value: &serde_json::Value) {
+    pub fn add_field<S: AsRef<str>>(&mut self, key: &S, value: serde_json::Value) {
         match self.fields.as_mut() {
             serde_json::Value::Object(obj) => match obj.get(key.as_ref()) {
-                None => obj.insert(key.as_ref().to_string(), value.clone()),
+                None => obj.insert(key.as_ref().to_string(), value),
                 Some(_) => todo!(),
             },
             _ => todo!("need to guarantee fields is an object in Session initialization"),
