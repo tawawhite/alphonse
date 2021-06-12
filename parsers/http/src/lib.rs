@@ -56,8 +56,6 @@ struct HTTP {
     #[serde(skip_serializing_if = "HashSet::is_empty")]
     client_version: HashSet<String>,
     #[serde(skip_serializing_if = "HashSet::is_empty")]
-    server_version: HashSet<String>,
-    #[serde(skip_serializing_if = "HashSet::is_empty")]
     cookie_key: HashSet<String>,
     #[serde(skip_serializing_if = "HashSet::is_empty")]
     cookie_value: HashSet<String>,
@@ -93,6 +91,8 @@ struct HTTP {
     response_header_field: Vec<String>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     response_header_value: Vec<String>,
+    #[serde(skip_serializing_if = "HashSet::is_empty")]
+    server_version: HashSet<String>,
     #[serde(skip_serializing_if = "HashSet::is_empty")]
     status_code: HashSet<u16>,
     #[serde(skip_serializing_if = "HashSet::is_empty")]

@@ -1,11 +1,37 @@
-use std::cell::RefCell;
+use std::cell::{RefCell, RefMut};
 use std::rc::Rc;
 
 use anyhow::Result;
+use combine::many1;
+use combine::parser::byte::{byte, spaces, take_until_byte};
+use combine::parser::choice::optional;
+use combine::parser::range::take_while1;
+use combine::parser::Parser;
 
 use crate::{Md5Context, HTTP};
 
 pub(crate) type Data = Rc<RefCell<HTTP>>;
+
+fn parse_cookie(data: &[u8], http: &mut RefMut<HTTP>) -> Result<()> {
+    println!("{}", String::from_utf8_lossy(data));
+    let key = take_until_byte(b'=');
+    let value = take_while1(|b| b != b';');
+    let kv_parser = key
+        .skip(byte(b'='))
+        .and(value)
+        .skip(optional(byte(b';')))
+        .skip(optional(spaces()));
+    let mut cookie_parser = many1::<Vec<(&[u8], &[u8])>, _, _>(kv_parser);
+
+    let kvs = cookie_parser.parse(data)?.0;
+    for (k, v) in kvs.iter() {
+        http.cookie_key
+            .insert(String::from_utf8_lossy(k).to_string());
+        http.cookie_value
+            .insert(String::from_utf8_lossy(v).to_string());
+    }
+    Ok(())
+}
 
 pub(crate) fn on_message_begin(parser: &mut llhttp::Parser<Data>) -> Result<()> {
     let mut http = match parser.data() {
@@ -75,9 +101,7 @@ pub(crate) fn on_header_value(parser: &mut llhttp::Parser<Data>, data: &[u8]) ->
             "host" => {
                 http.host.insert(value.clone());
             }
-            "cookie" => {
-                // http.cookies.insert(value.clone(), HashSet::default());
-            }
+            "cookie" => parse_cookie(data, &mut http)?,
             "authorization" => {}
             _ => {}
         }
