@@ -12,8 +12,8 @@ use crate::{Md5Context, HTTP};
 
 pub(crate) type Data = Rc<RefCell<HTTP>>;
 
+/// Maybe use nom implement this logic in the future
 fn parse_cookie(data: &[u8], http: &mut RefMut<HTTP>) -> Result<()> {
-    println!("{}", String::from_utf8_lossy(data));
     let key = take_until_byte(b'=');
     let value = take_while1(|b| b != b';');
     let kv_parser = key
