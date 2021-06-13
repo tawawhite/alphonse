@@ -36,3 +36,18 @@ simple-writer:
     pcap.dirs: ["./raw"]
     max.file.size: 10737418240 # bytes, default 10GB
 ip.db.directory: "./etc"
+
+# Headers listed below will be added as session fields
+http.headers:
+  - x-forwarded-for
+  - user-agent
+  - host
+http.request.headers:
+  - referer
+  - authorization
+  - content-type
+  - origin
+http.response.headers:
+  - location
+  - server
+  - content-type

@@ -1,6 +1,8 @@
 use std::cell::RefCell;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
+use std::ops::DerefMut;
 use std::rc::Rc;
+use std::sync::{Arc, RwLock};
 
 use anyhow::{anyhow, Result};
 use once_cell::sync::OnceCell;
@@ -37,6 +39,9 @@ struct HttpProcessor<'a> {
     parsers: [llhttp::Parser<'a, Data>; 2],
     resp_rule_id: RuleID,
     client_direction: Direction,
+    headers: Arc<RwLock<HashSet<String>>>,
+    req_headers: Arc<RwLock<HashSet<String>>>,
+    resp_headers: Arc<RwLock<HashSet<String>>>,
 }
 
 #[derive(Clone)]
@@ -67,10 +72,9 @@ struct HTTP {
     cookie_key: HashSet<String>,
     #[serde(skip_serializing_if = "HashSet::is_empty")]
     cookie_value: HashSet<String>,
-    #[serde(skip_serializing)]
-    client_direction: Direction,
-    #[serde(skip_serializing)]
-    direction: Direction,
+    #[serde(skip_serializing_if = "HashMap::is_empty")]
+    #[serde(flatten)]
+    header_values: HashMap<String, HashSet<String>>,
     #[serde(skip_serializing_if = "HashSet::is_empty")]
     host: HashSet<String>,
     #[serde(skip_serializing_if = "HashSet::is_empty")]
@@ -123,11 +127,14 @@ impl<'a> HttpProcessor<'a> {
             parsers: [llhttp::Parser::default(), llhttp::Parser::default()],
             resp_rule_id: 0,
             client_direction: Direction::Left,
+            headers: Arc::default(),
+            req_headers: Arc::default(),
+            resp_headers: Arc::default(),
         }
     }
 }
 
-impl<'a> Plugin for HttpProcessor<'static> {
+impl<'a> Plugin for HttpProcessor<'a> {
     fn plugin_type(&self) -> PluginType {
         PluginType::PacketProcessor
     }
@@ -136,7 +143,7 @@ impl<'a> Plugin for HttpProcessor<'static> {
         &self.name.as_str()
     }
 
-    fn init(&self, _: &Config) -> Result<()> {
+    fn init(&self, cfg: &Config) -> Result<()> {
         // initialize global llhttp settings
         let mut settings = llhttp::Settings::default();
 
@@ -162,6 +169,28 @@ impl<'a> Plugin for HttpProcessor<'static> {
         settings.on_message_complete(Some(_on_message_complete));
 
         SETTINGS.set(settings).unwrap();
+
+        let headers = cfg.get_str_arr("http.headers");
+        let mut hdrs = self.headers.write().or_else(|e| Err(anyhow!("{}", e)))?;
+        let hdrs = hdrs.deref_mut();
+        *hdrs = headers.into_iter().collect();
+
+        let headers = cfg.get_str_arr("http.request.headers");
+        let mut req_headers = self
+            .req_headers
+            .write()
+            .or_else(|e| Err(anyhow!("{}", e)))?;
+        let req_headers = req_headers.deref_mut();
+        *req_headers = headers.into_iter().collect();
+
+        let headers = cfg.get_str_arr("http.response.headers");
+        let mut resp_headers = self
+            .resp_headers
+            .write()
+            .or_else(|e| Err(anyhow!("{}", e)))?;
+        let resp_headers = resp_headers.deref_mut();
+        *resp_headers = headers.into_iter().collect();
+
         Ok(())
     }
 }
@@ -267,7 +296,6 @@ impl<'a> Processor for HttpProcessor<'static> {
         rule: Option<&api::classifiers::matched::Rule>,
         ses: &mut Session,
     ) -> Result<()> {
-        println!("{:?}", unsafe { pkt.src_port() });
         let direction = pkt.direction() as u8 as usize;
 
         // update client direction
@@ -294,8 +322,11 @@ impl<'a> Processor for HttpProcessor<'static> {
 
             let state = Rc::new(RefCell::new(State::default()));
             let mut s = state.borrow_mut();
-            s.http.direction = pkt.direction();
-            s.http.client_direction = self.client_direction;
+            s.ctx.direction = pkt.direction();
+            s.ctx.client_direction = self.client_direction;
+            s.ctx.headers = self.headers.clone();
+            s.ctx.req_headers = self.req_headers.clone();
+            s.ctx.resp_headers = self.resp_headers.clone();
             for parser in &mut self.parsers {
                 parser.init(settings, llhttp::Type::HTTP_BOTH);
                 parser.set_data(Some(Box::new(state.clone())));
@@ -304,7 +335,7 @@ impl<'a> Processor for HttpProcessor<'static> {
 
         match self.parsers[direction].data() {
             None => {}
-            Some(s) => s.borrow_mut().http.direction = pkt.direction(),
+            Some(s) => s.borrow_mut().ctx.direction = pkt.direction(),
         };
 
         match self.parsers[direction].parse(pkt.payload()) {
