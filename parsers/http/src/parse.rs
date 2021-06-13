@@ -33,6 +33,15 @@ fn parse_cookie(data: &[u8], http: &mut RefMut<HTTP>) -> Result<()> {
     Ok(())
 }
 
+fn parse_host(data: &[u8], http: &mut RefMut<HTTP>) -> Result<()> {
+    let host = take_while1(|b: u8| b != b':');
+    let mut host_parser = host.skip(optional(byte(b':')));
+    let (host, _) = host_parser.parse(data)?;
+    let host = String::from_utf8_lossy(host).to_string();
+    http.host.insert(host);
+    Ok(())
+}
+
 pub(crate) fn on_message_begin(parser: &mut llhttp::Parser<Data>) -> Result<()> {
     let mut http = match parser.data() {
         Some(h) => h.borrow_mut(),
@@ -98,9 +107,7 @@ pub(crate) fn on_header_value(parser: &mut llhttp::Parser<Data>, data: &[u8]) ->
     if http.direction == http.client_direction {
         http.request_header_field.push(value.clone());
         match http.last_header.to_ascii_lowercase().as_str() {
-            "host" => {
-                http.host.insert(value.clone());
-            }
+            "host" => parse_host(data, &mut http)?,
             "cookie" => parse_cookie(data, &mut http)?,
             "authorization" => {}
             _ => {}
