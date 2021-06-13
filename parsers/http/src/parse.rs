@@ -2,11 +2,12 @@ use std::cell::{RefCell, RefMut};
 use std::rc::Rc;
 
 use anyhow::Result;
-use combine::many1;
-use combine::parser::byte::{byte, spaces, take_until_byte};
+use combine::parser::byte::{byte, bytes, spaces, take_until_byte, take_until_byte2};
 use combine::parser::choice::optional;
-use combine::parser::range::take_while1;
+use combine::parser::range::{range, take_while1};
+use combine::parser::repeat::skip_until;
 use combine::parser::Parser;
+use combine::{many1, skip_many};
 
 use crate::{Md5Context, HTTP};
 
@@ -39,6 +40,38 @@ fn parse_host(data: &[u8], http: &mut RefMut<HTTP>) -> Result<()> {
     let (host, _) = host_parser.parse(data)?;
     let host = String::from_utf8_lossy(host).to_string();
     http.host.insert(host);
+    Ok(())
+}
+
+fn parse_authorization(data: &[u8], http: &mut RefMut<HTTP>) -> Result<()> {
+    let auth_type = take_until_byte(b' ');
+    let mut auth_parser = skip_many(spaces()).and(auth_type).skip(spaces());
+    let ((_, auth), value) = auth_parser.parse(data)?;
+
+    let auth_type = String::from_utf8_lossy(auth).to_string();
+    http.auth_type.insert(auth_type);
+
+    match auth.to_ascii_lowercase().as_slice() {
+        b"basic" => {
+            let mut basic_parser = range(&b"token="[..]).and(take_until_byte(b':'));
+            let ((_, user), _) = basic_parser.parse(value)?;
+            let user = String::from_utf8_lossy(user).to_string();
+            http.user.insert(user);
+        }
+        b"digest" => {
+            let mut parser = skip_until(bytes(b"username"))
+                .skip(spaces())
+                .skip(byte(b'='))
+                .skip(spaces())
+                .skip(optional(byte(b'"')))
+                .and(take_until_byte2(b'"', b','));
+            let ((_, user), _) = parser.parse(value)?;
+            let user = String::from_utf8_lossy(user).to_string();
+            http.user.insert(user);
+        }
+        _ => {}
+    };
+
     Ok(())
 }
 
@@ -109,7 +142,7 @@ pub(crate) fn on_header_value(parser: &mut llhttp::Parser<Data>, data: &[u8]) ->
         match http.last_header.to_ascii_lowercase().as_str() {
             "host" => parse_host(data, &mut http)?,
             "cookie" => parse_cookie(data, &mut http)?,
-            "authorization" => {}
+            "authorization" => parse_authorization(data, &mut http)?,
             _ => {}
         }
     } else {
