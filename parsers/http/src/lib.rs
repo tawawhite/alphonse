@@ -21,12 +21,20 @@ use parse::*;
 
 static SETTINGS: OnceCell<llhttp::Settings> = OnceCell::new();
 
+#[derive(Clone, Default)]
+struct State {
+    http: HTTP,
+    ctx: HTTPContext,
+}
+
+type Data = Rc<RefCell<State>>;
+
 #[derive(Clone)]
 struct HttpProcessor<'a> {
     id: ProcessorID,
     name: String,
     classified: bool,
-    parsers: [llhttp::Parser<'a, Rc<RefCell<HTTP>>>; 2],
+    parsers: [llhttp::Parser<'a, Data>; 2],
     resp_rule_id: RuleID,
     client_direction: Direction,
 }
@@ -67,8 +75,6 @@ struct HTTP {
     host: HashSet<String>,
     #[serde(skip_serializing_if = "HashSet::is_empty")]
     key: HashSet<String>,
-    #[serde(skip_serializing)]
-    last_header: String,
     #[serde(skip_serializing_if = "HashSet::is_empty")]
     method: HashSet<String>,
     #[serde(skip_serializing)]
@@ -261,6 +267,7 @@ impl<'a> Processor for HttpProcessor<'static> {
         rule: Option<&api::classifiers::matched::Rule>,
         ses: &mut Session,
     ) -> Result<()> {
+        println!("{:?}", unsafe { pkt.src_port() });
         let direction = pkt.direction() as u8 as usize;
 
         // update client direction
@@ -285,19 +292,19 @@ impl<'a> Processor for HttpProcessor<'static> {
                 None => return Err(anyhow!("Global llhttp sttings is empty or initializing")),
             };
 
-            let http = Rc::new(RefCell::new(HTTP::default()));
-            let mut h = http.borrow_mut();
-            h.direction = pkt.direction();
-            h.client_direction = self.client_direction;
+            let state = Rc::new(RefCell::new(State::default()));
+            let mut s = state.borrow_mut();
+            s.http.direction = pkt.direction();
+            s.http.client_direction = self.client_direction;
             for parser in &mut self.parsers {
                 parser.init(settings, llhttp::Type::HTTP_BOTH);
-                parser.set_data(Some(Box::new(http.clone())));
+                parser.set_data(Some(Box::new(state.clone())));
             }
         }
 
         match self.parsers[direction].data() {
             None => {}
-            Some(http) => http.borrow_mut().direction = pkt.direction(),
+            Some(s) => s.borrow_mut().http.direction = pkt.direction(),
         };
 
         match self.parsers[direction].parse(pkt.payload()) {
@@ -325,12 +332,12 @@ impl<'a> Processor for HttpProcessor<'static> {
 
     fn finish(&mut self, ses: &mut Session) {
         self.parsers[0].set_data(None);
-        let http = self.parsers[1].set_data(None);
-        let http = match http {
+        let state = self.parsers[1].set_data(None);
+        let state = match state {
             None => return,
-            Some(http) => http,
+            Some(state) => state.take(),
         };
-        ses.add_field(&"http", json!(http));
+        ses.add_field(&"http", json!(state.http));
 
         // body md5
         // let digests: Vec<String> = http
