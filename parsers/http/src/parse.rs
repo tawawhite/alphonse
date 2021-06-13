@@ -14,7 +14,22 @@ use combine::{many1, skip_many};
 use alphonse_api as api;
 use api::packet::Direction;
 
-use crate::{Data, Md5Context, State};
+use crate::{Data, State};
+
+#[derive(Clone)]
+struct Md5Context(md5::Context);
+
+impl Default for Md5Context {
+    fn default() -> Self {
+        Self(md5::Context::new())
+    }
+}
+
+impl AsMut<md5::Context> for Md5Context {
+    fn as_mut(&mut self) -> &mut md5::Context {
+        &mut self.0
+    }
+}
 
 #[derive(Clone, Default)]
 pub(crate) struct HTTPContext {
@@ -32,6 +47,8 @@ pub(crate) struct HTTPContext {
     pub headers: Arc<RwLock<HashSet<String>>>,
     /// Special case for cookie
     host: Vec<u8>,
+    /// Body Md5
+    md5: [Md5Context; 2],
     /// Request headers to be added
     pub req_headers: Arc<RwLock<HashSet<String>>>,
     /// Response headers to be added
@@ -158,7 +175,7 @@ pub(crate) fn on_message_begin(parser: &mut llhttp::Parser<Data>) -> Result<()> 
 
     state.http.body_magic.clear();
     state
-        .http
+        .ctx
         .md5
         .iter_mut()
         .for_each(|md5| *md5 = Md5Context::default());
@@ -179,7 +196,7 @@ pub(crate) fn on_body(parser: &mut llhttp::Parser<Data>, data: &[u8]) -> Result<
     let mut state = get_state(parser)?;
 
     let dir = state.ctx.direction as u8 as usize;
-    state.http.md5[dir].as_mut().consume(data);
+    state.ctx.md5[dir].as_mut().consume(data);
     Ok(())
 }
 
@@ -252,8 +269,13 @@ pub(crate) fn on_message_complete(parser: &mut llhttp::Parser<Data>) -> Result<(
     let mut state = get_state(parser)?;
 
     let dir = state.ctx.direction as u8 as usize;
-    let d = state.http.md5[dir].as_mut().clone().compute();
-    state.http.md5_digest.insert(d);
+    let digest = state.ctx.md5[dir].as_mut().clone().compute();
+
+    let digest = format!("{:x}", digest);
+    if digest != "d41d8cd98f00b204e9800998ecf8427e" {
+        state.http.md5.insert(digest);
+    }
+
     Ok(())
 }
 

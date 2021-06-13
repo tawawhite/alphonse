@@ -44,21 +44,6 @@ struct HttpProcessor<'a> {
     resp_headers: Arc<RwLock<HashSet<String>>>,
 }
 
-#[derive(Clone)]
-struct Md5Context(md5::Context);
-
-impl Default for Md5Context {
-    fn default() -> Self {
-        Self(md5::Context::new())
-    }
-}
-
-impl AsMut<md5::Context> for Md5Context {
-    fn as_mut(&mut self) -> &mut md5::Context {
-        &mut self.0
-    }
-}
-
 #[derive(Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct HTTP {
@@ -81,10 +66,8 @@ struct HTTP {
     key: HashSet<String>,
     #[serde(skip_serializing_if = "HashSet::is_empty")]
     method: HashSet<String>,
-    #[serde(skip_serializing)]
-    md5: [Md5Context; 2],
-    #[serde(skip_serializing)]
-    md5_digest: HashSet<md5::Digest>,
+    #[serde(skip_serializing_if = "HashSet::is_empty")]
+    md5: HashSet<String>,
     #[serde(skip_serializing_if = "HashSet::is_empty")]
     path: HashSet<String>,
     #[serde(skip_serializing_if = "HashSet::is_empty")]
@@ -368,22 +351,8 @@ impl<'a> Processor for HttpProcessor<'static> {
             None => return,
             Some(state) => state.take(),
         };
-        ses.add_field(&"http", json!(state.http));
 
-        // body md5
-        // let digests: Vec<String> = http
-        //     .md5_digest
-        //     .iter()
-        //     .filter_map(|digest| {
-        //         let s = format!("{:x}", digest);
-        //         if s == "d41d8cd98f00b204e9800998ecf8427e" {
-        //             None
-        //         } else {
-        //             Some(s)
-        //         }
-        //     })
-        //     .collect();
-        // ses.add_field(&"http.md5", &json!(digests));
+        ses.add_field(&"http", json!(state.http));
 
         println!("{}", serde_json::to_string_pretty(&ses).unwrap());
     }
