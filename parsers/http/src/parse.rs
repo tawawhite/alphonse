@@ -223,9 +223,7 @@ pub(crate) fn on_body(parser: &mut llhttp::Parser<Data>, data: &[u8]) -> Result<
     Ok(())
 }
 
-pub(crate) fn on_header_field(parser: &mut llhttp::Parser<Data>, data: &[u8]) -> Result<()> {
-    let mut state = get_state(parser)?;
-
+fn save_header_value(state: &mut State) -> Result<()> {
     if !state.ctx.value.is_empty() {
         // if value is not empty, add it to header's values
         let header = state.ctx.header.to_ascii_lowercase();
@@ -252,8 +250,16 @@ pub(crate) fn on_header_field(parser: &mut llhttp::Parser<Data>, data: &[u8]) ->
             state.http.response_header_value.push(value);
         }
         state.ctx.value.clear();
-        state.ctx.header.clear();
     }
+    Ok(())
+}
+
+pub(crate) fn on_header_field(parser: &mut llhttp::Parser<Data>, data: &[u8]) -> Result<()> {
+    let mut state = get_state(parser)?;
+
+    save_header_value(state.deref_mut())?;
+
+    state.ctx.header.clear();
     state.ctx.header.extend_from_slice(data);
 
     Ok(())
@@ -263,17 +269,25 @@ pub(crate) fn on_header_value(parser: &mut llhttp::Parser<Data>, data: &[u8]) ->
     let mut state = get_state(parser)?;
 
     let header = String::from_utf8_lossy(state.ctx.header.as_slice()).to_string();
-    let hdr_low = header.to_ascii_lowercase();
 
-    match state.http.header_values.get_mut(&hdr_low) {
-        None => {
-            state
-                .http
-                .header_values
-                .insert(header.clone(), HashSet::default());
-        }
-        Some(_) => {}
-    };
+    let hdr_low = header.to_ascii_lowercase();
+    let headers = state.ctx.find_header(hdr_low.as_str())?;
+
+    if headers.len() > 0 {
+        state.ctx.value.extend_from_slice(data);
+    }
+
+    for header in headers {
+        match state.http.header_values.get_mut(&header) {
+            None => {
+                state
+                    .http
+                    .header_values
+                    .insert(header.clone(), HashSet::default());
+            }
+            Some(_) => {}
+        };
+    }
 
     if state.ctx.direction == state.ctx.client_direction {
         state.http.request_header_field.push(header.clone());
@@ -282,8 +296,6 @@ pub(crate) fn on_header_value(parser: &mut llhttp::Parser<Data>, data: &[u8]) ->
         state.http.response_header_field.push(header.clone());
         state.http.response_header.insert(header);
     }
-
-    state.ctx.value.extend_from_slice(data);
 
     Ok(())
 }
@@ -313,6 +325,8 @@ pub(crate) fn on_headers_complete(parser: &mut llhttp::Parser<Data>) -> Result<(
         state.http.server_version.insert(version);
         state.http.status_code.insert(parser.status_code());
     }
+
+    save_header_value(state.deref_mut())?;
 
     if !state.ctx.url.is_empty() {
         parse_url(state.deref_mut())?;

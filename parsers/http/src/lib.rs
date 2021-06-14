@@ -345,6 +345,10 @@ impl<'a> Processor for HttpProcessor<'static> {
     }
 
     fn finish(&mut self, ses: &mut Session) {
+        for parser in &mut self.parsers {
+            parser.finish();
+        }
+
         self.parsers[0].set_data(None);
         let state = self.parsers[1].set_data(None);
         let state = match state {
