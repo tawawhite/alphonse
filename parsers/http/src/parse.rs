@@ -324,5 +324,10 @@ pub(crate) fn on_headers_complete(parser: &mut llhttp::Parser<Data>) -> Result<(
         parse_authorization(state.deref_mut())?;
     }
 
+    state.ctx.url.clear();
+    state.ctx.host.clear();
+    state.ctx.cookie.clear();
+    state.ctx.auth.clear();
+
     Ok(())
 }
