@@ -1,3 +1,4 @@
+use std::borrow::Borrow;
 use std::cell::RefMut;
 use std::collections::HashSet;
 use std::ops::DerefMut;
@@ -10,6 +11,8 @@ use combine::parser::range::{range, take_while1};
 use combine::parser::repeat::skip_until;
 use combine::parser::Parser;
 use combine::{many1, skip_many};
+use percent_encoding::percent_decode_str;
+use url::Url;
 
 use alphonse_api as api;
 use api::packet::Direction;
@@ -162,6 +165,29 @@ fn parse_authorization(state: &mut State) -> Result<()> {
     Ok(())
 }
 
+fn parse_url(state: &mut State) -> Result<()> {
+    let url = Url::parse(std::str::from_utf8(state.ctx.url.as_slice())?)?;
+    state.http.path.insert(url.path().to_string());
+    for (key, value) in url.query_pairs() {
+        let key = match percent_decode_str(key.borrow()).decode_utf8() {
+            Ok(k) => k,
+            Err(_) => key,
+        };
+        state.http.key.insert(key.to_string());
+        let value = match percent_decode_str(value.borrow()).decode_utf8() {
+            Ok(v) => v,
+            Err(_) => value,
+        };
+        state.http.value.insert(value.to_string());
+    }
+
+    state
+        .http
+        .uri
+        .insert(String::from_utf8_lossy(state.ctx.url.as_slice()).to_string());
+    Ok(())
+}
+
 #[inline]
 fn get_state<'a>(parser: &'a llhttp::Parser<Data>) -> Result<RefMut<'a, State>> {
     match parser.data() {
@@ -185,10 +211,7 @@ pub(crate) fn on_message_begin(parser: &mut llhttp::Parser<Data>) -> Result<()> 
 
 pub(crate) fn on_url(parser: &mut llhttp::Parser<Data>, data: &[u8]) -> Result<()> {
     let mut state = get_state(parser)?;
-    state
-        .http
-        .uri
-        .insert(String::from_utf8_lossy(data).to_string());
+    state.ctx.url.extend_from_slice(data);
     Ok(())
 }
 
@@ -289,6 +312,10 @@ pub(crate) fn on_headers_complete(parser: &mut llhttp::Parser<Data>) -> Result<(
     } else {
         state.http.server_version.insert(version);
         state.http.status_code.insert(parser.status_code());
+    }
+
+    if !state.ctx.url.is_empty() {
+        parse_url(state.deref_mut())?;
     }
 
     if state.ctx.direction == state.ctx.client_direction {
