@@ -101,6 +101,10 @@ impl HTTPContext {
 
 /// Maybe use nom implement this logic in the future
 fn parse_cookie(state: &mut State) -> Result<()> {
+    if state.ctx.cookie.is_empty() {
+        return Ok(());
+    };
+
     let key = take_until_byte(b'=');
     let value = take_while1(|b| b != b';');
     let kv_parser = key
@@ -125,6 +129,10 @@ fn parse_cookie(state: &mut State) -> Result<()> {
 }
 
 fn parse_host(state: &mut State) -> Result<()> {
+    if state.ctx.host.is_empty() {
+        return Ok(());
+    };
+
     let host = take_while1(|b: u8| b != b':');
     let mut host_parser = host.skip(optional(byte(b':')));
     let (host, _) = host_parser.parse(state.ctx.host.as_slice())?;
@@ -134,6 +142,9 @@ fn parse_host(state: &mut State) -> Result<()> {
 }
 
 fn parse_authorization(state: &mut State) -> Result<()> {
+    if state.ctx.auth.is_empty() {
+        return Ok(());
+    };
     let auth_type = take_until_byte(b' ');
     let mut auth_parser = skip_many(space()).and(auth_type).skip(spaces());
     let ((_, auth), value) = auth_parser.parse(state.ctx.auth.as_slice())?;
@@ -166,7 +177,13 @@ fn parse_authorization(state: &mut State) -> Result<()> {
 }
 
 fn parse_url(state: &mut State) -> Result<()> {
-    let url = Url::parse(std::str::from_utf8(state.ctx.url.as_slice())?)?;
+    // construct a valid url for Url to parse, mey rewrite in combine in the future
+    let mut url = vec![];
+    url.extend(b"http://".iter());
+    url.extend(state.ctx.host.iter());
+    url.extend(state.ctx.url.iter());
+
+    let url = Url::parse(std::str::from_utf8(url.as_slice())?)?;
     state.http.path.insert(url.path().to_string());
     for (key, value) in url.query_pairs() {
         let key = match percent_decode_str(key.borrow()).decode_utf8() {
@@ -181,10 +198,6 @@ fn parse_url(state: &mut State) -> Result<()> {
         state.http.value.insert(value.to_string());
     }
 
-    state
-        .http
-        .uri
-        .insert(String::from_utf8_lossy(state.ctx.url.as_slice()).to_string());
     Ok(())
 }
 
@@ -269,10 +282,16 @@ pub(crate) fn on_header_value(parser: &mut llhttp::Parser<Data>, data: &[u8]) ->
     let mut state = get_state(parser)?;
 
     let header = String::from_utf8_lossy(state.ctx.header.as_slice()).to_string();
-
     let hdr_low = header.to_ascii_lowercase();
-    let headers = state.ctx.find_header(hdr_low.as_str())?;
 
+    match hdr_low.as_str() {
+        "authorization" => state.ctx.auth.extend_from_slice(data),
+        "cookie" => state.ctx.cookie.extend_from_slice(data),
+        "host" => state.ctx.host.extend_from_slice(data),
+        _ => {}
+    };
+
+    let headers = state.ctx.find_header(hdr_low.as_str())?;
     if headers.len() > 0 {
         state.ctx.value.extend_from_slice(data);
     }
@@ -314,6 +333,12 @@ pub(crate) fn on_message_complete(parser: &mut llhttp::Parser<Data>) -> Result<(
     Ok(())
 }
 
+fn find_subsequence(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+    haystack
+        .windows(needle.len())
+        .position(|window| window == needle)
+}
+
 pub(crate) fn on_headers_complete(parser: &mut llhttp::Parser<Data>) -> Result<()> {
     let mut state = get_state(parser)?;
 
@@ -326,17 +351,48 @@ pub(crate) fn on_headers_complete(parser: &mut llhttp::Parser<Data>) -> Result<(
         state.http.status_code.insert(parser.status_code());
     }
 
-    save_header_value(state.deref_mut())?;
-
-    if !state.ctx.url.is_empty() {
-        parse_url(state.deref_mut())?;
+    if !state.ctx.url.is_empty() && state.ctx.direction == state.ctx.client_direction {
+        match parse_url(state.deref_mut()) {
+            Err(e) => eprintln!("{}", e),
+            Ok(_) => {}
+        }
+        let url = if state.ctx.url[0] == b'/' {
+            let mut url = state.ctx.host.clone();
+            url.extend(state.ctx.url.iter());
+            url
+        } else {
+            match find_subsequence(state.ctx.url.as_slice(), state.ctx.host.as_slice()) {
+                Some(_) => {
+                    if state.ctx.host.len() <= 8 {
+                        state.ctx.url.clone()
+                    } else {
+                        let mut url = state.ctx.host.clone();
+                        url.push(b';');
+                        url.extend(state.ctx.url.iter());
+                        url
+                    }
+                }
+                None => {
+                    let mut url = state.ctx.host.clone();
+                    url.push(b';');
+                    url.extend(state.ctx.url.iter());
+                    url
+                }
+            }
+        };
+        state
+            .http
+            .uri
+            .insert(String::from_utf8_lossy(url.as_slice()).to_string());
+        println!("uri: {:?}", state.http.uri);
     }
 
-    if state.ctx.direction == state.ctx.client_direction {
-        parse_host(state.deref_mut())?;
-        parse_cookie(state.deref_mut())?;
-        parse_authorization(state.deref_mut())?;
-    }
+    save_header_value(state.deref_mut())
+        .unwrap_or_else(|e| eprintln!("save header value failed: {}", e));
+    parse_authorization(state.deref_mut())
+        .unwrap_or_else(|e| eprintln!("parse authorization failed: {}", e));
+    parse_cookie(state.deref_mut()).unwrap_or_else(|e| eprintln!("parse cookie failed: {}", e));
+    parse_host(state.deref_mut()).unwrap_or_else(|e| eprintln!("parse host failed: {}", e));
 
     state.ctx.url.clear();
     state.ctx.host.clear();
