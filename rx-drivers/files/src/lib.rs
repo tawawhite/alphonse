@@ -166,6 +166,7 @@ impl RxThread {
 
                 PacketHashKey::from(pkt.as_ref()).hash(&mut self.hasher);
                 let i = self.hasher.finish() as usize % self.senders.len();
+                self.hasher = FnvHasher::default();
                 let sender = &mut self.senders[i];
 
                 match sender.try_send(pkt) {

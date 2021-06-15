@@ -7,6 +7,7 @@ use std::thread::JoinHandle;
 
 use anyhow::{anyhow, Result};
 use crossbeam_channel::{Receiver, Sender};
+use fnv::FnvHasher;
 use once_cell::sync::OnceCell;
 use serde::Deserialize;
 use yaml_rust::YamlEmitter;
@@ -281,6 +282,7 @@ impl Processor for SimpleWriterProcessor {
                 .ok_or(anyhow!("{}: SCHEDULERS is not initialized", self.name()))?
         };
         let hash = self.hasher.finish() as usize % schedulers.len();
+        self.hasher = FnvHasher::default();
         let info = schedulers[hash].gen(pkt);
         if schedulers[hash].current_fid() != self.fid {
             self.fid = schedulers[hash].current_fid();
