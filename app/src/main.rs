@@ -20,7 +20,8 @@ mod threadings;
 
 use threadings::SessionTable;
 
-fn main() -> Result<()> {
+#[tokio::main(flavor = "multi_thread")]
+async fn main() -> Result<()> {
     let root_cmd = commands::new_root_command();
     let cfg = config::parse_args(root_cmd)?;
 
@@ -44,7 +45,7 @@ fn main() -> Result<()> {
     let mut handles = vec![];
     let mut ses_senders = vec![];
     let mut ses_receivers = vec![];
-    for i in 0..warehouse.output_plugins.len() {
+    for _ in 0..warehouse.output_plugins.len() {
         let (sender, receiver) = bounded(cfg.pkt_channel_size as usize);
         ses_senders.push(sender);
         ses_receivers.push(receiver);
@@ -89,23 +90,21 @@ fn main() -> Result<()> {
     // start all session timeout threads
     for thread in timeout_threads {
         let cfg = cfg.clone();
-        let builder = std::thread::Builder::new().name(thread.name());
-        let handle = builder.spawn(move || thread.spawn(cfg)).unwrap();
+        let handle = tokio::task::spawn_blocking(move || thread.main_loop(cfg));
         handles.push(handle);
     }
 
     // start all pkt threads
     for thread in pkt_threads {
         let cfg = cfg.clone();
-        let parsers = Box::new(
+        let processors = Box::new(
             warehouse
                 .pkt_processors
                 .iter()
                 .map(|p| p.clone_processor())
                 .collect(),
         );
-        let builder = std::thread::Builder::new().name(thread.name());
-        let handle = builder.spawn(move || thread.spawn(cfg, parsers))?;
+        let handle = tokio::task::spawn_blocking(move || thread.main_loop(cfg, processors));
         handles.push(handle);
     }
 
@@ -117,11 +116,17 @@ fn main() -> Result<()> {
     drop(ses_receivers);
 
     for handle in handles {
-        match handle.join() {
-            Ok(_) => {}
+        match handle.await {
+            Ok(r) => match r {
+                Ok(_) => {}
+                Err(e) => {
+                    cfg.exit.store(true, Ordering::SeqCst);
+                    eprintln!("{}", e);
+                }
+            },
             Err(e) => {
                 cfg.exit.store(true, Ordering::SeqCst);
-                println!("{:?}", e)
+                eprintln!("{}", e);
             }
         };
     }
