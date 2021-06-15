@@ -305,6 +305,13 @@ impl Processor for SimpleWriterProcessor {
         Ok(())
     }
 
+    fn mid_save(&mut self, ses: &mut Session) {
+        self.finish(ses);
+        // Cleanup previous packet positions
+        self.packet_pos.clear();
+        self.fid = 0;
+    }
+
     /// Add packet positions into session after session is about to timeout or closed
     fn finish(&mut self, ses: &mut Session) {
         let value = serde_json::Value::Array(
