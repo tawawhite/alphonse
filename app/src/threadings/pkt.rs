@@ -85,7 +85,7 @@ impl PktThread {
         Ok(())
     }
 
-    pub fn spawn(
+    pub fn main_loop(
         &self,
         cfg: Arc<Config>,
         mut processors: Box<Vec<Box<dyn Processor>>>,
