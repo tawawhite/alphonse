@@ -59,9 +59,10 @@ impl TimeoutThread {
         format!("alphonse-timeout{}", self.id)
     }
 
-    pub fn main_loop(&self, cfg: Arc<Config>) -> Result<()> {
+    pub fn spawn(&self, cfg: Arc<Config>) -> Result<()> {
         let now: u64 = SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)?
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
             .as_secs();
         let mut next_timeout_check_time: u64 = now + cfg.timeout_interval;
         println!("{} started", self.name());
