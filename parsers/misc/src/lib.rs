@@ -67,7 +67,6 @@ mod zookeeper;
 #[derive(Clone, Default)]
 pub struct Misc {
     id: ProcessorID,
-    name: String,
     classified: bool,
     match_cbs: FnvHashMap<RuleID, MatchCallBack>,
 }
@@ -87,7 +86,7 @@ impl Plugin for Misc {
     }
 
     fn name(&self) -> &str {
-        &self.name.as_str()
+        "misc"
     }
 }
 
