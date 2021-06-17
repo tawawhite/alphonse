@@ -384,7 +384,6 @@ pub(crate) fn on_headers_complete(parser: &mut llhttp::Parser<Data>) -> Result<(
             .http
             .uri
             .insert(String::from_utf8_lossy(url.as_slice()).to_string());
-        println!("uri: {:?}", state.http.uri);
     }
 
     save_header_value(state.deref_mut())

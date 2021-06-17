@@ -155,7 +155,6 @@ impl<'a> Plugin for HttpProcessor<'a> {
 
         let headers = cfg.get_str_arr("http.headers");
         let mut hdrs = self.headers.write().or_else(|e| Err(anyhow!("{}", e)))?;
-        let hdrs = hdrs.deref_mut();
         *hdrs = headers.into_iter().collect();
 
         let headers = cfg.get_str_arr("http.request.headers");
@@ -358,7 +357,7 @@ impl<'a> Processor for HttpProcessor<'static> {
 
         ses.add_field(&"http", json!(state.http));
 
-        println!("{}", serde_json::to_string_pretty(&ses).unwrap());
+        println!("{}", serde_json::to_string(&ses).unwrap());
     }
 }
 
