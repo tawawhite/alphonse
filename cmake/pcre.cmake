@@ -1,12 +1,12 @@
 if(OFFLINE_ENVIRONMENT)
-    set(pcre_url ${CMAKE_CURRENT_SOURCE_DIR}/third_party/pcre-8.44.tar.bz2)
+    set(pcre_url ${CMAKE_CURRENT_SOURCE_DIR}/third_party/pcre-8.45.tar.bz2)
 else()
-    set(pcre_url https://ftp.pcre.org/pub/pcre/pcre-8.44.tar.bz2)
+    set(pcre_url https://ftp.pcre.org/pub/pcre/pcre-8.45.tar.bz2)
 endif()
 
 ExternalProject_Add(libpcre
     URL ${pcre_url}
-    URL_MD5 cf7326204cc46c755b5b2608033d9d24
+    URL_MD5 4452288e6a0eefb2ab11d36010a1eebb
     EXCLUDE_FROM_ALL ON
     PREFIX pcre
     INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR}/install
