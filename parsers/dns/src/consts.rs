@@ -1,7 +1,9 @@
+use std::hash::Hash;
+
 use serde::Serialize;
 
 #[repr(u16)]
-#[derive(Debug, Primitive)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Primitive, Serialize)]
 pub enum Class {
     IN = 1,
     CH = 3,
@@ -43,7 +45,7 @@ impl Flags {
     }
 }
 #[repr(u8)]
-#[derive(Clone, Debug, Eq, Hash, PartialEq, Primitive, Serialize)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Primitive, Serialize)]
 pub enum OpCode {
     Query = 0,
     IQuery = 1,
@@ -54,7 +56,32 @@ pub enum OpCode {
 }
 
 #[repr(u16)]
-#[derive(Debug, Primitive)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Primitive, Serialize)]
+pub enum RCode {
+    NoError = 0,
+    FormErr = 1,
+    ServFail = 2,
+    NXDomain = 3,
+    NotImp = 4,
+    Refused = 5,
+    YXDomain = 6,
+    YXRRSet = 7,
+    NXRRSet = 8,
+    NotAuth = 9,
+    NotZone = 10,
+    DSOTYPENI = 11,
+    BADVERS_OR_BADKEY = 16,
+    BADKEY = 17,
+    BADTIME = 18,
+    BADMODE = 19,
+    BADNAME = 20,
+    BADALG = 21,
+    BADTRUNC = 22,
+    BADCOOKIE = 23,
+}
+
+#[repr(u16)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Primitive, Serialize)]
 pub enum ResourceRecordType {
     A = 1,
     NS = 2,

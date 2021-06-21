@@ -23,12 +23,11 @@ mod parser;
 
 use parser::{
     parse_dns_packet, parse_dns_query, parse_dns_resource_records, parse_tcp_dns_packet, Class,
-    DnsMessage, DnsMessageType, Flags, OpCode, ResourceRecord, ResourceRecordType,
+    DnsMessage, DnsMessageType, OpCode, RCode, ResourceRecord, ResourceRecordType,
 };
 
-const DNS_HEADER_LEN: usize = 12;
-
 #[derive(Clone, Debug, Default, Serialize)]
+#[cfg_attr(feature = "arkime", serde(rename_all = "camelCase"))]
 struct DNS {
     #[serde(skip_serializing_if = "HashSet::is_empty")]
     host: HashSet<String>,
@@ -47,11 +46,11 @@ struct DNS {
     #[serde(skip_serializing_if = "HashSet::is_empty")]
     puny: HashSet<String>,
     #[serde(skip_serializing_if = "HashSet::is_empty")]
-    qc: HashSet<String>,
+    qc: HashSet<Class>,
     #[serde(skip_serializing_if = "HashSet::is_empty")]
-    qt: HashSet<String>,
+    qt: HashSet<ResourceRecordType>,
     #[serde(skip_serializing_if = "HashSet::is_empty")]
-    status: HashSet<String>,
+    status: HashSet<RCode>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -173,6 +172,13 @@ impl Processor for DNSProcessor {
             }
         };
 
+        match RCode::from_u16(msg.flags.reply_code() as u16) {
+            None => eprintln!("unassigned RCode({})", msg.flags.reply_code()),
+            Some(rcode) => {
+                dns.status.insert(rcode);
+            }
+        }
+
         let mut remain = msg.queries;
         for _ in 0..msg.qry_num as usize {
             let (tmp, query) = match parse_dns_query(remain) {
@@ -193,10 +199,12 @@ impl Processor for DNSProcessor {
 
             let tmp = match msg.msg_type {
                 DnsMessageType::Query => tmp,
-                DnsMessageType::Response => match Self::on_resource_records(dns, &msg, tmp) {
-                    Err(_) => return Ok(()),
-                    Ok(tmp) => tmp,
-                },
+                DnsMessageType::Response => {
+                    match Self::on_resource_records(dns, &msg, &name, tmp) {
+                        Err(_) => return Ok(()),
+                        Ok(tmp) => tmp,
+                    }
+                }
             };
 
             dns.host.insert(name);
@@ -221,11 +229,12 @@ impl DNSProcessor {
     fn on_resource_records<'a>(
         dns: &mut DNS,
         msg: &DnsMessage,
+        host: &String,
         answers: &'a [u8],
     ) -> Result<&'a [u8]> {
         let remain = match parse_dns_resource_records(answers) {
             Err(e) => {
-                println!("on resource records: {}", e);
+                eprintln!("on resource records: {}", e);
                 &[]
             }
             Ok((remain, records)) => {
@@ -234,6 +243,8 @@ impl DNSProcessor {
                         None => continue,
                         Some(class) => class,
                     };
+
+                    dns.qc.insert(class);
 
                     match class {
                         Class::IN => {}
@@ -244,13 +255,14 @@ impl DNSProcessor {
                         None => continue,
                         Some(rr_type) => rr_type,
                     };
+                    dns.qt.insert(rr_type);
 
                     match rr_type {
-                        ResourceRecordType::A => Self::on_a(dns, msg, &record),
-                        ResourceRecordType::AAAA => Self::on_aaaa(dns, msg, &record),
-                        ResourceRecordType::NS => Self::on_ns(dns, msg, &record),
-                        ResourceRecordType::CNAME => Self::on_cname(dns, msg, &record),
-                        ResourceRecordType::MX => Self::on_mx(dns, msg, &record),
+                        ResourceRecordType::A => Self::on_a(dns, msg, host, &record),
+                        ResourceRecordType::AAAA => Self::on_aaaa(dns, msg, host, &record),
+                        ResourceRecordType::NS => Self::on_ns(dns, msg, host, &record),
+                        ResourceRecordType::CNAME => Self::on_cname(dns, msg, host, &record),
+                        ResourceRecordType::MX => Self::on_mx(dns, msg, host, &record),
                         _ => continue,
                     }
                     .unwrap();
@@ -263,17 +275,32 @@ impl DNSProcessor {
     }
 
     /// Called on a host address record
-    fn on_a<'a>(dns: &mut DNS, msg: &DnsMessage, record: &ResourceRecord) -> Result<()> {
+    fn on_a<'a>(
+        dns: &mut DNS,
+        msg: &DnsMessage,
+        host: &String,
+        record: &ResourceRecord,
+    ) -> Result<()> {
         match OpCode::from_u8(msg.flags.op_code()) {
             None => eprintln!("unassigned OpCode({})", msg.flags.op_code()),
             Some(opcode) => {
+                let ip = record.data;
+                let ip = IpAddr::V4(Ipv4Addr::new(ip[0], ip[1], ip[2], ip[3]));
                 match opcode {
                     OpCode::Update => {
-                        let ip = record.data;
-                        let ip = IpAddr::V4(Ipv4Addr::new(ip[0], ip[1], ip[2], ip[3]));
                         dns.ip.insert(ip);
                     }
-                    _ => {}
+                    _ => {
+                        if dns.host.contains(host) {
+                            dns.ip.insert(ip);
+                        }
+                        if dns.mailserver_host.contains(host) {
+                            dns.mailserver_ip.insert(ip);
+                        }
+                        if dns.nameserver_host.contains(host) {
+                            dns.nameserver_ip.insert(ip);
+                        }
+                    }
                 };
             }
         };
@@ -281,17 +308,32 @@ impl DNSProcessor {
     }
 
     /// Called on an IPV6 address record
-    fn on_aaaa<'a>(dns: &mut DNS, msg: &DnsMessage, record: &ResourceRecord) -> Result<()> {
+    fn on_aaaa<'a>(
+        dns: &mut DNS,
+        msg: &DnsMessage,
+        host: &String,
+        record: &ResourceRecord,
+    ) -> Result<()> {
         match OpCode::from_u8(msg.flags.op_code()) {
             None => eprintln!("unassigned OpCode({})", msg.flags.op_code()),
             Some(opcode) => {
+                let ip = unsafe { *(record.data.as_ptr() as *const u128) };
+                let ip = IpAddr::V6(Ipv6Addr::from(ip));
                 match opcode {
                     OpCode::Update => {
-                        let ip = unsafe { *(record.data.as_ptr() as *const u128) };
-                        let ip = IpAddr::V6(Ipv6Addr::from(ip));
                         dns.ip.insert(ip);
                     }
-                    _ => {}
+                    _ => {
+                        if dns.host.contains(host) {
+                            dns.ip.insert(ip);
+                        }
+                        if dns.mailserver_host.contains(host) {
+                            dns.mailserver_ip.insert(ip);
+                        }
+                        if dns.nameserver_host.contains(host) {
+                            dns.nameserver_ip.insert(ip);
+                        }
+                    }
                 };
             }
         };
@@ -299,17 +341,26 @@ impl DNSProcessor {
     }
 
     /// Called on an authoritative name server record
-    fn on_ns<'a>(dns: &mut DNS, msg: &DnsMessage, record: &ResourceRecord) -> Result<()> {
+    fn on_ns<'a>(dns: &mut DNS, _: &DnsMessage, host: &String, _: &ResourceRecord) -> Result<()> {
+        dns.nameserver_host.insert(host.clone());
         Ok(())
     }
 
     /// Called on canonical name for an alias record
-    fn on_cname<'a>(dns: &mut DNS, msg: &DnsMessage, record: &ResourceRecord) -> Result<()> {
+    fn on_cname<'a>(
+        dns: &mut DNS,
+        _: &DnsMessage,
+        host: &String,
+        _: &ResourceRecord,
+    ) -> Result<()> {
+        dns.host.insert(host.clone());
         Ok(())
     }
 
     /// Called on mail exchange record
-    fn on_mx<'a>(dns: &mut DNS, msg: &DnsMessage, record: &ResourceRecord) -> Result<()> {
+    fn on_mx<'a>(dns: &mut DNS, _: &DnsMessage, host: &String, _: &ResourceRecord) -> Result<()> {
+        dns.mailserver_host.insert(host.clone());
+        dns.host.insert(host.clone());
         Ok(())
     }
 }
