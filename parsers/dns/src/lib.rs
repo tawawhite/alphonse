@@ -207,7 +207,7 @@ impl Processor for DNSProcessor {
                 }
             };
 
-            dns.host.insert(name);
+            Self::add_host(dns, &name);
             remain = tmp
         }
 
@@ -226,6 +226,13 @@ impl Processor for DNSProcessor {
 }
 
 impl DNSProcessor {
+    fn add_host(dns: &mut DNS, host: &String) {
+        if host.contains("xn--") {
+            dns.puny.insert(host.to_ascii_lowercase());
+        }
+        dns.host.insert(host.clone());
+    }
+
     fn on_resource_records<'a>(
         dns: &mut DNS,
         msg: &DnsMessage,
@@ -353,14 +360,14 @@ impl DNSProcessor {
         host: &String,
         _: &ResourceRecord,
     ) -> Result<()> {
-        dns.host.insert(host.clone());
+        Self::add_host(dns, host);
         Ok(())
     }
 
     /// Called on mail exchange record
     fn on_mx<'a>(dns: &mut DNS, _: &DnsMessage, host: &String, _: &ResourceRecord) -> Result<()> {
         dns.mailserver_host.insert(host.clone());
-        dns.host.insert(host.clone());
+        Self::add_host(dns, host);
         Ok(())
     }
 }
