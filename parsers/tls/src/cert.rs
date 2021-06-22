@@ -5,6 +5,9 @@ use serde::{Serialize, Serializer};
 use tls_parser::TlsCertificateContents;
 use x509_parser::prelude::{parse_x509_certificate, GeneralName, ParsedExtension};
 
+use alphonse_api as api;
+use api::packet::Direction;
+
 use crate::TlsProcessor;
 
 #[derive(Clone, Debug, Default, Serialize)]
@@ -42,46 +45,50 @@ where
 }
 
 #[derive(Clone, Debug, Default, Serialize)]
+#[cfg_attr(feature = "arkime", serde(rename_all = "camelCase"))]
 pub struct Cert {
-    #[serde(skip_serializing)]
-    pub hash: u32,
-
-    #[serde(rename = "notBefore")]
-    pub not_before: u64,
-
-    #[serde(rename = "notAfter")]
-    pub not_after: u64,
-
-    #[serde(flatten)]
-    #[serde(serialize_with = "serialize_issuer")]
-    pub issuer: CertInfo,
-
-    #[serde(flatten)]
-    #[serde(serialize_with = "serialize_subject")]
-    pub subject: CertInfo,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub algorithm: String,
 
     #[serde(skip_serializing_if = "HashSet::is_empty")]
     pub alt: HashSet<String>,
 
-    #[serde(rename = "serial")]
-    pub serial_number: String,
-
     #[serde(skip_serializing)]
     pub bucket: usize,
 
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub curv: String,
+
+    #[serde(skip_serializing)]
+    pub hash: u32,
+
     #[serde(rename = "hash")]
+    #[serde(skip_serializing_if = "String::is_empty")]
     pub hash_str: String,
 
     #[serde(skip_serializing)]
     pub is_ca: bool,
 
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub algorithm: String,
+    #[serde(flatten)]
+    #[serde(serialize_with = "serialize_issuer")]
+    pub issuer: CertInfo,
 
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub curv: String,
+    pub not_after: u64,
 
-    #[serde(rename = "validDays")]
+    pub not_before: u64,
+
+    #[serde(skip_serializing_if = "HashSet::is_empty")]
+    pub public_algorithm: HashSet<String>,
+
+    pub remainingdays: usize,
+
+    #[serde(rename = "serial")]
+    pub serial_number: String,
+
+    #[serde(flatten)]
+    #[serde(serialize_with = "serialize_subject")]
+    pub subject: CertInfo,
+
     pub valid_days: usize,
 }
 
@@ -97,11 +104,14 @@ impl Cert {
 }
 
 impl TlsProcessor {
-    pub fn handle_certificate(&mut self, cert: &TlsCertificateContents) {
+    pub fn handle_certificate(&mut self, dir: Direction, cert: &TlsCertificateContents) {
         for raw_cert in &cert.cert_chain {
             let mut cert = Cert::default();
             match parse_x509_certificate(raw_cert.data) {
-                Err(_) => continue,
+                Err(e) => {
+                    eprintln!("parse x509 certitifacte: {}", e);
+                    continue;
+                }
                 Ok((_, cer)) => {
                     // get cert serial number
                     cert.serial_number = format!("{:x}", cer.tbs_certificate.serial);
@@ -169,7 +179,11 @@ impl TlsProcessor {
             }
 
             cert.update_valid_days();
-            self.certs.push(cert);
+            if dir == self.client_direction {
+                self.client_certs.push(cert);
+            } else {
+                self.server_certs.push(cert);
+            }
         }
     }
 }

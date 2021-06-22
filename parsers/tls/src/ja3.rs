@@ -53,8 +53,9 @@ impl Ja3 {
             self.ec_points.push(*point);
         }
     }
-
-    pub fn string(&mut self) -> String {
+}
+impl ToString for Ja3 {
+    fn to_string(&self) -> String {
         let mut str = String::new();
 
         str.push_str(&format!("{},", self.ver));
@@ -79,6 +80,51 @@ impl Ja3 {
 
         for point in &self.ec_points {
             str.push_str(&format!("{}-", point));
+        }
+        str.pop();
+
+        str
+    }
+}
+
+#[derive(Clone, Debug, Default, Hash, PartialEq, Eq)]
+pub struct Ja3s {
+    ver: u16,
+    cipher: u16,
+    exts: Vec<u16>,
+}
+
+impl Ja3s {
+    pub fn set_tls_version(&mut self, ver: u16) {
+        self.ver = ver;
+    }
+
+    pub fn set_cipher(&mut self, cipher: TlsCipherSuiteID) {
+        self.cipher = cipher.0;
+    }
+
+    pub fn set_extension_type(&mut self, ext: &TlsExtension) {
+        let ext_val = u16::from(TlsExtensionType::from(ext));
+        if GREASE.contains(&ext_val) {
+            return;
+        }
+
+        self.exts.push(ext_val);
+    }
+}
+
+impl ToString for Ja3s {
+    fn to_string(&self) -> String {
+        let mut str = String::new();
+
+        str.push_str(&format!("{},", self.ver));
+
+        str.push_str(&format!("{}", self.cipher));
+        str.pop();
+        str.push(',');
+
+        for ext in &self.exts {
+            str.push_str(&format!("{}-", ext));
         }
         str.pop();
 

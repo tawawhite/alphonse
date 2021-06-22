@@ -3,7 +3,10 @@ use std::collections::HashSet;
 use anyhow::Result;
 use serde::Serialize;
 use serde_json::json;
-use tls_parser::TlsServerHelloContents;
+use tls_parser::{
+    parse_tls_extensions, ClientHello, TlsCipherSuite, TlsExtension, TlsServerHelloContents,
+    TlsVersion,
+};
 
 use alphonse_api as api;
 use api::classifiers;
@@ -19,6 +22,7 @@ mod tcp;
 mod udp;
 
 use cert::Cert;
+use ja3::{Ja3, Ja3s};
 
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, Hash, PartialEq)]
@@ -37,36 +41,46 @@ impl Default for Side {
 struct SideInfo {
     #[serde(skip_serializing)]
     side: Side,
-    /// Session ID
-    session_ids: HashSet<String>,
-    /// ja3
-    #[serde(skip_serializing)]
-    ja3s: HashSet<ja3::Ja3>,
     /// Last time unprocessed payload
     #[serde(skip_serializing)]
     remained: Vec<u8>,
 }
 
+#[derive(Clone, Debug, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct TLS {
+    #[serde(skip_serializing_if = "HashSet::is_empty")]
+    version: HashSet<String>,
+    #[serde(skip_serializing_if = "HashSet::is_empty")]
+    cipher: HashSet<String>,
+    #[serde(skip_serializing_if = "HashSet::is_empty")]
+    ja3: HashSet<String>,
+    #[serde(skip_serializing_if = "HashSet::is_empty")]
+    ja3s: HashSet<String>,
+    #[serde(skip_serializing_if = "HashSet::is_empty")]
+    server_session_id: HashSet<String>,
+    #[serde(skip_serializing_if = "HashSet::is_empty")]
+    client_session_id: HashSet<String>,
+    #[serde(skip_serializing_if = "HashSet::is_empty")]
+    ja3string: HashSet<String>,
+    #[serde(skip_serializing_if = "HashSet::is_empty")]
+    ja3sstring: HashSet<String>,
+}
+
 #[derive(Clone, Default)]
 struct TlsProcessor {
     id: ProcessorID,
-    name: String,
     classified: bool,
+    client_direction: Direction,
 
     tcp_rule_id: RuleID,
     udp_rule_id: RuleID,
 
     side_data: [SideInfo; 2],
-    certs: Vec<Cert>,
+    client_certs: Vec<Cert>,
+    server_certs: Vec<Cert>,
+    tls: TLS,
     hostnames: HashSet<String>,
-}
-
-impl TlsProcessor {
-    fn new() -> Self {
-        let mut p = Self::default();
-        p.name = String::from("tls");
-        p
-    }
 }
 
 impl Plugin for TlsProcessor {
@@ -75,7 +89,7 @@ impl Plugin for TlsProcessor {
     }
 
     fn name(&self) -> &str {
-        &self.name.as_str()
+        "tls"
     }
 }
 
@@ -129,26 +143,113 @@ impl Processor for TlsProcessor {
     }
 
     fn finish(&mut self, ses: &mut Session) {
-        ses.add_field(&"cert", json!(self.certs));
-        for side in &self.side_data {
-            match side.side {
-                Side::Client => {}
-                Side::Server => {}
-            };
+        if !self.client_certs.is_empty() {
+            ses.add_field(&"certClient", json!(self.client_certs));
         }
+        if !self.server_certs.is_empty() {
+            ses.add_field(&"certServer", json!(self.server_certs));
+        }
+        ses.add_field(&"tls", json!(self.tls));
+        // TODO: this would lead to error when http connect request followed by tls session
+        ses.add_field(&"host.http", json!(self.hostnames));
+
+        println!("{}", serde_json::to_string_pretty(ses).unwrap());
     }
 }
 
 impl TlsProcessor {
-    fn handle_server_hello(&mut self, dir: Direction, hello: &TlsServerHelloContents) {
-        let dir = dir as u8 as usize;
-        self.side_data[dir].side = Side::Server;
-        match hello.session_id {
+    fn handle_client_hello<'a, H: ClientHello<'a>>(&mut self, dir: Direction, hello: &H) {
+        self.client_direction = dir;
+        match hello.session_id() {
             Some(id) => {
-                self.side_data[dir].session_ids.insert(hex::encode(id));
+                self.tls.client_session_id.insert(hex::encode(id));
             }
             None => {}
         };
+
+        let mut ja3 = Ja3::default();
+        ja3.set_tls_version(u16::from(hello.version()));
+        ja3.set_ciphers(hello.ciphers());
+
+        let buf = hello.ext().unwrap_or_default();
+        let (_, exts) = parse_tls_extensions(buf).unwrap_or_default();
+        for ext in &exts {
+            ja3.set_extension_type(ext);
+            match ext {
+                TlsExtension::SNI(names) => {
+                    for (_, name) in names {
+                        match std::str::from_utf8(name) {
+                            Err(_) => {}
+                            Ok(name) => {
+                                self.hostnames.insert(name.to_string());
+                            }
+                        }
+                    }
+                }
+                TlsExtension::EllipticCurves(groups) => {
+                    ja3.set_supported_groups(groups);
+                }
+                TlsExtension::EcPointFormats(formats) => {
+                    ja3.set_ec_points(formats);
+                }
+                _ => {}
+            }
+        }
+        let mut md5 = md5::Context::new();
+        let ja3 = ja3.to_string();
+        md5.consume(ja3.as_bytes());
+        self.tls.ja3.insert(format!("{:x}", md5.compute()));
+        self.tls.ja3string.insert(ja3);
+    }
+
+    fn handle_server_hello(&mut self, dir: Direction, hello: &TlsServerHelloContents) {
+        self.client_direction = dir.reverse();
+        match hello.session_id {
+            Some(id) => {
+                self.tls.server_session_id.insert(hex::encode(id));
+            }
+            None => {}
+        };
+
+        match hello.version {
+            TlsVersion::DTls10 => self.tls.version.insert("DTLSv1.0".to_string()),
+            TlsVersion::DTls11 => self.tls.version.insert("DTLSv1.1".to_string()),
+            TlsVersion::DTls12 => self.tls.version.insert("DTLSv1.2".to_string()),
+            TlsVersion::Ssl30 => self.tls.version.insert("SSLv3".to_string()),
+            TlsVersion::Tls10 => self.tls.version.insert("TLSv1.0".to_string()),
+            TlsVersion::Tls11 => self.tls.version.insert("TLSv1.1".to_string()),
+            TlsVersion::Tls12 => self.tls.version.insert("TLSv1.2".to_string()),
+            TlsVersion::Tls13 => self.tls.version.insert("TLSv1.3".to_string()),
+            TlsVersion::Tls13Draft18 => self.tls.version.insert("TLSv1.3-draft-18".to_string()),
+            TlsVersion::Tls13Draft19 => self.tls.version.insert("TLSv1.3-draft-19".to_string()),
+            TlsVersion::Tls13Draft20 => self.tls.version.insert("TLSv1.3-draft-20".to_string()),
+            TlsVersion::Tls13Draft21 => self.tls.version.insert("TLSv1.3-draft-21".to_string()),
+            TlsVersion::Tls13Draft22 => self.tls.version.insert("TLSv1.3-draft-22".to_string()),
+            TlsVersion::Tls13Draft23 => self.tls.version.insert("TLSv1.3-draft-23".to_string()),
+            v => self.tls.version.insert(v.to_string()),
+        };
+
+        match TlsCipherSuite::from_id(hello.cipher.0) {
+            Some(cipher) => {
+                self.tls.cipher.insert(cipher.name.to_string());
+            }
+            None => {}
+        };
+
+        let mut ja3s = Ja3s::default();
+        ja3s.set_tls_version(u16::from(hello.version));
+        ja3s.set_cipher(hello.cipher);
+        let buf = hello.ext.unwrap_or_default();
+        let (_, exts) = parse_tls_extensions(buf).unwrap_or_default();
+        for ext in exts {
+            ja3s.set_extension_type(&ext);
+        }
+
+        let mut md5 = md5::Context::new();
+        let ja3s = ja3s.to_string();
+        md5.consume(ja3s.as_bytes());
+        self.tls.ja3s.insert(format!("{:x}", md5.compute()));
+        self.tls.ja3sstring.insert(ja3s);
     }
 }
 
@@ -163,7 +264,7 @@ mod test {
     #[test]
     fn classify() {
         let mut manager = ClassifierManager::new();
-        let mut parser = TlsProcessor::new();
+        let mut parser = TlsProcessor::default();
         parser.register_classify_rules(&mut manager).unwrap();
         manager.prepare().unwrap();
         let mut scratch = manager.alloc_scratch().unwrap();
@@ -212,7 +313,7 @@ mod test {
 
 #[no_mangle]
 pub extern "C" fn al_new_pkt_processor() -> Box<Box<dyn Processor>> {
-    Box::new(Box::new(TlsProcessor::new()))
+    Box::new(Box::new(TlsProcessor::default()))
 }
 
 #[no_mangle]

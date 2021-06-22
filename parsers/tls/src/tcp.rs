@@ -1,7 +1,6 @@
 use anyhow::Result;
 use tls_parser::{
-    parse_tls_extensions, parse_tls_plaintext, Err as TlsErr, TlsCipherSuiteID,
-    TlsClientHelloContents, TlsExtension, TlsMessage, TlsMessageHandshake, TlsPlaintext,
+    parse_tls_plaintext, Err as TlsErr, TlsMessage, TlsMessageHandshake, TlsPlaintext,
 };
 
 use alphonse_api as api;
@@ -10,8 +9,7 @@ use api::plugins::processor::Processor;
 use api::plugins::Plugin;
 use api::session::{ProtocolLayer, Session};
 
-use crate::ja3::Ja3;
-use crate::{Side, TlsProcessor};
+use crate::TlsProcessor;
 
 impl TlsProcessor {
     pub fn parse_tcp_pkt(&mut self, pkt: &dyn Packet, ses: &mut Session) -> Result<()> {
@@ -25,6 +23,7 @@ impl TlsProcessor {
         let dir = pkt.direction() as u8 as usize;
         let mut _buf = vec![];
         let mut buf = if self.side_data[dir].remained.len() > 0 {
+            // If there are bytes left from last packet, prepend them to current packet's payloads
             _buf = self.side_data[dir].remained.clone();
             _buf.extend_from_slice(pkt.payload());
             _buf.as_slice()
@@ -65,13 +64,19 @@ impl TlsProcessor {
                 TlsMessage::Handshake(handshake) => {
                     match handshake {
                         TlsMessageHandshake::ClientHello(hello) => {
-                            self.handle_tls_client_hello(dir, hello)
+                            self.handle_client_hello(dir, hello)
                         }
                         TlsMessageHandshake::Certificate(cert) => {
-                            self.handle_certificate(cert);
+                            self.handle_certificate(dir, cert);
                         }
                         TlsMessageHandshake::ServerHello(hello) => {
                             self.handle_server_hello(dir, hello);
+                        }
+                        TlsMessageHandshake::ServerHelloV13Draft18(_) => {
+                            todo!("process tls 1.3 server hello(draft 18)");
+                        }
+                        TlsMessageHandshake::HelloRetryRequest(_) => {
+                            todo!("process tls 1.3 server hello retry request");
                         }
                         _ => {}
                     };
@@ -79,55 +84,5 @@ impl TlsProcessor {
                 _ => {}
             };
         }
-    }
-
-    fn handle_tls_client_hello(&mut self, dir: Direction, hello: &TlsClientHelloContents) {
-        let dir = dir as u8 as usize;
-
-        self.side_data[dir].side = Side::Client;
-
-        let mut ja3 = Ja3::default();
-        match hello.session_id {
-            Some(id) => {
-                self.side_data[dir].session_ids.insert(hex::encode(id));
-            }
-            None => {}
-        };
-
-        ja3.set_tls_version(u16::from(hello.get_version()));
-
-        let ciphers: Vec<TlsCipherSuiteID> = hello
-            .get_ciphers()
-            .iter()
-            .filter(|opt| opt.is_some())
-            .map(|opt| TlsCipherSuiteID(opt.unwrap().id))
-            .collect();
-        ja3.set_ciphers(ciphers.as_slice());
-
-        let buf = hello.ext.unwrap_or_default();
-        let (_, exts) = parse_tls_extensions(buf).unwrap_or_default();
-        for ext in &exts {
-            ja3.set_extension_type(ext);
-            match ext {
-                TlsExtension::SNI(names) => {
-                    for (_, name) in names {
-                        match std::str::from_utf8(name) {
-                            Err(_) => {}
-                            Ok(name) => {
-                                self.hostnames.insert(name.to_string());
-                            }
-                        }
-                    }
-                }
-                TlsExtension::EllipticCurves(groups) => {
-                    ja3.set_supported_groups(groups);
-                }
-                TlsExtension::EcPointFormats(formats) => {
-                    ja3.set_ec_points(formats);
-                }
-                _ => {}
-            }
-        }
-        self.side_data[dir].ja3s.insert(ja3);
     }
 }
