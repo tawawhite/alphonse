@@ -67,11 +67,12 @@ impl TlsProcessor {
                             self.handle_client_hello(dir, hello)
                         }
                         TlsMessageHandshake::Certificate(cert) => {
-                            self.handle_certificate(dir, cert);
+                            self.handle_certificate(cert);
                         }
                         TlsMessageHandshake::ServerHello(hello) => {
                             self.handle_server_hello(dir, hello);
                         }
+                        TlsMessageHandshake::ServerKeyExchange(_) => {}
                         TlsMessageHandshake::ServerHelloV13Draft18(_) => {
                             todo!("process tls 1.3 server hello(draft 18)");
                         }

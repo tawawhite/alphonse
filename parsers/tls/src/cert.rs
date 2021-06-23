@@ -1,12 +1,12 @@
 use std::collections::HashSet;
+use std::time::SystemTime;
 
 use serde::ser::SerializeStruct;
 use serde::{Serialize, Serializer};
 use tls_parser::TlsCertificateContents;
-use x509_parser::prelude::{parse_x509_certificate, GeneralName, ParsedExtension};
+use x509_parser::prelude::{oid2sn, parse_x509_certificate, GeneralName, ParsedExtension};
 
 use alphonse_api as api;
-use api::packet::Direction;
 
 use crate::TlsProcessor;
 
@@ -45,29 +45,19 @@ where
 }
 
 #[derive(Clone, Debug, Default, Serialize)]
-#[cfg_attr(feature = "arkime", serde(rename_all = "camelCase"))]
+#[serde(rename_all = "camelCase")]
 pub struct Cert {
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub algorithm: String,
-
     #[serde(skip_serializing_if = "HashSet::is_empty")]
     pub alt: HashSet<String>,
 
-    #[serde(skip_serializing)]
-    pub bucket: usize,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub curve: String,
 
     #[serde(skip_serializing_if = "String::is_empty")]
-    pub curv: String,
+    pub hash: String,
 
     #[serde(skip_serializing)]
-    pub hash: u32,
-
-    #[serde(rename = "hash")]
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub hash_str: String,
-
-    #[serde(skip_serializing)]
-    pub is_ca: bool,
+    pub ca: bool,
 
     #[serde(flatten)]
     #[serde(serialize_with = "serialize_issuer")]
@@ -77,8 +67,8 @@ pub struct Cert {
 
     pub not_before: u64,
 
-    #[serde(skip_serializing_if = "HashSet::is_empty")]
-    pub public_algorithm: HashSet<String>,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub public_algorithm: String,
 
     pub remainingdays: usize,
 
@@ -104,7 +94,7 @@ impl Cert {
 }
 
 impl TlsProcessor {
-    pub fn handle_certificate(&mut self, dir: Direction, cert: &TlsCertificateContents) {
+    pub fn handle_certificate(&mut self, cert: &TlsCertificateContents) {
         for raw_cert in &cert.cert_chain {
             let mut cert = Cert::default();
             match parse_x509_certificate(raw_cert.data) {
@@ -158,10 +148,38 @@ impl TlsProcessor {
                         }
                     }
 
+                    // match cer.signature_algorithm.algorithm {};
+                    cert.public_algorithm = oid2sn(&cer.signature_algorithm.algorithm)
+                        .unwrap_or("corrupt")
+                        .to_string();
+
+                    if cer.tbs_certificate.subject_pki.algorithm.algorithm
+                        == x509_parser::oid_registry::OID_KEY_TYPE_EC_PUBLIC_KEY
+                    {
+                        match &cer.tbs_certificate.subject_pki.algorithm.parameters {
+                            None => cert.curve = "unknown".to_string(),
+                            Some(p) => {
+                                match p.as_oid() {
+                                    Err(_) => cert.curve = "corrupt".to_string(),
+                                    Ok(oid) => {
+                                        // TODO: x509-parser::objects::OID_REGISTRY is not public, so probably
+                                        // all the curves would be recoginzed as unknown
+                                        cert.curve = oid2sn(oid).unwrap_or("unknown").to_string();
+                                    }
+                                };
+                            }
+                        }
+                    }
+
                     // get extension infomation
                     for ext in cer.extensions().values() {
                         match ext.parsed_extension() {
-                            ParsedExtension::KeyUsage(usage) => {}
+                            ParsedExtension::BasicConstraints(bc) => {
+                                cert.ca = bc.ca;
+                            }
+                            ParsedExtension::KeyUsage(usage) => {
+                                cert.ca = usage.key_cert_sign();
+                            }
                             ParsedExtension::SubjectAlternativeName(an) => {
                                 for gn in &an.general_names {
                                     match gn {
@@ -179,11 +197,13 @@ impl TlsProcessor {
             }
 
             cert.update_valid_days();
-            if dir == self.client_direction {
-                self.client_certs.push(cert);
-            } else {
-                self.server_certs.push(cert);
-            }
+            cert.remainingdays = (cert.not_after.saturating_sub(
+                SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs(),
+            )) as usize;
+            self.certs.push(cert);
         }
     }
 }

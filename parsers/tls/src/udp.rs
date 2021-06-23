@@ -39,7 +39,7 @@ impl TlsProcessor {
                             self.handle_client_hello(dir, hello)
                         }
                         DTLSMessageHandshakeBody::Certificate(cert) => {
-                            self.handle_certificate(dir, cert)
+                            self.handle_certificate(cert)
                         }
                         DTLSMessageHandshakeBody::ServerHello(hello) => {
                             self.handle_server_hello(dir, hello)

@@ -77,8 +77,7 @@ struct TlsProcessor {
     udp_rule_id: RuleID,
 
     side_data: [SideInfo; 2],
-    client_certs: Vec<Cert>,
-    server_certs: Vec<Cert>,
+    certs: Vec<Cert>,
     tls: TLS,
     hostnames: HashSet<String>,
 }
@@ -143,11 +142,13 @@ impl Processor for TlsProcessor {
     }
 
     fn finish(&mut self, ses: &mut Session) {
-        if !self.client_certs.is_empty() {
-            ses.add_field(&"certClient", json!(self.client_certs));
+        for cert in &self.certs {
+            if cert.ca {
+                ses.add_tag(&"self-signed");
+            }
         }
-        if !self.server_certs.is_empty() {
-            ses.add_field(&"certServer", json!(self.server_certs));
+        if !self.certs.is_empty() {
+            ses.add_field(&"cert", json!(self.certs));
         }
         ses.add_field(&"tls", json!(self.tls));
         // TODO: this would lead to error when http connect request followed by tls session
