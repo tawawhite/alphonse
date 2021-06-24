@@ -54,10 +54,9 @@ impl Hash for Layer {
 
 impl Layer {
     /// Get this layer's raw packet data
+    #[inline]
     pub fn data<'a>(&self, pkt: &'a dyn Packet) -> &'a [u8] {
-        let payload = pkt.payload();
-        let data = &payload[self.offset as usize..0];
-        data
+        &pkt.raw()[self.offset as usize..0]
     }
 }
 
