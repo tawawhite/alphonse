@@ -292,9 +292,16 @@ pub(crate) fn on_header_value(parser: &mut llhttp::Parser<Data>, data: &[u8]) ->
     };
 
     let headers = state.ctx.find_header(hdr_low.as_str())?;
-    if headers.len() > 0 {
-        state.ctx.value.extend_from_slice(data);
+    if headers.len() <= 0 {
+        if state.ctx.direction == state.ctx.client_direction {
+            state.http.request_header.insert(header);
+        } else {
+            state.http.response_header.insert(header);
+        }
+        return Ok(());
     }
+
+    state.ctx.value.extend_from_slice(data);
 
     for header in headers {
         match state.http.header_values.get_mut(&header) {
