@@ -109,7 +109,8 @@ impl TimeoutThread {
                             ses.info.mid_save_reset(now + cfg.ses_save_timeout as u64);
                         } else if timeout {
                             for (_, processor) in ses.processors.iter_mut() {
-                                processor.finish(ses.info.as_mut());
+                                processor.save(ses.info.as_mut());
+                                processor.finish();
                             }
                             for sender in &self.senders {
                                 sender.try_send(ses.info.clone()).unwrap();
@@ -128,7 +129,8 @@ impl TimeoutThread {
                 shard.write().retain(|_, ses| {
                     let ses = ses.get_mut();
                     for (_, processor) in ses.processors.iter_mut() {
-                        processor.finish(ses.info.as_mut());
+                        processor.save(ses.info.as_mut());
+                        processor.finish();
                     }
                     for sender in &self.senders {
                         sender.try_send(ses.info.clone()).unwrap();

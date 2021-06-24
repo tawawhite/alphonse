@@ -46,12 +46,21 @@ pub trait Processor: Send + Sync + Plugin {
     /// Change this protocol processor's internal state to indicate this session is classfied as this protocol
     fn classified_as_this_protocol(&mut self) -> Result<()>;
 
-    /// Called when this session is timeout, add fields to this sessions
-    fn finish(&mut self, _ses: &mut session::Session) {}
-
     #[inline]
     /// Called when this session needs to mid save, by default call finish method
     fn mid_save(&mut self, ses: &mut session::Session) {
-        self.finish(ses)
+        self.save(ses)
+    }
+
+    /// Called when this session is timeout, add fields to this sessions
+    fn save(&mut self, ses: &mut session::Session);
+
+    /// Called when this session is timeout, release resources aquired while parsing
+    ///
+    /// This is different from plugin's cleanup method. This method is called after session
+    /// is timeouted and about to be sent to output plugins, so it only cleanups resources
+    /// related to the session. Global resources should be released when cleanup method is called.
+    fn finish(&mut self) -> Result<()> {
+        Ok(())
     }
 }
