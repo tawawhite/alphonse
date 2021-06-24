@@ -200,6 +200,8 @@ impl Processor for Misc {
         };
         Ok(())
     }
+
+    fn save(&mut self, _: &mut Session) {}
 }
 
 #[no_mangle]
