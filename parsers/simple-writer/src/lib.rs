@@ -306,14 +306,14 @@ impl Processor for SimpleWriterProcessor {
     }
 
     fn mid_save(&mut self, ses: &mut Session) {
-        self.finish(ses);
+        self.save(ses);
         // Cleanup previous packet positions
         self.packet_pos.clear();
         self.fid = 0;
     }
 
     /// Add packet positions into session after session is about to timeout or closed
-    fn finish(&mut self, ses: &mut Session) {
+    fn save(&mut self, ses: &mut Session) {
         let value = serde_json::Value::Array(
             self.packet_pos
                 .iter()
@@ -344,7 +344,7 @@ mod tests {
         processor.packet_pos = vec![-1, 1, 2, 3, 4, 5];
 
         let mut ses = Session::new();
-        processor.finish(&mut ses);
+        processor.save(&mut ses);
 
         let packet_pos = ses.fields["packetPos"].clone();
         assert!(packet_pos.is_array());
