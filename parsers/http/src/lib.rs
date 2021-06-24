@@ -343,21 +343,26 @@ impl<'a> Processor for HttpProcessor<'static> {
         Ok(())
     }
 
-    fn finish(&mut self, ses: &mut Session) {
+    fn mid_save(&mut self, ses: &mut api::session::Session) {
+        let state = match self.parsers[0].data() {
+            None => return,
+            Some(s) => s.borrow(),
+        };
+        ses.add_field(&"http", json!(state.http));
+        println!("{}", serde_json::to_string_pretty(&ses).unwrap());
+    }
+
+    fn save(&mut self, ses: &mut Session) {
         for parser in &mut self.parsers {
             parser.finish();
         }
+        self.mid_save(ses);
+    }
 
+    fn finish(&mut self) -> Result<()> {
         self.parsers[0].set_data(None);
-        let state = self.parsers[1].set_data(None);
-        let state = match state {
-            None => return,
-            Some(state) => state.take(),
-        };
-
-        ses.add_field(&"http", json!(state.http));
-
-        println!("{}", serde_json::to_string(&ses).unwrap());
+        self.parsers[1].set_data(None);
+        Ok(())
     }
 }
 
