@@ -141,7 +141,7 @@ impl Processor for TlsProcessor {
         }
     }
 
-    fn finish(&mut self, ses: &mut Session) {
+    fn save(&mut self, ses: &mut Session) {
         for cert in &self.certs {
             if cert.ca {
                 ses.add_tag(&"self-signed");
@@ -155,6 +155,13 @@ impl Processor for TlsProcessor {
         ses.add_field(&"host.http", json!(self.hostnames));
 
         println!("{}", serde_json::to_string_pretty(ses).unwrap());
+    }
+
+    fn mid_save(&mut self, ses: &mut api::session::Session) {
+        self.save(ses);
+        self.certs.clear();
+        self.tls = TLS::default();
+        self.hostnames.clear();
     }
 }
 
