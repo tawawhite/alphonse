@@ -214,7 +214,7 @@ impl Processor for DNSProcessor {
         Ok(())
     }
 
-    fn finish(&mut self, ses: &mut Session) {
+    fn save(&mut self, ses: &mut Session) {
         let fields = self.fields.take();
         let fields = match fields {
             None => return,
