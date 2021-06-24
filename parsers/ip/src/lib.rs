@@ -38,25 +38,13 @@ impl Default for IpInfo {
     }
 }
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 struct IPProcessor {
     id: ProcessorID,
     classified: bool,
     processed: bool,
     src_ip: IpInfo,
     dst_ip: IpInfo,
-}
-
-impl Clone for IPProcessor {
-    fn clone(&self) -> Self {
-        Self {
-            id: self.id,
-            classified: self.classified,
-            processed: self.processed,
-            src_ip: self.src_ip.clone(),
-            dst_ip: self.dst_ip.clone(),
-        }
-    }
 }
 
 impl Plugin for IPProcessor {
@@ -199,7 +187,7 @@ impl Processor for IPProcessor {
         Ok(())
     }
 
-    fn finish(&mut self, ses: &mut Session) {
+    fn save(&mut self, ses: &mut Session) {
         ses.add_field(&"srcIp", json!(self.src_ip.addr));
         if !self.src_ip.asn.is_empty() {
             ses.add_field(&"src.ASN", json!(self.src_ip.asn));
