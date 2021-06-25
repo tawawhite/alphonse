@@ -119,9 +119,11 @@ impl Processor for IPProcessor {
             self.classified = true;
             match pkt.layers().network.protocol {
                 Protocol::IPV4 => {
+                    ses.set_ip_protocol(pkt.layers().network.data(pkt)[9]);
                     ses.add_protocol(&"ipv4", ProtocolLayer::Network);
                 }
                 Protocol::IPV6 => {
+                    ses.set_ip_protocol(pkt.layers().network.data(pkt)[6]);
                     ses.add_protocol(&"ipv6", ProtocolLayer::Network);
                 }
                 _ => unreachable!(),

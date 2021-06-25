@@ -56,7 +56,7 @@ impl Layer {
     /// Get this layer's raw packet data
     #[inline]
     pub fn data<'a>(&self, pkt: &'a dyn Packet) -> &'a [u8] {
-        &pkt.raw()[self.offset as usize..0]
+        &pkt.raw()[self.offset as usize..]
     }
 }
 

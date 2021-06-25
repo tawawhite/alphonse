@@ -131,8 +131,7 @@ pub struct Session {
     protocol: HashSet<String>,
 
     /// IP Protocol(compatible to arkime's ipProtocol field)
-    #[serde(skip_serializing_if = "String::is_empty")]
-    ip_protocol: String,
+    ip_protocol: u8,
 
     /// Protocols bucketed by layer
     protocols: Protocols,
@@ -197,25 +196,24 @@ impl Session {
                 .datalink
                 .insert(protocol.as_ref().to_string()),
             ProtocolLayer::Network => self.protocols.network.insert(protocol.as_ref().to_string()),
-            ProtocolLayer::Transport => {
-                self.ip_protocol = protocol.as_ref().to_string();
-                self.protocols
-                    .transport
-                    .insert(protocol.as_ref().to_string())
-            }
+            ProtocolLayer::Transport => self
+                .protocols
+                .transport
+                .insert(protocol.as_ref().to_string()),
             ProtocolLayer::Application => self.protocols.app.insert(protocol.as_ref().to_string()),
             ProtocolLayer::Tunnel => self.protocols.tunnel.insert(protocol.as_ref().to_string()),
         };
+    }
+
+    pub fn set_ip_protocol(&mut self, protocol: u8) {
+        self.ip_protocol = protocol
     }
 
     pub fn has_protocol<S: AsRef<str>>(&mut self, protocol: &S, layer: ProtocolLayer) -> bool {
         let contains = match layer {
             ProtocolLayer::Datalink => self.protocols.datalink.contains(protocol.as_ref()),
             ProtocolLayer::Network => self.protocols.network.contains(protocol.as_ref()),
-            ProtocolLayer::Transport => {
-                self.protocols.transport.contains(protocol.as_ref())
-                    && (self.ip_protocol == protocol.as_ref())
-            }
+            ProtocolLayer::Transport => self.protocols.transport.contains(protocol.as_ref()),
             ProtocolLayer::Application => self.protocols.app.contains(protocol.as_ref()),
             ProtocolLayer::Tunnel => self.protocols.tunnel.contains(protocol.as_ref()),
         };
