@@ -9,6 +9,7 @@ members = [
     "parsers/simple-writer",
     "parsers/tls",
     "parsers/ip",
+    "parsers/udp",
     "rx-drivers/libpcap",
     "rx-drivers/files",
 ]

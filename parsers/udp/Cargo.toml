@@ -1,0 +1,16 @@
+[package]
+name = "udp"
+version = "0.1.0"
+authors = ["Jack Liar"]
+edition = "2018"
+
+[lib]
+crate-type = ["cdylib"]
+name = "udp"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+alphonse-api = { path="../../api", optional=false }
+anyhow = "1.0"
+serde_json = "1.0"
