@@ -109,7 +109,7 @@ impl OutputPlugin for Output {
         Box::new(self.clone())
     }
 
-    fn start(&self, cfg: Arc<Config>, receiver: &Receiver<Box<Session>>) -> Result<()> {
+    fn start(&self, cfg: Arc<Config>, receiver: &Receiver<Arc<Box<Session>>>) -> Result<()> {
         let mut handles = vec![];
         let cfg = cfg.clone();
         let mut thread = OutputThread::new(receiver.clone());
@@ -128,11 +128,11 @@ impl OutputPlugin for Output {
 }
 
 struct OutputThread {
-    receiver: Receiver<Box<Session>>,
+    receiver: Receiver<Arc<Box<Session>>>,
 }
 
 impl OutputThread {
-    pub fn new(receiver: Receiver<Box<Session>>) -> Self {
+    pub fn new(receiver: Receiver<Arc<Box<Session>>>) -> Self {
         OutputThread { receiver }
     }
 
@@ -175,7 +175,7 @@ impl OutputThread {
                 continue;
             }
 
-            sessions.push(Arc::from(ses));
+            sessions.push(ses);
             if sessions.len() == 5 {
                 let sessions_cloned = Box::new(sessions.clone());
                 let cfg = cfg.clone();
@@ -212,7 +212,7 @@ impl OutputThread {
     async fn save_sessions(
         _cfg: Arc<Config>,
         es: Arc<Elasticsearch>,
-        sessions: Box<Vec<Arc<Session>>>,
+        sessions: Box<Vec<Arc<Box<Session>>>>,
     ) -> Result<()> {
         let body = sessions
             .iter()

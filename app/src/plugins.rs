@@ -73,7 +73,7 @@ impl PluginWarehouse {
     pub fn start_output_plugins(
         &self,
         cfg: &Arc<Config>,
-        receivers: &[Receiver<Box<Session>>],
+        receivers: &[Receiver<Arc<Box<Session>>>],
     ) -> Result<()> {
         for (i, plugin) in self.output_plugins.iter().enumerate() {
             match plugin.start(cfg.clone(), &receivers[i]) {

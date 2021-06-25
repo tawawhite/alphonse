@@ -13,5 +13,5 @@ pub const NEW_OUTPUT_PLUGIN_FUNC_NAME: &str = "al_new_output_plugin";
 
 pub trait OutputPlugin: Plugin {
     fn clone_output_plugin(&self) -> Box<dyn OutputPlugin>;
-    fn start(&self, cfg: Arc<Config>, receiver: &Receiver<Box<Session>>) -> Result<()>;
+    fn start(&self, cfg: Arc<Config>, receiver: &Receiver<Arc<Box<Session>>>) -> Result<()>;
 }

@@ -36,7 +36,7 @@ pub type SessionTable = DashMap<PacketHashKey, Box<SessionData>, FnvBuildHasher>
 pub struct TimeoutThread {
     id: u8,
     exit: Arc<AtomicBool>,
-    senders: Vec<Sender<Box<Session>>>,
+    senders: Vec<Sender<Arc<Box<Session>>>>,
     session_table: Arc<SessionTable>,
 }
 
@@ -44,7 +44,7 @@ impl TimeoutThread {
     pub fn new(
         id: u8,
         exit: Arc<AtomicBool>,
-        senders: Vec<Sender<Box<Session>>>,
+        senders: Vec<Sender<Arc<Box<Session>>>>,
         session_table: Arc<SessionTable>,
     ) -> Self {
         Self {
@@ -103,16 +103,24 @@ impl TimeoutThread {
                             for (_, processor) in ses.processors.iter_mut() {
                                 processor.mid_save(ses.info.as_mut());
                             }
+                            let info = Arc::new(std::mem::replace(
+                                &mut ses.info,
+                                Box::new(Session::new()),
+                            ));
                             for sender in &self.senders {
-                                sender.try_send(ses.info.clone()).unwrap();
+                                sender.try_send(info.clone()).unwrap();
                             }
                             ses.info.mid_save_reset(now + cfg.ses_save_timeout as u64);
                         } else if timeout {
                             for (_, processor) in ses.processors.iter_mut() {
                                 processor.save(ses.info.as_mut());
                             }
+                            let info = Arc::new(std::mem::replace(
+                                &mut ses.info,
+                                Box::new(Session::new()),
+                            ));
                             for sender in &self.senders {
-                                sender.try_send(ses.info.clone()).unwrap();
+                                sender.try_send(info.clone()).unwrap();
                             }
                         }
                         !timeout
@@ -130,8 +138,9 @@ impl TimeoutThread {
                     for (_, processor) in ses.processors.iter_mut() {
                         processor.save(ses.info.as_mut());
                     }
+                    let info = Arc::new(std::mem::replace(&mut ses.info, Box::new(Session::new())));
                     for sender in &self.senders {
-                        sender.try_send(ses.info.clone()).unwrap();
+                        sender.try_send(info.clone()).unwrap();
                     }
                     false
                 })
