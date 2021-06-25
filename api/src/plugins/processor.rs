@@ -2,8 +2,9 @@ use anyhow::Result;
 
 use crate::classifiers::matched;
 use crate::classifiers::ClassifierManager;
+use crate::packet::Packet;
 use crate::plugins::Plugin;
-use crate::{packet, session};
+use crate::session::Session;
 
 pub type ProcessorID = u8;
 
@@ -27,33 +28,21 @@ pub trait Processor: Send + Sync + Plugin {
     /// Parse a single packet and maybe update session information
     fn parse_pkt(
         &mut self,
-        _pkt: &dyn packet::Packet,
+        _pkt: &dyn Packet,
         _rule: Option<&matched::Rule>,
-        ses: &mut session::Session,
+        _ses: &mut Session,
     ) -> Result<()> {
-        if !self.is_classified() {
-            // If this session is already classified as this protocol, skip
-            self.classified_as_this_protocol()?;
-            ses.add_protocol(&self.name(), session::ProtocolLayer::All)?;
-        }
-
         Ok(())
     }
 
-    /// Check whether the session is classfied as this protocol
-    fn is_classified(&self) -> bool;
-
-    /// Change this protocol processor's internal state to indicate this session is classfied as this protocol
-    fn classified_as_this_protocol(&mut self) -> Result<()>;
-
     #[inline]
     /// Called when this session needs to mid save, by default call finish method
-    fn mid_save(&mut self, ses: &mut session::Session) {
+    fn mid_save(&mut self, ses: &mut Session) {
         self.save(ses)
     }
 
     /// Called when this session is timeout, add fields to this sessions
-    fn save(&mut self, ses: &mut session::Session);
+    fn save(&mut self, ses: &mut Session);
 
     /// Called when this session is timeout, release resources aquired while parsing
     ///

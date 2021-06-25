@@ -52,6 +52,20 @@ pub enum ProtocolLayer {
     Tunnel,
 }
 
+#[derive(Clone, Debug, Default, Serialize)]
+struct Protocols {
+    #[serde(skip_serializing_if = "HashSet::is_empty")]
+    datalink: HashSet<String>,
+    #[serde(skip_serializing_if = "HashSet::is_empty")]
+    network: HashSet<String>,
+    #[serde(skip_serializing_if = "HashSet::is_empty")]
+    transport: HashSet<String>,
+    #[serde(skip_serializing_if = "HashSet::is_empty")]
+    app: HashSet<String>,
+    #[serde(skip_serializing_if = "HashSet::is_empty")]
+    tunnel: HashSet<String>,
+}
+
 /// Network session
 #[derive(Clone, Default, Serialize)]
 #[cfg_attr(feature = "arkime", serde(rename_all = "camelCase"))]
@@ -109,6 +123,13 @@ pub struct Session {
     /// Tunnel Protocols
     #[serde(skip_serializing_if = "packet::Tunnel::is_empty")]
     tunnels: packet::Tunnel,
+
+    /// Protocols(compatible to arkime's protocol field)
+    #[serde(skip_serializing_if = "HashSet::is_empty")]
+    protocol: HashSet<String>,
+
+    /// Protocols bucketed by layer
+    protocols: Protocols,
 }
 
 impl Session {
@@ -162,40 +183,21 @@ impl Session {
         };
     }
 
-    pub fn add_protocol<S: AsRef<str>>(
-        &mut self,
-        protocol: &S,
-        layer: ProtocolLayer,
-    ) -> Result<()> {
-        let layer = match layer {
-            ProtocolLayer::All => "protocol",
-            ProtocolLayer::Datalink => "protocols.datalink",
-            ProtocolLayer::Network => "protocols.network",
-            ProtocolLayer::Transport => "protocols.transport",
-            ProtocolLayer::Application => "protocols.app",
-            ProtocolLayer::Tunnel => "protocols.tunnel",
+    pub fn add_protocol<S: AsRef<str>>(&mut self, protocol: &S, layer: ProtocolLayer) {
+        match layer {
+            ProtocolLayer::All => self.protocol.insert(protocol.as_ref().to_string()),
+            ProtocolLayer::Datalink => self
+                .protocols
+                .datalink
+                .insert(protocol.as_ref().to_string()),
+            ProtocolLayer::Network => self.protocols.network.insert(protocol.as_ref().to_string()),
+            ProtocolLayer::Transport => self
+                .protocols
+                .transport
+                .insert(protocol.as_ref().to_string()),
+            ProtocolLayer::Application => self.protocols.app.insert(protocol.as_ref().to_string()),
+            ProtocolLayer::Tunnel => self.protocols.tunnel.insert(protocol.as_ref().to_string()),
         };
-        match self.fields.as_mut() {
-            serde_json::Value::Object(obj) => match obj.get_mut(layer) {
-                Some(protocols) => {
-                    let protocols = protocols
-                        .as_array_mut()
-                        .ok_or(anyhow!("{} is not an json array", layer))?;
-                    match protocols.iter().find(|p| match p.as_str() {
-                        Some(p) => p == protocol.as_ref(),
-                        None => false,
-                    }) {
-                        Some(_) => {}
-                        None => protocols.push(json!(protocol.as_ref())),
-                    };
-                }
-                None => {
-                    obj.insert(layer.to_string(), json!(vec![json!(protocol.as_ref())]));
-                }
-            },
-            _ => todo!("need to guarantee fields is an object in Session initialization"),
-        };
-        Ok(())
     }
 
     pub fn has_protocol<S: AsRef<str>>(
@@ -275,7 +277,7 @@ mod tests {
     #[test]
     fn add_protocol() -> Result<()> {
         let mut ses = Session::new();
-        ses.add_protocol(&"protocol", ProtocolLayer::All)?;
+        ses.add_protocol(&"protocol", ProtocolLayer::All);
         assert_eq!(
             ses.has_protocol(&"protocol", ProtocolLayer::All).unwrap(),
             true
