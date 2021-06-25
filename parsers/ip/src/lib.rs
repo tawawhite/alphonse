@@ -189,14 +189,14 @@ impl Processor for IPProcessor {
         }
 
         ses.add_field(&"dstIp", json!(self.dst_ip.addr));
-        if !self.src_ip.asn.is_empty() {
-            ses.add_field(&"dstASN", json!(self.src_ip.asn));
+        if !self.dst_ip.asn.is_empty() {
+            ses.add_field(&"dstASN", json!(self.dst_ip.asn));
         }
-        if !self.src_ip.country.is_empty() {
-            ses.add_field(&"dstGEO", json!(self.src_ip.country));
+        if !self.dst_ip.country.is_empty() {
+            ses.add_field(&"dstGEO", json!(self.dst_ip.country));
         }
-        if !self.src_ip.city.is_empty() {
-            ses.add_field(&"dstGEOCity", json!(self.src_ip.city));
+        if !self.dst_ip.city.is_empty() {
+            ses.add_field(&"dstGEOCity", json!(self.dst_ip.city));
         }
     }
 }
