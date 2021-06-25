@@ -95,10 +95,7 @@ mod test {
                 .parse_pkt(pkt.as_ref(), Some(rule), &mut ses)
                 .unwrap();
         }
-        assert!(!ses.has_protocol(&"bgp", ProtocolLayer::All).unwrap());
-        assert!(!ses
-            .has_protocol(&"bgp", ProtocolLayer::Application)
-            .unwrap());
+        assert!(!ses.has_protocol(&"bgp", ProtocolLayer::Application));
 
         // OPEN message type
         let mut pkt: Box<TestPacket> = Box::new(TestPacket::default());
