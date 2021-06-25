@@ -119,15 +119,6 @@ impl Processor for TlsProcessor {
         Ok(())
     }
 
-    fn is_classified(&self) -> bool {
-        self.classified
-    }
-
-    fn classified_as_this_protocol(&mut self) -> Result<()> {
-        self.classified = true;
-        return Ok(());
-    }
-
     fn parse_pkt(
         &mut self,
         pkt: &dyn Packet,

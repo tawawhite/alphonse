@@ -11,9 +11,9 @@ use serde_json::json;
 
 use alphonse_api as api;
 use api::classifiers;
-use api::classifiers::{dpi, RuleID};
+use api::classifiers::{dpi, matched::Rule, RuleID};
 use api::config::Config;
-use api::packet::Direction;
+use api::packet::{Direction, Packet};
 use api::plugins::processor::{Processor, ProcessorID};
 use api::plugins::{Plugin, PluginType};
 use api::session::{ProtocolLayer, Session};
@@ -263,21 +263,7 @@ impl<'a> Processor for HttpProcessor<'static> {
         Ok(())
     }
 
-    fn is_classified(&self) -> bool {
-        self.classified
-    }
-
-    fn classified_as_this_protocol(&mut self) -> Result<()> {
-        self.classified = true;
-        Ok(())
-    }
-
-    fn parse_pkt(
-        &mut self,
-        pkt: &dyn api::packet::Packet,
-        rule: Option<&api::classifiers::matched::Rule>,
-        ses: &mut Session,
-    ) -> Result<()> {
+    fn parse_pkt(&mut self, pkt: &dyn Packet, rule: Option<&Rule>, _: &mut Session) -> Result<()> {
         let direction = pkt.direction() as u8 as usize;
 
         // update client direction
@@ -292,11 +278,9 @@ impl<'a> Processor for HttpProcessor<'static> {
             None => {}
         };
 
-        if !self.is_classified() {
+        if !self.classified {
             // If this session is already classified as this protocol, skip
-            self.classified_as_this_protocol()?;
-            ses.add_protocol(&self.name(), ProtocolLayer::All)?;
-            ses.add_protocol(&self.name(), ProtocolLayer::Application)?;
+            self.classified = true;
             let settings = match SETTINGS.get() {
                 Some(s) => s,
                 None => return Err(anyhow!("Global llhttp sttings is empty or initializing")),
@@ -344,6 +328,7 @@ impl<'a> Processor for HttpProcessor<'static> {
     }
 
     fn mid_save(&mut self, ses: &mut api::session::Session) {
+        ses.add_protocol(&self.name(), ProtocolLayer::Application);
         let state = match self.parsers[0].data() {
             None => return,
             Some(s) => s.borrow(),

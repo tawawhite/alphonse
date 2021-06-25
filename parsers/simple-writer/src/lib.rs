@@ -296,15 +296,6 @@ impl Processor for SimpleWriterProcessor {
         Ok(())
     }
 
-    fn is_classified(&self) -> bool {
-        self.classified
-    }
-
-    fn classified_as_this_protocol(&mut self) -> Result<()> {
-        self.classified = true;
-        Ok(())
-    }
-
     fn mid_save(&mut self, ses: &mut Session) {
         self.save(ses);
         // Cleanup previous packet positions

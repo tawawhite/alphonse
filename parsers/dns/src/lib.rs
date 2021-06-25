@@ -104,38 +104,25 @@ impl Processor for DNSProcessor {
         Ok(())
     }
 
-    fn is_classified(&self) -> bool {
-        self.classified
-    }
-
-    fn classified_as_this_protocol(&mut self) -> Result<()> {
-        self.classified = true;
-        Ok(())
-    }
-
     fn parse_pkt(
         &mut self,
         pkt: &dyn api::packet::Packet,
         rule: Option<&api::classifiers::matched::Rule>,
         ses: &mut Session,
     ) -> Result<()> {
-        if !self.is_classified() {
-            self.classified_as_this_protocol()?;
+        if !self.classified {
+            self.classified = true;
             match rule {
                 None => {
-                    ses.add_protocol(&"dns", ProtocolLayer::All)?;
-                    ses.add_protocol(&"dns", ProtocolLayer::Application)?;
+                    ses.add_protocol(&"dns", ProtocolLayer::Application);
                 }
                 Some(rule) => {
                     if rule.id == self.mdns_rule_id {
-                        ses.add_protocol(&"mdns", ProtocolLayer::All)?;
-                        ses.add_protocol(&"mdns", ProtocolLayer::Application)?;
+                        ses.add_protocol(&"mdns", ProtocolLayer::Application);
                     } else if rule.id == self.llmnr_rule_id {
-                        ses.add_protocol(&"llmnr", ProtocolLayer::All)?;
-                        ses.add_protocol(&"llmnr", ProtocolLayer::Application)?;
+                        ses.add_protocol(&"llmnr", ProtocolLayer::Application);
                     } else {
-                        ses.add_protocol(&"dns", ProtocolLayer::All)?;
-                        ses.add_protocol(&"dns", ProtocolLayer::Application)?;
+                        ses.add_protocol(&"dns", ProtocolLayer::Application);
                     }
                 }
             };

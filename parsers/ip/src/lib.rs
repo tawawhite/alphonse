@@ -105,15 +105,6 @@ impl Processor for IPProcessor {
         Ok(())
     }
 
-    fn is_classified(&self) -> bool {
-        self.classified
-    }
-
-    fn classified_as_this_protocol(&mut self) -> Result<()> {
-        self.classified = true;
-        Ok(())
-    }
-
     fn parse_pkt(
         &mut self,
         pkt: &dyn api::packet::Packet,
@@ -124,16 +115,14 @@ impl Processor for IPProcessor {
             return Ok(());
         };
 
-        if !self.is_classified() {
-            self.classified_as_this_protocol()?;
+        if !self.classified {
+            self.classified = true;
             match pkt.layers().network.protocol {
                 Protocol::IPV4 => {
-                    ses.add_protocol(&"ipv4", ProtocolLayer::All)?;
-                    ses.add_protocol(&"ipv4", ProtocolLayer::Network)?;
+                    ses.add_protocol(&"ipv4", ProtocolLayer::Network);
                 }
                 Protocol::IPV6 => {
-                    ses.add_protocol(&"ipv6", ProtocolLayer::All)?;
-                    ses.add_protocol(&"ipv6", ProtocolLayer::Network)?;
+                    ses.add_protocol(&"ipv6", ProtocolLayer::Network);
                 }
                 _ => unreachable!(),
             }

@@ -189,17 +189,13 @@ macro_rules! add_udp_port_rule_with_func {
 #[macro_export]
 macro_rules! add_protocol {
     ($ses:expr, $protocol:literal) => {
-        $ses.add_protocol(&$protocol, ProtocolLayer::All)?;
-        $ses.add_protocol(&$protocol, ProtocolLayer::Application)?;
+        $ses.add_protocol(&$protocol, ProtocolLayer::Application);
     };
 }
 
 #[macro_export]
 macro_rules! assert_has_protocol {
     ($ses:expr, $protocol:literal) => {
-        assert!($ses.has_protocol(&$protocol, ProtocolLayer::All).unwrap());
-        assert!($ses
-            .has_protocol(&$protocol, ProtocolLayer::Application)
-            .unwrap());
+        assert!($ses.has_protocol(&$protocol, ProtocolLayer::Application));
     };
 }

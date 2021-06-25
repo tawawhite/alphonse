@@ -5,7 +5,6 @@ use tls_parser::{
 
 use alphonse_api as api;
 use api::packet::{Direction, Packet};
-use api::plugins::processor::Processor;
 use api::plugins::Plugin;
 use api::session::{ProtocolLayer, Session};
 
@@ -13,11 +12,10 @@ use crate::TlsProcessor;
 
 impl TlsProcessor {
     pub fn parse_tcp_pkt(&mut self, pkt: &dyn Packet, ses: &mut Session) -> Result<()> {
-        if !self.is_classified() {
+        if !self.classified {
             // If this session is already classified as this protocol, skip
-            self.classified_as_this_protocol()?;
-            ses.add_protocol(&self.name(), ProtocolLayer::All)?;
-            ses.add_protocol(&self.name(), ProtocolLayer::Application)?;
+            self.classified = true;
+            ses.add_protocol(&self.name(), ProtocolLayer::Application);
         }
 
         let dir = pkt.direction() as u8 as usize;

@@ -164,15 +164,6 @@ impl Processor for Misc {
         Ok(())
     }
 
-    fn is_classified(&self) -> bool {
-        self.classified
-    }
-
-    fn classified_as_this_protocol(&mut self) -> Result<()> {
-        self.classified = true;
-        Ok(())
-    }
-
     fn parse_pkt(
         &mut self,
         pkt: &dyn api::packet::Packet,
@@ -188,8 +179,7 @@ impl Processor for Misc {
         match self.match_cbs.get(&rule.id()) {
             Some(cb) => match cb {
                 MatchCallBack::ProtocolName(protocol) => {
-                    ses.add_protocol(protocol, ProtocolLayer::All)?;
-                    ses.add_protocol(protocol, ProtocolLayer::Application)?;
+                    ses.add_protocol(protocol, ProtocolLayer::Application);
                 }
                 MatchCallBack::Func(func) => func(ses, pkt)?,
                 MatchCallBack::None => {}
