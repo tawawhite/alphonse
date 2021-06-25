@@ -44,7 +44,6 @@ where
 
 #[derive(Clone, Copy, Debug)]
 pub enum ProtocolLayer {
-    All,
     Datalink,
     Network,
     Transport,
@@ -184,8 +183,8 @@ impl Session {
     }
 
     pub fn add_protocol<S: AsRef<str>>(&mut self, protocol: &S, layer: ProtocolLayer) {
+        self.protocol.insert(protocol.as_ref().to_string());
         match layer {
-            ProtocolLayer::All => self.protocol.insert(protocol.as_ref().to_string()),
             ProtocolLayer::Datalink => self
                 .protocols
                 .datalink
@@ -200,37 +199,15 @@ impl Session {
         };
     }
 
-    pub fn has_protocol<S: AsRef<str>>(
-        &mut self,
-        protocol: &S,
-        layer: ProtocolLayer,
-    ) -> Result<bool> {
-        let layer = match layer {
-            ProtocolLayer::All => "protocol",
-            ProtocolLayer::Datalink => "protocols.datalink",
-            ProtocolLayer::Network => "protocols.network",
-            ProtocolLayer::Transport => "protocols.transport",
-            ProtocolLayer::Application => "protocols.app",
-            ProtocolLayer::Tunnel => "protocols.tunnel",
+    pub fn has_protocol<S: AsRef<str>>(&mut self, protocol: &S, layer: ProtocolLayer) -> bool {
+        let contains = match layer {
+            ProtocolLayer::Datalink => self.protocols.datalink.contains(protocol.as_ref()),
+            ProtocolLayer::Network => self.protocols.network.contains(protocol.as_ref()),
+            ProtocolLayer::Transport => self.protocols.transport.contains(protocol.as_ref()),
+            ProtocolLayer::Application => self.protocols.app.contains(protocol.as_ref()),
+            ProtocolLayer::Tunnel => self.protocols.tunnel.contains(protocol.as_ref()),
         };
-        match self.fields.as_mut() {
-            serde_json::Value::Object(obj) => match obj.get_mut(layer) {
-                Some(protocols) => {
-                    let protocols = protocols
-                        .as_array_mut()
-                        .ok_or(anyhow!("{} is not an json array", layer))?;
-                    match protocols.iter().find(|p| match p.as_str() {
-                        Some(p) => p == protocol.as_ref(),
-                        None => false,
-                    }) {
-                        Some(_) => Ok(true),
-                        None => Ok(false),
-                    }
-                }
-                None => Ok(false),
-            },
-            _ => todo!("need to guarantee fields is an object in Session initialization"),
-        }
+        contains & self.protocol.contains(protocol.as_ref())
     }
 
     /// Whether this session needs to do a middle save operation
@@ -277,9 +254,9 @@ mod tests {
     #[test]
     fn add_protocol() -> Result<()> {
         let mut ses = Session::new();
-        ses.add_protocol(&"protocol", ProtocolLayer::All);
+        ses.add_protocol(&"protocol", ProtocolLayer::Application);
         assert_eq!(
-            ses.has_protocol(&"protocol", ProtocolLayer::All).unwrap(),
+            ses.has_protocol(&"protocol", ProtocolLayer::Application),
             true
         );
 
