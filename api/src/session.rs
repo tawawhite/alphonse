@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::os::raw::c_long;
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use serde::ser::SerializeStruct;
 use serde::{Serialize, Serializer};
 use serde_json::json;
@@ -243,6 +243,12 @@ impl Session {
         self.data_bytes = [0, 0];
         self.save_time = save_time;
         self.fields = Box::new(json!({}));
+        self.protocol.clear();
+        self.protocols.datalink.clear();
+        self.protocols.network.clear();
+        self.protocols.transport.clear();
+        self.protocols.app.clear();
+        self.protocols.tunnel.clear();
     }
 }
 
