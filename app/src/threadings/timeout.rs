@@ -110,7 +110,6 @@ impl TimeoutThread {
                         } else if timeout {
                             for (_, processor) in ses.processors.iter_mut() {
                                 processor.save(ses.info.as_mut());
-                                processor.finish();
                             }
                             for sender in &self.senders {
                                 sender.try_send(ses.info.clone()).unwrap();
@@ -130,7 +129,6 @@ impl TimeoutThread {
                     let ses = ses.get_mut();
                     for (_, processor) in ses.processors.iter_mut() {
                         processor.save(ses.info.as_mut());
-                        processor.finish();
                     }
                     for sender in &self.senders {
                         sender.try_send(ses.info.clone()).unwrap();

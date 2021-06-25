@@ -43,13 +43,4 @@ pub trait Processor: Send + Sync + Plugin {
 
     /// Called when this session is timeout, add fields to this sessions
     fn save(&mut self, ses: &mut Session);
-
-    /// Called when this session is timeout, release resources aquired while parsing
-    ///
-    /// This is different from plugin's cleanup method. This method is called after session
-    /// is timeouted and about to be sent to output plugins, so it only cleanups resources
-    /// related to the session. Global resources should be released when cleanup method is called.
-    fn finish(&mut self) -> Result<()> {
-        Ok(())
-    }
 }

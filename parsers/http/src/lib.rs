@@ -342,12 +342,8 @@ impl<'a> Processor for HttpProcessor<'static> {
             parser.finish();
         }
         self.mid_save(ses);
-    }
-
-    fn finish(&mut self) -> Result<()> {
         self.parsers[0].set_data(None);
         self.parsers[1].set_data(None);
-        Ok(())
     }
 }
 
