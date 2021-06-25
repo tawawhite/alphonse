@@ -17,6 +17,7 @@ where
     let mut state = s.serialize_struct("", 2)?;
     state.serialize_field("srcPackets", &packets[0])?;
     state.serialize_field("dstPackets", &packets[1])?;
+    state.serialize_field("totPackets", &(packets[0] + packets[1]))?;
     state.end()
 }
 
@@ -28,6 +29,7 @@ where
     let mut state = s.serialize_struct("", 2)?;
     state.serialize_field("srcBytes", &bytes[0])?;
     state.serialize_field("dstBytes", &bytes[1])?;
+    state.serialize_field("totBytes", &(bytes[0] + bytes[1]))?;
     state.end()
 }
 
@@ -39,6 +41,7 @@ where
     let mut state = s.serialize_struct("", 2)?;
     state.serialize_field("srcDataBytes", &data_bytes[0])?;
     state.serialize_field("dstDataBytes", &data_bytes[1])?;
+    state.serialize_field("totDataBytes", &(data_bytes[0] + data_bytes[1]))?;
     state.end()
 }
 
