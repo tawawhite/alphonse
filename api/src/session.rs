@@ -130,6 +130,10 @@ pub struct Session {
     #[serde(skip_serializing_if = "HashSet::is_empty")]
     protocol: HashSet<String>,
 
+    /// IP Protocol(compatible to arkime's ipProtocol field)
+    #[serde(skip_serializing_if = "String::is_empty")]
+    ip_protocol: String,
+
     /// Protocols bucketed by layer
     protocols: Protocols,
 }
@@ -193,10 +197,12 @@ impl Session {
                 .datalink
                 .insert(protocol.as_ref().to_string()),
             ProtocolLayer::Network => self.protocols.network.insert(protocol.as_ref().to_string()),
-            ProtocolLayer::Transport => self
-                .protocols
-                .transport
-                .insert(protocol.as_ref().to_string()),
+            ProtocolLayer::Transport => {
+                self.ip_protocol = protocol.as_ref().to_string();
+                self.protocols
+                    .transport
+                    .insert(protocol.as_ref().to_string())
+            }
             ProtocolLayer::Application => self.protocols.app.insert(protocol.as_ref().to_string()),
             ProtocolLayer::Tunnel => self.protocols.tunnel.insert(protocol.as_ref().to_string()),
         };
@@ -206,11 +212,14 @@ impl Session {
         let contains = match layer {
             ProtocolLayer::Datalink => self.protocols.datalink.contains(protocol.as_ref()),
             ProtocolLayer::Network => self.protocols.network.contains(protocol.as_ref()),
-            ProtocolLayer::Transport => self.protocols.transport.contains(protocol.as_ref()),
+            ProtocolLayer::Transport => {
+                self.protocols.transport.contains(protocol.as_ref())
+                    && (self.ip_protocol == protocol.as_ref())
+            }
             ProtocolLayer::Application => self.protocols.app.contains(protocol.as_ref()),
             ProtocolLayer::Tunnel => self.protocols.tunnel.contains(protocol.as_ref()),
         };
-        contains & self.protocol.contains(protocol.as_ref())
+        contains && self.protocol.contains(protocol.as_ref())
     }
 
     /// Whether this session needs to do a middle save operation

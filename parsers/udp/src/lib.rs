@@ -50,7 +50,7 @@ impl Processor for ProtocolParser {
 
     fn register_classify_rules(&mut self, manager: &mut ClassifierManager) -> Result<()> {
         let mut rule = Rule::new(self.id);
-        rule.rule_type = RuleType::Protocol(api::classifiers::protocol::Rule(Protocol::TCP));
+        rule.rule_type = RuleType::Protocol(api::classifiers::protocol::Rule(Protocol::UDP));
         manager.add_rule(&mut rule)?;
         Ok(())
     }
@@ -63,7 +63,7 @@ impl Processor for ProtocolParser {
     ) -> Result<()> {
         if !self.classified {
             self.classified = true;
-            ses.add_protocol(&self.name(), ProtocolLayer::Application);
+            ses.add_protocol(&self.name(), ProtocolLayer::Transport);
             unsafe {
                 ses.add_field(&"srcPort", json!(pkt.src_port()));
                 ses.add_field(&"dstPort", json!(pkt.dst_port()));
