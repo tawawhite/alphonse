@@ -258,7 +258,7 @@ impl PacketTrait for Packet {
     }
 
     fn rules(&self) -> &[Rule] {
-        self.rules.as_slice()
+        self.rules.as_ref().as_slice()
     }
 
     fn rules_mut(&mut self) -> &mut Rules {
