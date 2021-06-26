@@ -169,7 +169,7 @@ impl Classifier {
                         if self.dpi_rules[*id].need_matched_pos {
                             rule.from_to = Some((*from as u16, *to as u16));
                         }
-                        pkt.rules_mut().push(rule);
+                        pkt.rules_mut().as_mut().push(rule);
                     }
                 }
 

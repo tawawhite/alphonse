@@ -54,7 +54,7 @@ impl Classifier {
                 let etype = (pkt.raw()[offset + 12] as u16) << 8 | (pkt.raw()[offset + 13] as u16);
                 let etype = etype as usize;
                 if self.rules[etype].processors.len() > 0 {
-                    pkt.rules_mut().push(self.rules[etype].clone());
+                    pkt.rules_mut().as_mut().push(self.rules[etype].clone());
                 }
             }
             _ => return,

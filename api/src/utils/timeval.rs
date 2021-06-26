@@ -10,16 +10,19 @@ pub mod precision {
     pub trait Precision {}
 
     #[derive(Clone)]
+    #[repr(C)]
     pub struct Second {}
     impl Precision for Second {}
 
     #[derive(Clone)]
+    #[repr(C)]
     pub struct Millisecond {}
     impl Precision for Millisecond {}
 }
 
 /// Wrapper type for libc::timeval
 #[derive(Clone)]
+#[repr(C)]
 pub struct TimeVal<P: 'static + precision::Precision> {
     tv: timeval,
     percision: PhantomData<&'static P>,

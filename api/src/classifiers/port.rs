@@ -73,12 +73,12 @@ impl Classifier {
 
         let src_index = unsafe { base_index + pkt.src_port() as usize };
         if self.rules[src_index].processors.len() > 0 {
-            pkt.rules_mut().push(self.rules[src_index].clone());
+            pkt.rules_mut().as_mut().push(self.rules[src_index].clone());
         }
 
         let dst_index = unsafe { base_index + pkt.dst_port() as usize };
         if self.rules[dst_index].processors.len() > 0 {
-            pkt.rules_mut().push(self.rules[dst_index].clone());
+            pkt.rules_mut().as_mut().push(self.rules[dst_index].clone());
         }
     }
 }

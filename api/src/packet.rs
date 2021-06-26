@@ -1,9 +1,3 @@
-//! We do not perform serious protocol parsing in this module.
-//! All we do here is figuring out layer's length and protocol type, that's it.
-//! More serious protocol parsing jobs are done by the packet processors in another module.
-//!
-//!
-
 use std::convert::TryFrom;
 use std::hash::{Hash, Hasher};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
@@ -18,7 +12,9 @@ use super::classifiers::matched::Rule;
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, Hash, PartialEq)]
 pub enum Direction {
+    /// From src to dst
     Right = 0,
+    /// From dst to src
     Left = 1,
 }
 
@@ -29,6 +25,7 @@ impl Default for Direction {
 }
 
 impl Direction {
+    /// Getting the opposite direction of this direction
     pub fn reverse(&self) -> Direction {
         match self {
             Direction::Left => Direction::Right,
@@ -37,10 +34,16 @@ impl Direction {
     }
 }
 
+#[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 /// Packet protocol layer
 pub struct Layer {
-    /// protocol start offset
+    /// protocol start offset to the start of packet
+    ///
+    /// Generally a packet is no longer than MTU, normally 1500 bytes.
+    /// However, considering loopback interface may generate packets way
+    /// bigger than u16's max value, we may change this offset's type to
+    /// usize in the future.
     pub offset: u16,
     pub protocol: Protocol,
 }
@@ -60,6 +63,7 @@ impl Layer {
     }
 }
 
+#[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Layers {
     pub data_link: Layer,
@@ -78,6 +82,13 @@ pub enum PacketHashMethod {
     MacOnly,
 }
 
+impl Default for PacketHashMethod {
+    fn default() -> Self {
+        PacketHashMethod::FiveTuple
+    }
+}
+
+#[repr(C)]
 #[derive(Debug, Eq)]
 pub struct PacketHashKey {
     pub hash_method: PacketHashMethod,
@@ -260,8 +271,21 @@ impl PartialEq for PacketHashKey {
 /// reduce heap allocation using a Vec
 pub const DEFAULT_MAX_MATCHED_RULES: usize = 8;
 
-/// Type alia for matched rule vector
-pub type Rules = TinyVec<[Rule; DEFAULT_MAX_MATCHED_RULES]>;
+#[repr(C)]
+#[derive(Clone, Debug, Default)]
+pub struct Rules(TinyVec<[Rule; DEFAULT_MAX_MATCHED_RULES]>);
+
+impl AsRef<TinyVec<[Rule; DEFAULT_MAX_MATCHED_RULES]>> for Rules {
+    fn as_ref(&self) -> &TinyVec<[Rule; DEFAULT_MAX_MATCHED_RULES]> {
+        &self.0
+    }
+}
+
+impl AsMut<TinyVec<[Rule; DEFAULT_MAX_MATCHED_RULES]>> for Rules {
+    fn as_mut(&mut self) -> &mut TinyVec<[Rule; DEFAULT_MAX_MATCHED_RULES]> {
+        &mut self.0
+    }
+}
 
 pub trait Packet: Send {
     /// Get raw packet data
@@ -479,6 +503,7 @@ impl Default for Protocol {
 }
 
 bitflags! {
+    #[repr(transparent)]
     pub struct Tunnel: u8 {
         const NONE = 0;
         const GRE = 0b00000001;

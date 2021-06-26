@@ -55,7 +55,7 @@ impl Classifier {
     #[inline]
     pub fn classify(&self, pkt: &mut dyn packet::Packet) {
         if self.rule.processors.len() > 0 {
-            pkt.rules_mut().push(self.rule.clone())
+            pkt.rules_mut().as_mut().push(self.rule.clone())
         }
     }
 }

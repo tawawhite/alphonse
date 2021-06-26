@@ -52,7 +52,7 @@ impl Classifier {
             ($layer:ident) => {
                 let i = pkt.layers().$layer.protocol as usize;
                 if self.rules[i].processors.len() > 0 {
-                    pkt.rules_mut().push(self.rules[i].clone());
+                    pkt.rules_mut().as_mut().push(self.rules[i].clone());
                 }
             };
         }

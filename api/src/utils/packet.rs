@@ -3,6 +3,7 @@ use crate::packet::{Layers, Packet as PacketTrait, Rules, Tunnel};
 
 // Packet structure only for test use
 #[derive(Clone)]
+#[repr(C)]
 pub struct Packet {
     /// timestamp
     pub ts: libc::timeval,
@@ -57,7 +58,7 @@ impl PacketTrait for Packet {
     }
 
     fn rules(&self) -> &[Rule] {
-        self.rules.as_slice()
+        self.rules.as_ref().as_slice()
     }
 
     fn rules_mut(&mut self) -> &mut Rules {
