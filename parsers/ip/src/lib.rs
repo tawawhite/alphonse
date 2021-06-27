@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use anyhow::{anyhow, Result};
 use maxminddb::{geoip2, Reader as GeoLiteReader};
-use memmap::Mmap;
+use memmap2::Mmap;
 use once_cell::sync::OnceCell;
 use serde::Serialize;
 use serde_json::json;
