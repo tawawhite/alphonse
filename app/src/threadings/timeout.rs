@@ -103,10 +103,11 @@ impl TimeoutThread {
                             for (_, processor) in ses.processors.iter_mut() {
                                 processor.mid_save(ses.info.as_mut());
                             }
-                            let info = Arc::new(std::mem::replace(
-                                &mut ses.info,
-                                Box::new(Session::new()),
-                            ));
+                            let mut info_new = Box::new(Session::new());
+                            info_new.src_direction = ses.info.src_direction;
+                            info_new.start_time = ses.info.start_time.clone();
+                            info_new.save_time = ses.info.save_time + cfg.ses_save_timeout as u64;
+                            let info = Arc::new(std::mem::replace(&mut ses.info, info_new));
                             for sender in &self.senders {
                                 sender.try_send(info.clone()).unwrap();
                             }
