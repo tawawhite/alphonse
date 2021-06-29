@@ -109,6 +109,7 @@ impl PktThread {
             match self.session_table.get_mut(&key) {
                 Some(mut ses) => {
                     ses.info.update(pkt.as_ref());
+                    ses.info.save_time = pkt.ts().tv_sec as u64 + cfg.ses_save_timeout as u64;
                     self.parse_pkt(
                         &mut classify_scratch,
                         &mut processors,
