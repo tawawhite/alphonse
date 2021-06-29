@@ -130,9 +130,6 @@ pub struct Session {
     #[serde(skip_serializing_if = "HashSet::is_empty")]
     protocol: HashSet<String>,
 
-    /// IP Protocol(compatible to arkime's ipProtocol field)
-    ip_protocol: u8,
-
     /// Protocols bucketed by layer
     protocols: Protocols,
 }
@@ -203,10 +200,6 @@ impl Session {
             ProtocolLayer::Application => self.protocols.app.insert(protocol.as_ref().to_string()),
             ProtocolLayer::Tunnel => self.protocols.tunnel.insert(protocol.as_ref().to_string()),
         };
-    }
-
-    pub fn set_ip_protocol(&mut self, protocol: u8) {
-        self.ip_protocol = protocol
     }
 
     pub fn has_protocol<S: AsRef<str>>(&mut self, protocol: &S, layer: ProtocolLayer) -> bool {

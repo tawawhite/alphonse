@@ -113,6 +113,7 @@ struct IPProcessor {
     id: ProcessorID,
     classified: bool,
     processed: bool,
+    ip_protocol: u8,
     src_ip: IpInfo,
     dst_ip: IpInfo,
 }
@@ -214,11 +215,11 @@ impl Processor for IPProcessor {
             self.classified = true;
             match pkt.layers().network.protocol {
                 Protocol::IPV4 => {
-                    ses.set_ip_protocol(pkt.layers().network.data(pkt)[9]);
+                    self.ip_protocol = pkt.layers().network.data(pkt)[9];
                     ses.add_protocol(&"ipv4", ProtocolLayer::Network);
                 }
                 Protocol::IPV6 => {
-                    ses.set_ip_protocol(pkt.layers().network.data(pkt)[6]);
+                    self.ip_protocol = pkt.layers().network.data(pkt)[6];
                     ses.add_protocol(&"ipv6", ProtocolLayer::Network);
                 }
                 _ => unreachable!(),
@@ -277,6 +278,7 @@ impl Processor for IPProcessor {
     }
 
     fn save(&mut self, ses: &mut Session) {
+        ses.add_field(&"ipProtocol", json!(self.ip_protocol));
         ses.add_field(&"srcIp", json!(self.src_ip.addr));
         if !self.src_ip.asn.is_empty() {
             ses.add_field(&"srcASN", json!(self.src_ip.asn));
