@@ -42,10 +42,16 @@ impl TryFrom<&str> for Rotate {
 }
 
 /// Convert timestamp to index suffix
+///
+/// # Arguments
+///
+/// * `rotate` - index rotate way
+///
+/// * `ts` - UTC timestamp
 fn to_index_suffix(rotate: Rotate, ts: &TimeVal<Millisecond>) -> String {
     let stime = std::time::UNIX_EPOCH
         + std::time::Duration::from_nanos(ts.tv_sec as u64 * 1000000000 + ts.tv_usec as u64 * 1000);
-    let datetime = chrono::DateTime::<chrono::Utc>::from(stime);
+    let datetime = chrono::DateTime::<chrono::Local>::from(stime);
     match rotate {
         Rotate::Daily => datetime.format("%y%m%d").to_string(),
         Rotate::Weekly => {
