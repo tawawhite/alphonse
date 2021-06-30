@@ -5,25 +5,25 @@ authors = ["Jack Liar"]
 edition = "2018"
 
 [dependencies]
-alphonse-api = { path = "../api", optional = false }
+alphonse-api = { path="../api", optional=false }
 anyhow = "1.0"
 # arc-swap = "1.1"
 clap = "2.33"
 crossbeam-channel = "0.5"
 chrono = "0.4"
-dashmap = { version = "4.0", features = ["raw-api"] }
+dashmap = { version="4.0", features=["raw-api"] }
 dynamic_reload = "0.4"
-elasticsearch = { version = "7.12.0-alpha.1", features = ["rustls-tls"] }
+elasticsearch = { version="7.12.1-alpha.1", features=["rustls-tls"] }
 fnv = "1.0"
 hostname = "0.3"
-hyperscan = { version = "0.2", features = ["static"] }
+hyperscan = { version="0.2", features=["static"] }
 libc = "0.2"
 rayon = "1.5"
-serde = { version = "1.0", features = ["rc"] }
+serde = { version="1.0", features=["rc"] }
 serde_json = "1.0"
 signal-hook = "0.3"
-strum = { version = "0.21.0", features = ["derive"] }
-tokio = { version = "1", features = ["macros", "net", "rt-multi-thread", "time"] }
+strum = { version="0.21.0", features=["derive"] }
+tokio = { version="1", features=["macros", "net", "rt-multi-thread", "time"] }
 yaml-rust = ">=0.4.1"
 
 [features]
