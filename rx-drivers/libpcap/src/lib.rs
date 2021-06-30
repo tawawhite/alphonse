@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::hash::{Hash, Hasher};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, RwLock};
@@ -18,8 +19,10 @@ use api::plugins::{Plugin, PluginType};
 
 #[derive(Clone, Default)]
 struct Driver {
-    handles: Arc<RwLock<Vec<JoinHandle<Result<()>>>>>,
-    stats: RxStat,
+    /// Thread handle
+    handle: Arc<RwLock<Option<JoinHandle<Result<()>>>>>,
+    /// Thread context
+    thread_ctx: Arc<RwLock<Vec<Arc<RxThread>>>>,
 }
 
 impl Plugin for Driver {
@@ -32,19 +35,18 @@ impl Plugin for Driver {
     }
 
     fn cleanup(&self) -> Result<()> {
-        let mut handles = match self.handles.write() {
+        let mut handle = match self.handle.write() {
             Ok(h) => h,
             Err(e) => return Err(anyhow!("{}", e)),
         };
 
-        while handles.len() > 0 {
-            let hdl = handles.pop();
-            match hdl {
-                None => continue,
-                Some(hdl) => match hdl.join() {
+        match handle.take() {
+            None => {}
+            Some(handle) => {
+                match handle.join() {
                     Ok(_) => {}
                     Err(e) => eprintln!("{:?}", e),
-                },
+                };
             }
         }
 
@@ -54,53 +56,108 @@ impl Plugin for Driver {
 
 impl RxDriver for Driver {
     fn start(&self, cfg: Arc<Config>, senders: &[Sender<Box<dyn PacketTrait>>]) -> Result<()> {
-        let mut handles = vec![];
         let interfaces = cfg.get_str_arr(&"rx.libpcap.interfaces");
         if interfaces.is_empty() {
             return Err(anyhow!(
-                "{} launches without specifying any network interfaces",
+                "Could lauch {} driver without specifying any network interfaces",
                 self.name()
             ));
         }
 
-        for interface in interfaces.iter() {
+        let mut ctx = match self.thread_ctx.write() {
+            Ok(ctx) => ctx,
+            Err(e) => return Err(anyhow!("{}", e)),
+        };
+        for (id, interface) in interfaces.iter().enumerate() {
             let cfg = cfg.clone();
-            let mut thread = RxThread {
+            let thread = RxThread {
+                id: id as u8,
                 exit: cfg.exit.clone(),
                 senders: senders.iter().map(|s| s.clone()).collect(),
                 interface: interface.clone(),
-                hasher: FnvHasher::default(),
+                cap: Some(RefCell::new(NetworkInterface::try_from_str(
+                    interface.as_str(),
+                )?)),
             };
-            let builder = std::thread::Builder::new().name(thread.name());
-            let handle = builder.spawn(move || thread.spawn(cfg))?;
-            handles.push(handle);
+            ctx.push(Arc::new(thread));
         }
 
-        match self.handles.write() {
+        // create a new native thread to use tokio runtime
+        let threads = ctx.iter().map(|t| t.clone()).collect();
+        let builder = std::thread::Builder::new().name(self.name().to_string());
+        let handle = builder.spawn(move || main_loop(cfg, threads))?;
+
+        match self.handle.write() {
             Ok(mut h) => {
-                *h.as_mut() = handles;
+                *h = Some(handle);
             }
             Err(e) => return Err(anyhow!("{}", e)),
         };
+
         Ok(())
     }
 
-    fn stats(&self) -> RxStat {
-        self.stats
+    fn stats(&self) -> Result<RxStat> {
+        let mut stat = RxStat::default();
+        let threads = self.thread_ctx.read().or_else(|e| Err(anyhow!("{}", e)))?;
+        for thread in threads.iter() {
+            stat += thread.stats();
+        }
+        Ok(stat)
     }
 }
 
+fn main_loop(cfg: Arc<Config>, threads: Vec<Arc<RxThread>>) -> Result<()> {
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(1)
+        .thread_name("alphonse-libpcap")
+        .enable_all()
+        .build()?;
+    rt.block_on(async {
+        let mut handles = vec![];
+        let mut stats = vec![];
+
+        for thread in threads {
+            let cfg = cfg.clone();
+            let handle = tokio::task::spawn_blocking(move || thread.spawn(cfg));
+            handles.push(handle);
+            stats.push(RxStat::default());
+        }
+
+        for hdl in handles {
+            match hdl.await {
+                Err(e) => eprintln!("{}", e),
+                Ok(r) => match r {
+                    Err(e) => eprintln!("{}", e),
+                    Ok(_) => {}
+                },
+            };
+        }
+    });
+
+    Ok(())
+}
+
 struct RxThread {
+    id: u8,
     exit: Arc<AtomicBool>,
     senders: Vec<Sender<Box<dyn PacketTrait>>>,
     interface: String,
-    hasher: FnvHasher,
+    cap: Option<RefCell<NetworkInterface>>,
 }
 
+// Since RxThread is
+unsafe impl Send for RxThread {}
+unsafe impl Sync for RxThread {}
+
 impl RxThread {
-    pub fn spawn(&mut self, cfg: Arc<Config>) -> Result<()> {
+    pub fn spawn(&self, cfg: Arc<Config>) -> Result<()> {
+        let mut hasher = FnvHasher::default();
         let parser = ProtocolDessector::new(LinkType::ETHERNET);
-        let mut cap = NetworkInterface::try_from_str(self.interface.as_str())?;
+        let mut cap = match &self.cap {
+            None => return Err(anyhow!("")),
+            Some(c) => c.borrow_mut(),
+        };
         let mut overflow_cnt: u64 = 0;
         let mut rx_cnt: u64 = 0;
 
@@ -144,10 +201,10 @@ impl RxThread {
                 };
             }
 
-            PacketHashKey::from(pkt.as_ref()).hash(&mut self.hasher);
-            let i = self.hasher.finish() as usize % self.senders.len();
-            self.hasher = FnvHasher::default();
-            let sender = &mut self.senders[i];
+            PacketHashKey::from(pkt.as_ref()).hash(&mut hasher);
+            let i = hasher.finish() as usize % self.senders.len();
+            hasher = FnvHasher::default();
+            let sender = &self.senders[i];
 
             match sender.try_send(pkt) {
                 Ok(_) => {}
@@ -176,6 +233,10 @@ impl RxThread {
 
     pub fn name(&self) -> String {
         format!("alphonse-{}", self.interface)
+    }
+
+    pub fn stats(&self) -> RxStat {
+        RxStat::default()
     }
 }
 

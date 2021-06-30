@@ -77,8 +77,8 @@ impl RxDriver for Driver {
         Ok(())
     }
 
-    fn stats(&self) -> RxStat {
-        self.stats
+    fn stats(&self) -> Result<RxStat> {
+        Ok(self.stats)
     }
 }
 
