@@ -6,8 +6,9 @@ extern crate strum;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use crossbeam_channel::bounded;
+use once_cell::sync::OnceCell;
 
 use alphonse_api as api;
 use api::classifiers;
@@ -19,6 +20,8 @@ mod stats;
 mod threadings;
 
 use threadings::SessionTable;
+
+pub static mut LAST_PACKET: OnceCell<Vec<u64>> = OnceCell::new();
 
 fn main() -> Result<()> {
     let root_cmd = commands::new_root_command();
@@ -44,7 +47,7 @@ fn main() -> Result<()> {
     let mut handles = vec![];
     let mut ses_senders = vec![];
     let mut ses_receivers = vec![];
-    for i in 0..warehouse.output_plugins.len() {
+    for _ in 0..warehouse.output_plugins.len() {
         let (sender, receiver) = bounded(cfg.pkt_channel_size as usize);
         ses_senders.push(sender);
         ses_receivers.push(receiver);
@@ -56,6 +59,13 @@ fn main() -> Result<()> {
     let mut pkt_threads = vec![];
     let mut timeout_threads = vec![];
     let mut session_tables = vec![];
+
+    let last_packet = vec![0; cfg.pkt_threads as usize];
+    unsafe {
+        LAST_PACKET
+            .set(last_packet)
+            .or(Err(anyhow!("alphonse LAST_PACKET is already setted")))?;
+    }
 
     for i in 0..cfg.pkt_threads {
         let (sender, receiver) = bounded(cfg.pkt_channel_size as usize);
@@ -90,7 +100,11 @@ fn main() -> Result<()> {
     for thread in timeout_threads {
         let cfg = cfg.clone();
         let builder = std::thread::Builder::new().name(thread.name());
-        let handle = builder.spawn(move || thread.spawn(cfg)).unwrap();
+        let last_packet =
+            unsafe { &mut LAST_PACKET.get_mut().ok_or(anyhow!(""))?[thread.id as usize] };
+        let handle = builder
+            .spawn(move || thread.spawn(cfg, last_packet))
+            .unwrap();
         handles.push(handle);
     }
 
@@ -105,7 +119,9 @@ fn main() -> Result<()> {
                 .collect(),
         );
         let builder = std::thread::Builder::new().name(thread.name());
-        let handle = builder.spawn(move || thread.spawn(cfg, parsers))?;
+        let last_packet =
+            unsafe { &mut LAST_PACKET.get_mut().ok_or(anyhow!(""))?[thread.id as usize] };
+        let handle = builder.spawn(move || thread.spawn(cfg, parsers, last_packet))?;
         handles.push(handle);
     }
 

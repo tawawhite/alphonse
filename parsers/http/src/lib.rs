@@ -334,7 +334,6 @@ impl<'a> Processor for HttpProcessor<'static> {
             Some(s) => s.borrow(),
         };
         ses.add_field(&"http", json!(state.http));
-        println!("{}", serde_json::to_string_pretty(&ses).unwrap());
     }
 
     fn save(&mut self, ses: &mut Session) {

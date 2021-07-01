@@ -144,8 +144,6 @@ impl Processor for TlsProcessor {
         ses.add_field(&"tls", json!(self.tls));
         // TODO: this would lead to error when http connect request followed by tls session
         ses.add_field(&"host.http", json!(self.hostnames));
-
-        println!("{}", serde_json::to_string_pretty(ses).unwrap());
     }
 
     fn mid_save(&mut self, ses: &mut api::session::Session) {

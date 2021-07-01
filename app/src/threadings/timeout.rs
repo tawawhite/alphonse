@@ -1,7 +1,6 @@
 use std::os::raw::c_long;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::time::SystemTime;
 
 use anyhow::Result;
 use crossbeam_channel::Sender;
@@ -34,7 +33,7 @@ pub type SessionTable = DashMap<PacketHashKey, Box<SessionData>, FnvBuildHasher>
 
 /// Session table timeout thread
 pub struct TimeoutThread {
-    id: u8,
+    pub id: u8,
     exit: Arc<AtomicBool>,
     senders: Vec<Sender<Arc<Box<Session>>>>,
     session_table: Arc<SessionTable>,
@@ -59,19 +58,12 @@ impl TimeoutThread {
         format!("alphonse-timeout{}", self.id)
     }
 
-    pub fn spawn(&self, cfg: Arc<Config>) -> Result<()> {
-        let now: u64 = SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-        let mut next_timeout_check_time: u64 = now + cfg.timeout_interval;
+    pub fn spawn(&self, cfg: Arc<Config>, last_packet: &mut u64) -> Result<()> {
+        let mut next_timeout_check_time: u64 = *last_packet + cfg.timeout_interval;
         println!("{} started", self.name());
 
         while !self.exit.load(Ordering::Relaxed) {
-            let now: u64 = SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs();
+            let now = *last_packet;
             if now <= next_timeout_check_time {
                 continue;
             }

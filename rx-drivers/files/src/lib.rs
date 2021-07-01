@@ -125,10 +125,13 @@ struct RxThread {
 }
 
 impl RxThread {
-    pub fn spawn(&mut self, _cfg: Arc<Config>) -> Result<()> {
+    pub fn spawn(&mut self, cfg: Arc<Config>) -> Result<()> {
         if self.files.is_empty() {
             return Ok(());
         }
+
+        let mut rx_byte: u64 = 0;
+        let mut rx_cnt: u64 = 0;
 
         println!("{} started", self.name());
 
@@ -142,7 +145,6 @@ impl RxThread {
                 api::dissectors::link::LinkType::from_u16(cap.cap.get_datalink().0 as u16)
                     .ok_or_else(|| anyhow!("Unrecognized link type"))?;
             let parser = api::dissectors::ProtocolDessector::new(link_type);
-            let mut overflow_cnt = 0;
 
             while !self.exit.load(Ordering::Relaxed) {
                 let mut pkt = match cap.next() {
@@ -164,6 +166,12 @@ impl RxThread {
                     },
                 };
 
+                rx_cnt += 1;
+                rx_byte += pkt.raw().len() as u64;
+                if rx_cnt % cfg.rx_stat_log_interval == 0 {
+                    println!("{} {}", rx_cnt, rx_byte,);
+                }
+
                 PacketHashKey::from(pkt.as_ref()).hash(&mut self.hasher);
                 let i = self.hasher.finish() as usize % self.senders.len();
                 self.hasher = FnvHasher::default();
@@ -171,22 +179,18 @@ impl RxThread {
 
                 match sender.try_send(pkt) {
                     Ok(_) => {}
-                    Err(err) => match err {
-                        crossbeam_channel::TrySendError::Full(_) => {
-                            overflow_cnt += 1;
-                            if overflow_cnt % 10000 == 0 {
-                                println!(
-                                    "{} overflowing, total overflow {}",
-                                    self.name(),
-                                    overflow_cnt
-                                );
+                    Err(err) => {
+                        match err {
+                            crossbeam_channel::TrySendError::Full(_) => {
+                                // wait until sender is not full
+                                while sender.is_full() {}
                             }
-                        }
-                        crossbeam_channel::TrySendError::Disconnected(_) => {
-                            println!("{} channel is closed, exit", self.name());
-                            break;
-                        }
-                    },
+                            crossbeam_channel::TrySendError::Disconnected(_) => {
+                                println!("{} channel is closed, exit", self.name());
+                                break;
+                            }
+                        };
+                    }
                 };
             }
         }
