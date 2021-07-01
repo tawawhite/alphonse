@@ -27,14 +27,14 @@ timeout.sctp: 60
 timeout.ses.save: 180
 ses.max.packets: 10000
 threads.pkt: 1
-plugins.processors: ["http", "ip", "misc", "tls"]
+plugins.processors: ["dns", "http", "ip", "misc", "tls", "udp", "es"]
 plugins.rx-driver: rxfiles
 plugins.dirs: ["target/debug"]
 
 # Configuration for simple writer
 simple-writer:
-    pcap.dirs: ["./raw"]
-    max.file.size: 10737418240 # bytes, default 10GB
+  pcap.dirs: ["./raw"]
+  max.file.size: 10737418240 # bytes, default 10GB
 ip.db.directory: "./etc"
 
 # Headers listed below will be added as session fields
