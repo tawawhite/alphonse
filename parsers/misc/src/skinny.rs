@@ -23,7 +23,7 @@ fn classify(ses: &mut Session, pkt: &dyn Packet) -> Result<()> {
         | (pkt.payload()[1] as u32) << 8
         | (pkt.payload()[2] as u32) << 16
         | (pkt.payload()[3] as u32) << 24;
-    if pkt.payload().len() < len as usize {
+    if pkt.payload().len() < len as usize || pkt.payload().len() < 9 {
         return Ok(());
     }
 
