@@ -10,11 +10,11 @@ name = "simplewriter"
 
 [dependencies]
 anyhow = "1.0"
-alphonse-api = { path = "../../api", optional = false }
+alphonse-api = { path="../../api", optional=false }
 chrono = "0.4"
 crossbeam-channel = "0.5"
-elasticsearch = { version = "7.12.0-alpha.1", features = ["rustls-tls"], optional = true }
-tokio = { version = "1", optional = true, features = ["net", "time"] }
+elasticsearch = { version="7.12.0-alpha.1", features=["rustls-tls"], optional=true }
+tokio = { version="1", features=["fs", "net", "time"] }
 fnv = "1.0"
 nix = "0.21"
 once_cell = "1.6"
@@ -25,5 +25,5 @@ serde_yaml = ">=0.8.4, <=0.9"
 yaml-rust = ">=0.4.1"
 
 [features]
-arkime = ["alphonse-api/arkime", "elasticsearch", "tokio"]
+arkime = ["alphonse-api/arkime", "elasticsearch"]
 default = ["arkime"]

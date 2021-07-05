@@ -25,6 +25,7 @@ mod threadings;
 mod writer;
 
 use scheuler::Scheduler;
+use threadings::writing_thread;
 use writer::SimpleWriter;
 
 const PKG_NAME: &'static str = env!("CARGO_PKG_NAME");
@@ -203,12 +204,9 @@ impl Plugin for SimpleWriterProcessor {
         };
 
         // Prepare packet info writer and spawn a writer thread
-        let mut thread = threadings::Thread {
-            writer: SimpleWriter::default(),
-            receiver: receiver.clone(),
-        };
         let builder = std::thread::Builder::new().name(self.name().to_string());
-        let handle = builder.spawn(move || thread.spawn(cfg.clone()))?;
+        let recv = receiver.clone();
+        let handle = builder.spawn(move || writing_thread(cfg, recv))?;
         let handles = vec![handle];
 
         unsafe {

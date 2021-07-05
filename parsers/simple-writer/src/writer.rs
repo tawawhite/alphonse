@@ -1,9 +1,6 @@
-use std::io::Write;
-
 use anyhow::{anyhow, Result};
 
-use alphonse_api as api;
-use api::packet::Packet;
+use tokio::io::AsyncWriteExt;
 
 use crate::{File, PacketInfo};
 
@@ -37,30 +34,6 @@ impl Default for PcapFileHeader {
     }
 }
 
-pub struct timeval {
-    tv_sec: u32,
-    tv_usec: u32,
-}
-
-pub struct PacketHeader {
-    ts: timeval,
-    cap_len: u32,
-    org_len: u32,
-}
-
-impl From<&dyn Packet> for PacketHeader {
-    fn from(pkt: &dyn Packet) -> Self {
-        Self {
-            ts: timeval {
-                tv_sec: pkt.ts().tv_sec as u32,
-                tv_usec: pkt.ts().tv_usec as u32,
-            },
-            cap_len: pkt.caplen(),
-            org_len: pkt.raw().len() as u32,
-        }
-    }
-}
-
 /// Writing pcap file format
 #[derive(Clone, Copy, Debug)]
 pub enum Format {
@@ -88,7 +61,7 @@ enum WriteError {
 #[derive(Debug)]
 pub struct SimpleWriter {
     /// Current opened pcap file handle
-    file: Option<std::fs::File>,
+    file: Option<tokio::fs::File>,
     format: Format,
     pcap_file_header: PcapFileHeader,
 }
@@ -111,7 +84,7 @@ impl Clone for SimpleWriter {
 
 impl SimpleWriter {
     /// Wirte packet to disk
-    pub fn write(&mut self, pkt: &[u8], info: &PacketInfo) -> Result<()> {
+    pub async fn write(&mut self, pkt: &[u8], info: &PacketInfo) -> Result<()> {
         if info.closing || self.file.is_none() {
             // Open new pcap file for writing
             let fname = match &info.file_info {
@@ -120,7 +93,7 @@ impl SimpleWriter {
                     unreachable!("If a pcap file is about to close or no file is opened for writing, file info must not be a ID")
                 }
             };
-            let mut file = std::fs::File::create(fname)?;
+            let mut file = tokio::fs::File::create(fname).await?;
 
             match self.format {
                 Format::Pcap => {}
@@ -132,7 +105,7 @@ impl SimpleWriter {
             let hdr_len = std::mem::size_of::<PcapFileHeader>();
             let hdr = (&self.pcap_file_header) as *const PcapFileHeader as *const u8;
             let hdr = unsafe { std::slice::from_raw_parts(hdr, hdr_len) };
-            file.write(hdr)?;
+            file.write(hdr).await?;
             self.file = Some(file);
         }
 
@@ -141,11 +114,8 @@ impl SimpleWriter {
             None => return Err(anyhow!("{:?}", WriteError::FileOpenError)),
         };
 
-        match file.write(pkt) {
+        match file.write(pkt).await {
             Ok(_) => {}
-            // Err(_) => {
-            //     todo!("handle file write error")
-            // }
             Err(e) => return Err(anyhow!("{}", e)),
         };
 

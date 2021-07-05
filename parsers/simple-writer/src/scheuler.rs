@@ -9,7 +9,31 @@ use crossbeam_channel::Sender;
 use alphonse_api as api;
 use api::packet::Packet;
 
-use crate::{writer::PacketHeader, File, Mode, PacketInfo, PcapDirAlgorithm, FILE_ID};
+use crate::{File, Mode, PacketInfo, PcapDirAlgorithm, FILE_ID};
+
+pub struct Timeval {
+    _tv_sec: u32,
+    _tv_usec: u32,
+}
+
+pub struct PacketHeader {
+    _ts: Timeval,
+    _cap_len: u32,
+    _org_len: u32,
+}
+
+impl From<&dyn Packet> for PacketHeader {
+    fn from(pkt: &dyn Packet) -> Self {
+        Self {
+            _ts: Timeval {
+                _tv_sec: pkt.ts().tv_sec as u32,
+                _tv_usec: pkt.ts().tv_usec as u32,
+            },
+            _cap_len: pkt.caplen(),
+            _org_len: pkt.raw().len() as u32,
+        }
+    }
+}
 
 #[derive(Clone, Debug)]
 /// Packet writing schedular
