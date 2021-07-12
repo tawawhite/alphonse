@@ -189,9 +189,9 @@ impl Processor for ProtocolParser {
         {
             self.flags_cnt.ack += 1;
             if self.ack_time == 0 {
-                self.ack_time = (pkt.ts().tv_sec - ses.start_time.tv_sec) as u64 * 1000000
-                    + (pkt.ts().tv_usec - ses.start_time.tv_usec) as u64
-                    + 1;
+                // self.ack_time = (pkt.ts().tv_sec - ses.start_time.tv_sec) as u64 * 1000000
+                //     + (pkt.ts().tv_usec - ses.start_time.tv_usec) as u64
+                //     + 1;
             }
         }
 
