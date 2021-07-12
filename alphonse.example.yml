@@ -18,6 +18,7 @@ dpdk.pkt.pool.size: 65535
 dpdk.pkt.pool.cache.size: 32
 
 elasticsearch: http://localhost:9200
+output.elasticsearch.maxBulkSize: 10000000
 output.disk.dirs: ["raw"]
 output.disk.maxsize: 10000000
 
