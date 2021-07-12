@@ -58,6 +58,12 @@ impl OutputPlugin for Output {
     fn start(&self, cfg: Arc<Config>, receiver: &Receiver<Arc<Box<Session>>>) -> Result<()> {
         let mut handles = vec![];
         let dirs = cfg.get_str_arr("output.disk.dirs");
+        if dirs.is_empty() {
+            return Err(anyhow!(
+                "No output directory is specified for disk output plugin"
+            ));
+        }
+
         for dir in dirs {
             let cfg = cfg.clone();
             let mut thread = OutputThread::new(receiver.clone());
