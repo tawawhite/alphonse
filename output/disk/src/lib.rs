@@ -124,6 +124,8 @@ impl OutputThread {
             writer.write(&ses)?;
         }
 
+        writer.write_all()?;
+
         println!("{} exit", self.name());
 
         Ok(())
