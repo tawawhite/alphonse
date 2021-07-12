@@ -63,12 +63,16 @@ impl OutputPlugin for Output {
                 "No output directory is specified for disk output plugin"
             ));
         }
+        let maxsize =
+            cfg.get_integer("output.disk.maxsize", 10000000, 1000000, 1000000000) as usize;
 
         for dir in dirs {
             let cfg = cfg.clone();
             let mut thread = OutputThread::new(receiver.clone());
             let builder = std::thread::Builder::new().name(thread.name());
-            let handle = builder.spawn(move || thread.spawn(cfg, dir)).unwrap();
+            let handle = builder
+                .spawn(move || thread.spawn(cfg, dir, maxsize))
+                .unwrap();
             handles.push(handle);
         }
 
@@ -95,10 +99,10 @@ impl OutputThread {
         format!("alphonse-output-disk")
     }
 
-    pub fn spawn(&mut self, cfg: Arc<Config>, dir: String) -> Result<()> {
+    pub fn spawn(&mut self, cfg: Arc<Config>, dir: String, maxsize: usize) -> Result<()> {
         let mut writer = Writer::default();
         writer.output_dir = OutputPath::from(&dir);
-        writer.max_file_size = 1000000;
+        writer.max_file_size = maxsize;
         std::fs::create_dir_all(&writer.output_dir.tmp_path)?;
 
         println!("{} started", self.name());
