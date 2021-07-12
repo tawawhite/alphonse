@@ -58,6 +58,7 @@ impl Writer {
         if self.written_size + size >= self.max_file_size {
             if !self.fpath.is_empty() {
                 std::fs::rename(&self.fpath.tmp_path, &self.fpath.path)?;
+                self.written_size = 0;
             }
 
             // If current size is huger than max file size or current file is a new opend file
@@ -68,7 +69,6 @@ impl Writer {
             self.written_size += size;
             self.file = Some(Box::new(file));
             self.sessions.clear();
-            self.written_size = 0;
         } else {
             self.sessions.push(ses.clone());
         }
