@@ -26,6 +26,13 @@ impl<P: Into<PathBuf>> From<P> for OutputPath {
     }
 }
 
+impl OutputPath {
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.tmp_path.as_os_str().is_empty() && self.path.as_os_str().is_empty()
+    }
+}
+
 trait DebugWrite: Write + std::fmt::Debug {}
 impl DebugWrite for File {}
 
@@ -49,6 +56,10 @@ impl Writer {
     pub fn write(&mut self, ses: &Arc<Box<Session>>) -> Result<()> {
         let size = get_ser_json_size(ses)?;
         if self.written_size + size >= self.max_file_size {
+            if !self.fpath.is_empty() {
+                std::fs::rename(&self.fpath.tmp_path, &self.fpath.path)?;
+            }
+
             // If current size is huger than max file size or current file is a new opend file
             let fpath = generate_fpath(&self.output_dir);
             self.fpath = fpath;
@@ -75,6 +86,8 @@ impl Writer {
         let mut file = File::create(&self.fpath.tmp_path)?;
         file.write(serde_json::to_string(&self.sessions)?.as_bytes())?;
         self.sessions.clear();
+        drop(file);
+        std::fs::rename(&self.fpath.tmp_path, &self.fpath.path)?;
 
         Ok(())
     }
