@@ -70,9 +70,7 @@ impl OutputPlugin for Output {
             let cfg = cfg.clone();
             let mut thread = OutputThread::new(receiver.clone());
             let builder = std::thread::Builder::new().name(thread.name());
-            let handle = builder
-                .spawn(move || thread.spawn(cfg, dir, maxsize))
-                .unwrap();
+            let handle = builder.spawn(move || thread.spawn(cfg, dir, maxsize))?;
             handles.push(handle);
         }
 
