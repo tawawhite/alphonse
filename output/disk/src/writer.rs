@@ -57,6 +57,7 @@ impl Writer {
             self.written_size += size;
             self.file = Some(Box::new(file));
             self.sessions.clear();
+            self.written_size = 0;
         } else {
             self.sessions.push(ses.clone());
         }
