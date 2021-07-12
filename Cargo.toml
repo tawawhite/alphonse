@@ -2,6 +2,7 @@
 members = [
     "app",
     "api",
+    "output/disk",
     "output/elasticsearch",
     "parsers/dns",
     "parsers/http",
