@@ -12,6 +12,7 @@ use api::config::Config;
 use api::plugins::output::OutputPlugin;
 use api::plugins::{Plugin, PluginType};
 use api::session::Session;
+use api::utils::serde::get_ser_json_size;
 use api::utils::timeval::{precision::Millisecond, TimeVal};
 
 enum Rotate {
@@ -118,7 +119,9 @@ impl OutputPlugin for Output {
     fn start(&self, cfg: Arc<Config>, receiver: &Receiver<Arc<Box<Session>>>) -> Result<()> {
         let mut handles = vec![];
         let cfg = cfg.clone();
-        let mut thread = OutputThread::new(receiver.clone());
+        let max_bulk_size =
+            cfg.get_integer("output.elasticsearch.maxBulkSize", 1000, 1000, 1000000000) as usize;
+        let mut thread = OutputThread::new(receiver.clone(), max_bulk_size);
         let builder = std::thread::Builder::new().name(thread.name());
         let handle = builder.spawn(move || thread.spawn(cfg)).unwrap();
         handles.push(handle);
@@ -135,11 +138,15 @@ impl OutputPlugin for Output {
 
 struct OutputThread {
     receiver: Receiver<Arc<Box<Session>>>,
+    max_bulk_size: usize,
 }
 
 impl OutputThread {
-    pub fn new(receiver: Receiver<Arc<Box<Session>>>) -> Self {
-        OutputThread { receiver }
+    pub fn new(receiver: Receiver<Arc<Box<Session>>>, max_bulk_size: usize) -> Self {
+        OutputThread {
+            receiver,
+            max_bulk_size,
+        }
     }
 
     pub fn spawn(&mut self, cfg: Arc<Config>) -> Result<()> {
@@ -167,6 +174,7 @@ impl OutputThread {
     }
 
     async fn main_loop(&mut self, cfg: &Arc<Config>, es: &Arc<Elasticsearch>) -> Result<()> {
+        let mut bulk_size = 0;
         let mut sessions = vec![];
         loop {
             let ses = match self.receiver.try_recv() {
@@ -181,36 +189,26 @@ impl OutputThread {
                 continue;
             }
 
-            sessions.push(ses);
-            if sessions.len() == 5 {
-                let sessions_cloned = Box::new(sessions.clone());
+            let size = get_ser_json_size(&ses)?;
+            if bulk_size != 0 && bulk_size + size >= self.max_bulk_size {
                 let cfg = cfg.clone();
                 let es = es.clone();
-                tokio::spawn(async {
-                    match Self::save_sessions(cfg, es, sessions_cloned).await {
-                        Ok(_) => {}
-                        Err(e) => eprintln!("{}", e),
-                    };
-                })
-                .await?;
+                Self::save_sessions(cfg, es, &sessions).await?;
                 sessions.clear();
+                bulk_size = 0;
             }
+
+            sessions.push(ses);
+            bulk_size += size;
         }
 
         if sessions.len() == 0 {
             return Ok(());
         }
 
-        let sessions_cloned = Box::new(sessions.clone());
         let cfg = cfg.clone();
         let es = es.clone();
-        tokio::spawn(async {
-            match Self::save_sessions(cfg, es, sessions_cloned).await {
-                Ok(_) => {}
-                Err(e) => eprintln!("{}", e),
-            };
-        })
-        .await?;
+        Self::save_sessions(cfg, es, &sessions).await?;
 
         Ok(())
     }
@@ -218,7 +216,7 @@ impl OutputThread {
     async fn save_sessions(
         _cfg: Arc<Config>,
         es: Arc<Elasticsearch>,
-        sessions: Box<Vec<Arc<Box<Session>>>>,
+        sessions: &Vec<Arc<Box<Session>>>,
     ) -> Result<()> {
         let body = sessions
             .iter()
