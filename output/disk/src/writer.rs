@@ -55,7 +55,7 @@ unsafe impl Sync for Writer {}
 impl Writer {
     pub fn write(&mut self, ses: &Arc<Box<Session>>) -> Result<()> {
         let size = get_ser_json_size(ses)?;
-        if self.written_size + size >= self.max_file_size {
+        if self.written_size != 0 && self.written_size + size >= self.max_file_size {
             if !self.fpath.is_empty() {
                 std::fs::rename(&self.fpath.tmp_path, &self.fpath.path)?;
             }
@@ -68,10 +68,10 @@ impl Writer {
             self.file = Some(Box::new(file));
             self.sessions.clear();
             self.written_size = 0;
-        } else {
-            self.sessions.push(ses.clone());
-            self.written_size += size;
         }
+
+        self.sessions.push(ses.clone());
+        self.written_size += size;
 
         Ok(())
     }
