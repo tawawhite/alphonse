@@ -58,19 +58,19 @@ impl Writer {
         if self.written_size + size >= self.max_file_size {
             if !self.fpath.is_empty() {
                 std::fs::rename(&self.fpath.tmp_path, &self.fpath.path)?;
-                self.written_size = 0;
             }
 
             // If current size is huger than max file size or current file is a new opend file
             let fpath = generate_fpath(&self.output_dir);
             self.fpath = fpath;
             let mut file = File::create(&self.fpath.tmp_path)?;
-            let size = file.write(serde_json::to_string(&self.sessions)?.as_bytes())?;
-            self.written_size += size;
+            file.write(serde_json::to_string(&self.sessions)?.as_bytes())?;
             self.file = Some(Box::new(file));
             self.sessions.clear();
+            self.written_size = 0;
         } else {
             self.sessions.push(ses.clone());
+            self.written_size += size;
         }
 
         Ok(())
