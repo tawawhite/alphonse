@@ -208,7 +208,6 @@ impl Processor for DNSProcessor {
             Some(fields) => fields,
         };
         ses.add_field(&"dns", json!(fields));
-        println!("{}", serde_json::to_string_pretty(ses).unwrap());
     }
 }
 

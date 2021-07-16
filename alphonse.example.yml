@@ -18,6 +18,9 @@ dpdk.pkt.pool.size: 65535
 dpdk.pkt.pool.cache.size: 32
 
 elasticsearch: http://localhost:9200
+output.elasticsearch.maxBulkSize: 10000000
+output.disk.dirs: ["raw"]
+output.disk.maxsize: 10000000
 
 timeout.interval: 1
 timeout.default: 60
@@ -27,14 +30,14 @@ timeout.sctp: 60
 timeout.ses.save: 180
 ses.max.packets: 10000
 threads.pkt: 1
-plugins.processors: ["http", "ip", "misc", "tls"]
+plugins.processors: ["dns", "http", "ip", "misc", "tcp", "tls", "udp", "es"]
 plugins.rx-driver: rxfiles
 plugins.dirs: ["target/debug"]
 
 # Configuration for simple writer
 simple-writer:
-    pcap.dirs: ["./raw"]
-    max.file.size: 10737418240 # bytes, default 10GB
+  pcap.dirs: ["./raw"]
+  max.file.size: 10737418240 # bytes, default 10GB
 ip.db.directory: "./etc"
 
 # Headers listed below will be added as session fields

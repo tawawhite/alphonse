@@ -14,7 +14,7 @@ use api::utils::timeval::TimeVal;
 use crate::threadings::{SessionData, SessionTable};
 
 pub struct PktThread {
-    id: u8,
+    pub id: u8,
     exit: Arc<AtomicBool>,
     classifier: Arc<ClassifierManager>,
     receiver: Receiver<Box<dyn Packet>>,
@@ -89,6 +89,7 @@ impl PktThread {
         &self,
         cfg: Arc<Config>,
         mut processors: Box<Vec<Box<dyn Processor>>>,
+        last_packet: &mut u64,
     ) -> Result<()> {
         let mut classify_scratch = match self.classifier.alloc_scratch() {
             Ok(scratch) => scratch,
@@ -104,12 +105,12 @@ impl PktThread {
                 }
                 Ok(s) => s,
             };
+            *last_packet = pkt.ts().tv_sec as u64;
 
             let key = PacketHashKey::from(pkt.as_ref());
             match self.session_table.get_mut(&key) {
                 Some(mut ses) => {
                     ses.info.update(pkt.as_ref());
-                    ses.info.save_time = pkt.ts().tv_sec as u64 + cfg.ses_save_timeout as u64;
                     self.parse_pkt(
                         &mut classify_scratch,
                         &mut processors,

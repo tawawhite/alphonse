@@ -2,11 +2,13 @@
 members = [
     "app",
     "api",
+    "output/disk",
     "output/elasticsearch",
     "parsers/dns",
     "parsers/http",
     "parsers/misc",
     "parsers/simple-writer",
+    "parsers/tcp",
     "parsers/tls",
     "parsers/ip",
     "parsers/udp",

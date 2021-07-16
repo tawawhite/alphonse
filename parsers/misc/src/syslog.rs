@@ -6,7 +6,7 @@ use api::classifiers::{dpi, ClassifierManager};
 use crate::{add_simple_dpi_rule, add_simple_dpi_tcp_udp_rule, MatchCallBack, Misc};
 
 pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManager) -> Result<()> {
-    add_simple_dpi_tcp_udp_rule!(r"^<[0-9]\d*>", "syslog", parser, manager);
+    add_simple_dpi_tcp_udp_rule!(r"^<[1-9]\d*>", "syslog", parser, manager);
 
     Ok(())
 }
