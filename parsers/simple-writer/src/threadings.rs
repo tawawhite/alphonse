@@ -60,7 +60,6 @@ async fn main_loop(cfg: Config, receiver: Receiver<Box<PacketInfo>>) -> Result<(
             FILE_ID.store(id as u32, Ordering::SeqCst);
         }
 
-        println!("{:?}", info.file_info);
         writer.write(info.buf.as_slice(), &info).await?;
     }
 }

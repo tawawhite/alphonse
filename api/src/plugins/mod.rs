@@ -32,7 +32,7 @@ pub trait Plugin {
     }
 
     /// Initialize the plugin
-    fn cleanup(&self) -> Result<()> {
+    fn cleanup(&mut self) -> Result<()> {
         Ok(())
     }
 }

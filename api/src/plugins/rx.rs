@@ -53,7 +53,7 @@ pub trait RxDriver: Plugin {
     ///
     /// Generally a rx driver needs to create a new thread to receive and process pkts at the same time.
     /// In old api, this is a sync function, which means an rx driver could only use
-    fn start(&self, cfg: Arc<Config>, senders: &[Sender<Box<dyn Packet>>]) -> Result<()>;
+    fn start(&mut self, cfg: Arc<Config>, senders: &[Sender<Box<dyn Packet>>]) -> Result<()>;
     fn stats(&self) -> Result<RxStat>;
     /// Whether this driver support offline pcap processing
     fn support_offline(&self) -> bool {

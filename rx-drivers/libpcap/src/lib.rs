@@ -1,12 +1,12 @@
 use std::cell::RefCell;
 use std::hash::{Hash, Hasher};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, RwLock};
-use std::thread::JoinHandle;
+use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
 use crossbeam_channel::Sender;
 use fnv::FnvHasher;
+use tokio::task::JoinHandle;
 
 use alphonse_api as api;
 use api::classifiers::matched::Rule;
@@ -17,12 +17,11 @@ use api::packet::{Layers, PacketHashKey, Rules, Tunnel};
 use api::plugins::rx::{RxDriver, RxStat};
 use api::plugins::{Plugin, PluginType};
 
-#[derive(Clone, Default)]
+#[derive(Default)]
 struct Driver {
-    /// Thread handle
-    handle: Arc<RwLock<Option<JoinHandle<Result<()>>>>>,
-    /// Thread context
-    thread_ctx: Arc<RwLock<Vec<Arc<RxThread>>>>,
+    rt: Option<tokio::runtime::Runtime>,
+    /// Thread handles
+    handles: Vec<JoinHandle<Result<()>>>,
 }
 
 impl Plugin for Driver {
@@ -34,20 +33,17 @@ impl Plugin for Driver {
         "rx-libpcap"
     }
 
-    fn cleanup(&self) -> Result<()> {
-        let mut handle = match self.handle.write() {
-            Ok(h) => h,
-            Err(e) => return Err(anyhow!("{}", e)),
-        };
+    fn cleanup(&mut self) -> Result<()> {
+        let mut handles = vec![];
+        while let Some(hdl) = self.handles.pop() {
+            handles.push(hdl);
+        }
 
-        match handle.take() {
-            None => {}
-            Some(handle) => {
-                match handle.join() {
-                    Ok(_) => {}
-                    Err(e) => eprintln!("{:?}", e),
-                };
-            }
+        match &self.rt {
+            None => unreachable!("this should never happen"),
+            Some(rt) => rt.block_on(async {
+                futures::future::join_all(handles).await;
+            }),
         }
 
         Ok(())
@@ -55,23 +51,25 @@ impl Plugin for Driver {
 }
 
 impl RxDriver for Driver {
-    fn start(&self, cfg: Arc<Config>, senders: &[Sender<Box<dyn PacketTrait>>]) -> Result<()> {
+    fn start(&mut self, cfg: Arc<Config>, senders: &[Sender<Box<dyn PacketTrait>>]) -> Result<()> {
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(1)
+            .thread_name("alphonse-libpcap")
+            .enable_all()
+            .build()?;
+
         let interfaces = cfg.get_str_arr(&"rx.libpcap.interfaces");
         if interfaces.is_empty() {
             return Err(anyhow!(
-                "Could lauch {} driver without specifying any network interfaces",
+                "Could not lauch {} driver without specifying any network interface",
                 self.name()
             ));
         }
 
-        let mut ctx = match self.thread_ctx.write() {
-            Ok(ctx) => ctx,
-            Err(e) => return Err(anyhow!("{}", e)),
-        };
-        for (id, interface) in interfaces.iter().enumerate() {
+        let mut handles = vec![];
+        for interface in &interfaces {
             let cfg = cfg.clone();
             let thread = RxThread {
-                id: id as u8,
                 exit: cfg.exit.clone(),
                 senders: senders.iter().map(|s| s.clone()).collect(),
                 interface: interface.clone(),
@@ -79,67 +77,22 @@ impl RxDriver for Driver {
                     interface.as_str(),
                 )?)),
             };
-            ctx.push(Arc::new(thread));
+            let hdl = rt.spawn_blocking(move || thread.spawn(cfg));
+            handles.push(hdl);
         }
 
-        // create a new native thread to use tokio runtime
-        let threads = ctx.iter().map(|t| t.clone()).collect();
-        let builder = std::thread::Builder::new().name(self.name().to_string());
-        let handle = builder.spawn(move || main_loop(cfg, threads))?;
-
-        match self.handle.write() {
-            Ok(mut h) => {
-                *h = Some(handle);
-            }
-            Err(e) => return Err(anyhow!("{}", e)),
-        };
+        self.handles = handles;
+        self.rt = Some(rt);
 
         Ok(())
     }
 
     fn stats(&self) -> Result<RxStat> {
-        let mut stat = RxStat::default();
-        let threads = self.thread_ctx.read().or_else(|e| Err(anyhow!("{}", e)))?;
-        for thread in threads.iter() {
-            stat += thread.stats();
-        }
-        Ok(stat)
+        Ok(RxStat::default())
     }
 }
 
-fn main_loop(cfg: Arc<Config>, threads: Vec<Arc<RxThread>>) -> Result<()> {
-    let rt = tokio::runtime::Builder::new_multi_thread()
-        .worker_threads(1)
-        .thread_name("alphonse-libpcap")
-        .enable_all()
-        .build()?;
-    rt.block_on(async {
-        let mut handles = vec![];
-        let mut stats = vec![];
-
-        for thread in threads {
-            let cfg = cfg.clone();
-            let handle = tokio::task::spawn_blocking(move || thread.spawn(cfg));
-            handles.push(handle);
-            stats.push(RxStat::default());
-        }
-
-        for hdl in handles {
-            match hdl.await {
-                Err(e) => eprintln!("{}", e),
-                Ok(r) => match r {
-                    Err(e) => eprintln!("{}", e),
-                    Ok(_) => {}
-                },
-            };
-        }
-    });
-
-    Ok(())
-}
-
 struct RxThread {
-    id: u8,
     exit: Arc<AtomicBool>,
     senders: Vec<Sender<Box<dyn PacketTrait>>>,
     interface: String,

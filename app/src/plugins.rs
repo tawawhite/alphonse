@@ -55,8 +55,12 @@ pub struct PluginWarehouse {
 }
 
 impl PluginWarehouse {
-    pub fn start_rx(&self, cfg: &Arc<Config>, senders: &[Sender<Box<dyn Packet>>]) -> Result<()> {
-        match &self.rx_driver {
+    pub fn start_rx(
+        &mut self,
+        cfg: &Arc<Config>,
+        senders: &[Sender<Box<dyn Packet>>],
+    ) -> Result<()> {
+        match &mut self.rx_driver {
             None => return Err(anyhow!("alphonse hasn't load any rx driver plugin")),
             Some(driver) => {
                 match driver.start(cfg.clone(), senders) {
@@ -206,12 +210,12 @@ pub fn init_plugins(
 }
 
 pub fn cleanup_plugins(warehouse: &mut PluginWarehouse) -> Result<()> {
-    match &warehouse.rx_driver {
+    match &mut warehouse.rx_driver {
         Some(driver) => driver.cleanup()?,
         None => {}
     };
 
-    for processor in &warehouse.pkt_processors {
+    for processor in &mut warehouse.pkt_processors {
         processor.cleanup()?;
     }
     Ok(())

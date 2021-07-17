@@ -221,7 +221,7 @@ impl Plugin for SimpleWriterProcessor {
         Ok(())
     }
 
-    fn cleanup(&self) -> Result<()> {
+    fn cleanup(&mut self) -> Result<()> {
         // At this moment, all packet process threads are finished, nothing would use SCHEDULERS any more,
         // so cleanup all existing schedulers. Once all the schedulers were dropped, PacketInfo channel
         // would be closed, so the packet writing thread would be closed too.

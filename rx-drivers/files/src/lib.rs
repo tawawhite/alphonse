@@ -34,7 +34,7 @@ impl Plugin for Driver {
         "rx-files"
     }
 
-    fn cleanup(&self) -> Result<()> {
+    fn cleanup(&mut self) -> Result<()> {
         let mut handles = match self.handles.write() {
             Ok(h) => h,
             Err(e) => return Err(anyhow!("{}", e)),
@@ -56,7 +56,7 @@ impl Plugin for Driver {
 }
 
 impl RxDriver for Driver {
-    fn start(&self, cfg: Arc<Config>, senders: &[Sender<Box<dyn PacketTrait>>]) -> Result<()> {
+    fn start(&mut self, cfg: Arc<Config>, senders: &[Sender<Box<dyn PacketTrait>>]) -> Result<()> {
         let mut handles = vec![];
         let mut thread = RxThread {
             exit: cfg.exit.clone(),

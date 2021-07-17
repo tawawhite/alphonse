@@ -90,7 +90,7 @@ impl Plugin for Output {
         "output-es"
     }
 
-    fn cleanup(&self) -> Result<()> {
+    fn cleanup(&mut self) -> Result<()> {
         let mut handles = match self.handles.write() {
             Ok(h) => h,
             Err(e) => return Err(anyhow!("{}", e)),
