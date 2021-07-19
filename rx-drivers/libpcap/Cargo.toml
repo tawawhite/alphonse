@@ -9,12 +9,19 @@ crate-type = ["cdylib"]
 name = "rxlibpcap"
 
 [dependencies]
-alphonse-api = { path = "../../api", optional = false }
+alphonse-arkime = { path = "../../arkime", optional = true }
+alphonse-api = { path = "../../api" }
 anyhow = "1.0"
 crossbeam-channel = "0.5"
+elasticsearch = { version = "7.12.1-alpha.1", features = ["rustls-tls"], optional = true }
 fnv = "1.0"
 futures = "0.3"
 libc = "0.2"
 pcap = "0.8"
 serde = "1.0"
+serde_json = { version = "1.0", optional = true }
 tokio = { version = "1", features = ["macros", "net", "rt-multi-thread", "time"] }
+
+[features]
+arkime = ["alphonse-arkime", "alphonse-api/arkime", "elasticsearch", "serde_json"]
+default = ["arkime"]

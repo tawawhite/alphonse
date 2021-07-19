@@ -17,6 +17,9 @@ use api::packet::{Layers, PacketHashKey, Rules, Tunnel};
 use api::plugins::rx::{RxDriver, RxStat};
 use api::plugins::{Plugin, PluginType};
 
+#[cfg(feature = "arkime")]
+mod arkime;
+
 #[derive(Default)]
 struct Driver {
     rt: Option<tokio::runtime::Runtime>,
@@ -81,21 +84,33 @@ impl RxDriver for Driver {
             self.caps.push(cap);
         }
 
+        #[cfg(feature = "arkime")]
+        {
+            let caps = self.caps.clone();
+            let hdl = rt.spawn(arkime::main_loop(cfg, caps));
+            self.handles.push(hdl);
+        }
+
         self.rt = Some(rt);
 
         Ok(())
     }
 
     fn stats(&self) -> Result<RxStat> {
-        let mut stat = RxStat::default();
-        for cap in &self.caps {
-            match cap.stats() {
-                Ok(stats) => stat += stats,
-                Err(e) => eprintln!("{}", e),
-            }
-        }
-        Ok(RxStat::default())
+        gather_stats(&self.caps)
     }
+}
+
+#[inline]
+fn gather_stats(caps: &[Arc<NetworkInterface>]) -> Result<RxStat> {
+    let mut stat = RxStat::default();
+    for cap in caps {
+        match cap.stats() {
+            Ok(stats) => stat += stats,
+            Err(e) => eprintln!("{}", e),
+        }
+    }
+    Ok(stat)
 }
 
 struct RxThread {

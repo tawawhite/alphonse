@@ -2,6 +2,7 @@
 members = [
     "app",
     "api",
+    "arkime",
     "output/disk",
     "output/elasticsearch",
     "parsers/dns",
