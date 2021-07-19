@@ -1,11 +1,11 @@
-use std::cell::RefCell;
 use std::hash::{Hash, Hasher};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
 use crossbeam_channel::Sender;
 use fnv::FnvHasher;
+use pcap::{Active, Capture};
 use tokio::task::JoinHandle;
 
 use alphonse_api as api;
@@ -22,6 +22,7 @@ struct Driver {
     rt: Option<tokio::runtime::Runtime>,
     /// Thread handles
     handles: Vec<JoinHandle<Result<()>>>,
+    caps: Vec<Arc<NetworkInterface>>,
 }
 
 impl Plugin for Driver {
@@ -66,28 +67,33 @@ impl RxDriver for Driver {
             ));
         }
 
-        let mut handles = vec![];
         for interface in &interfaces {
             let cfg = cfg.clone();
-            let thread = RxThread {
+            let cap = Arc::new(NetworkInterface::try_from_str(interface.as_str())?);
+            let mut thread = RxThread {
                 exit: cfg.exit.clone(),
                 senders: senders.iter().map(|s| s.clone()).collect(),
                 interface: interface.clone(),
-                cap: Some(RefCell::new(NetworkInterface::try_from_str(
-                    interface.as_str(),
-                )?)),
+                cap: cap.clone(),
             };
             let hdl = rt.spawn_blocking(move || thread.spawn(cfg));
-            handles.push(hdl);
+            self.handles.push(hdl);
+            self.caps.push(cap);
         }
 
-        self.handles = handles;
         self.rt = Some(rt);
 
         Ok(())
     }
 
     fn stats(&self) -> Result<RxStat> {
+        let mut stat = RxStat::default();
+        for cap in &self.caps {
+            match cap.stats() {
+                Ok(stats) => stat += stats,
+                Err(e) => eprintln!("{}", e),
+            }
+        }
         Ok(RxStat::default())
     }
 }
@@ -96,28 +102,19 @@ struct RxThread {
     exit: Arc<AtomicBool>,
     senders: Vec<Sender<Box<dyn PacketTrait>>>,
     interface: String,
-    cap: Option<RefCell<NetworkInterface>>,
+    cap: Arc<NetworkInterface>,
 }
 
-// Since RxThread is
-unsafe impl Send for RxThread {}
-unsafe impl Sync for RxThread {}
-
 impl RxThread {
-    pub fn spawn(&self, cfg: Arc<Config>) -> Result<()> {
+    pub fn spawn(&mut self, cfg: Arc<Config>) -> Result<()> {
         let mut hasher = FnvHasher::default();
         let parser = ProtocolDessector::new(LinkType::ETHERNET);
-        let mut cap = match &self.cap {
-            None => return Err(anyhow!("")),
-            Some(c) => c.borrow_mut(),
-        };
-        let mut overflow_cnt: u64 = 0;
         let mut rx_cnt: u64 = 0;
 
         println!("{} started", self.name());
 
         while !self.exit.load(Ordering::Relaxed) {
-            let mut pkt = match cap.next() {
+            let mut pkt: Box<dyn PacketTrait> = match self.cap.next() {
                 Ok(p) => p,
                 Err(e) => {
                     match e {
@@ -130,6 +127,10 @@ impl RxThread {
                 }
             };
 
+            self.cap
+                .rx_bytes
+                .fetch_add(pkt.raw().len() as u64, Ordering::Relaxed);
+
             match parser.parse_pkt(pkt.as_mut()) {
                 Ok(_) => {}
                 Err(e) => match e {
@@ -140,10 +141,11 @@ impl RxThread {
 
             rx_cnt += 1;
             if rx_cnt % cfg.rx_stat_log_interval == 0 {
-                match cap.stats() {
+                match self.cap.stats() {
                     Ok(stats) => {
                         println!(
-                            "{} {}({:.3}) {}",
+                            "{} {} {}({:.3}) {}",
+                            rx_cnt,
                             stats.rx_pkts,
                             stats.dropped,
                             stats.dropped as f64 / stats.rx_pkts as f64,
@@ -163,13 +165,10 @@ impl RxThread {
                 Ok(_) => {}
                 Err(err) => match err {
                     crossbeam_channel::TrySendError::Full(_) => {
-                        overflow_cnt += 1;
-                        if overflow_cnt % 10000 == 0 {
-                            println!(
-                                "{} overflowing, total overflow {}",
-                                self.name(),
-                                overflow_cnt
-                            );
+                        self.cap.overload_pkts.fetch_add(1, Ordering::Relaxed);
+                        let overload = self.cap.overload_pkts.load(Ordering::Relaxed);
+                        if overload % 10000 == 0 {
+                            println!("{} overloading, total overload {}", self.name(), overload);
                         }
                     }
                     crossbeam_channel::TrySendError::Disconnected(_) => {
@@ -187,30 +186,33 @@ impl RxThread {
     pub fn name(&self) -> String {
         format!("alphonse-{}", self.interface)
     }
-
-    pub fn stats(&self) -> RxStat {
-        RxStat::default()
-    }
 }
 
 struct NetworkInterface {
-    cap: Box<pcap::Capture<pcap::Active>>,
+    cap: Capture<Active>,
+    rx_bytes: AtomicU64,
+    overload_pkts: AtomicU64,
 }
 
 impl NetworkInterface {
     #[inline]
-    fn next(&mut self) -> Result<Box<dyn PacketTrait>, pcap::Error> {
-        let raw = self.cap.as_mut().next()?;
+    fn next(&self) -> Result<Box<Packet>, pcap::Error> {
+        let c = unsafe { &mut (*(&self.cap as *const _ as *mut Capture<Active>)) };
+        let raw = c.next()?;
         let pkt: Box<Packet> = Box::new(Packet::from(&raw));
         Ok(pkt)
     }
 
-    fn stats(&mut self) -> Result<RxStat> {
+    #[inline]
+    fn stats(&self) -> Result<RxStat> {
         let mut stats = RxStat::default();
-        let cap_stats = self.cap.as_mut().stats()?;
+        let c = unsafe { &mut (*(&self.cap as *const _ as *mut Capture<Active>)) };
+        let cap_stats = c.stats()?;
         stats.rx_pkts = cap_stats.received as u64;
         stats.dropped = cap_stats.dropped as u64;
         stats.if_dropped = cap_stats.if_dropped as u64;
+        stats.overload_dropped = self.overload_pkts.load(Ordering::Relaxed);
+        stats.rx_bytes = self.rx_bytes.load(Ordering::Relaxed);
         Ok(stats)
     }
 }
@@ -218,24 +220,31 @@ impl NetworkInterface {
 impl NetworkInterface {
     /// Initialize a Libpcap instance from a network interface
     pub fn try_from_str<S: AsRef<str>>(interface: S) -> Result<NetworkInterface> {
-        let inter_string = String::from(interface.as_ref());
+        let interface = String::from(interface.as_ref());
         match pcap::Device::list() {
             Ok(devices) => {
-                let _ = match devices.iter().position(|x| inter_string.eq(&x.name)) {
+                let _ = match devices.iter().position(|x| interface == x.name) {
                     Some(p) => p,
-                    None => todo!(),
+                    None => {
+                        return Err(anyhow!(
+                            "target network interface {} does not exits",
+                            interface
+                        ))
+                    }
                 };
 
-                let cap = pcap::Capture::from_device(interface.as_ref())
-                    .unwrap()
+                let cap = pcap::Capture::from_device(interface.as_ref())?
                     .promisc(true)
                     .timeout(1000)
                     .buffer_size(i32::MAX)
-                    .open()
-                    .unwrap();
-                Ok(NetworkInterface { cap: Box::new(cap) })
+                    .open()?;
+                Ok(NetworkInterface {
+                    cap,
+                    rx_bytes: AtomicU64::new(0),
+                    overload_pkts: AtomicU64::new(0),
+                })
             }
-            Err(_) => todo!(),
+            Err(e) => return Err(anyhow!("{}", e)),
         }
     }
 }
