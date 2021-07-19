@@ -17,6 +17,9 @@ use crate::{gather_stats, NetworkInterface};
 
 pub(crate) async fn main_loop(cfg: Arc<Config>, caps: Vec<Arc<NetworkInterface>>) -> Result<()> {
     let mut stats: Vec<Stat> = Vec::with_capacity(4);
+    for _ in 0..stats.capacity() {
+        stats.push(Stat::default());
+    }
 
     let db_version = 0;
 
