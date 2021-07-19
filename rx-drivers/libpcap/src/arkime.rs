@@ -4,7 +4,7 @@ use std::time::{Duration, SystemTime};
 use anyhow::Result;
 use elasticsearch::{
     http::response::Response, http::transport::Transport, params::VersionType, Elasticsearch,
-    IndexParts,
+    GetParts, IndexParts,
 };
 use serde_json::json;
 
@@ -21,7 +21,7 @@ pub(crate) async fn main_loop(cfg: Arc<Config>, caps: Vec<Arc<NetworkInterface>>
         stats.push(Stat::default());
     }
 
-    let db_version = 0;
+    let mut db_version = 0;
 
     let times = [2, 5, 60, 600];
 
@@ -29,6 +29,8 @@ pub(crate) async fn main_loop(cfg: Arc<Config>, caps: Vec<Arc<NetworkInterface>>
 
     let host = cfg.get_str("elasticsearch", "http://localhost:9200");
     let es = Arc::new(Elasticsearch::new(Transport::single_node(host.as_str())?));
+
+    load_stats(&cfg, &es, &mut db_version).await?;
 
     while !cfg.exit.load(Ordering::Relaxed) {
         // 0.5 seconds
@@ -56,7 +58,7 @@ pub(crate) async fn main_loop(cfg: Arc<Config>, caps: Vec<Arc<NetworkInterface>>
                     rx_stats.overload_dropped - stats[i].delta_overload_dropped;
                 stats[i].delta_bytes = rx_stats.rx_bytes - stats[i].delta_bytes;
 
-                update_stats(cfg.clone(), &es, stats[i].clone(), i, db_version).await?;
+                update_stats(&cfg, &es, stats[i].clone(), i, &mut db_version).await?;
 
                 last_time[i] = now;
             }
@@ -66,12 +68,34 @@ pub(crate) async fn main_loop(cfg: Arc<Config>, caps: Vec<Arc<NetworkInterface>>
     Ok(())
 }
 
+async fn load_stats(cfg: &Arc<Config>, es: &Elasticsearch, db_version: &mut u64) -> Result<()> {
+    let prefix = cfg.get_str("arkime.prefix", "");
+    let index = format!("{}stats", prefix);
+    let parts = GetParts::IndexId(&index, &cfg.node);
+    let resp = es.get(parts).send().await?;
+    match resp.status_code().as_u16() {
+        code if code / 100 == 2 => {
+            let j: serde_json::Value = resp.json().await?;
+            *db_version = j
+                .get("_version")
+                .unwrap_or(&json!(0))
+                .as_u64()
+                .unwrap_or_default();
+        }
+        code => {
+            println!("status code: {}", code);
+            println!("response message: {}", resp.text().await.unwrap());
+        }
+    };
+    Ok(())
+}
+
 async fn update_stats(
-    cfg: Arc<Config>,
+    cfg: &Arc<Config>,
     es: &Elasticsearch,
     stat: Stat,
     i: usize,
-    db_version: u64,
+    db_version: &mut u64,
 ) -> Result<()> {
     let intervals = [1, 5, 60, 600];
 
@@ -84,9 +108,10 @@ async fn update_stats(
     let resp = if i == 0 {
         let index = format!("{}stats", prefix);
         let parts = IndexParts::IndexId(&index, &cfg.node);
+        *db_version += 1;
         es.index(parts)
             .version_type(VersionType::External)
-            .version(db_version as i64)
+            .version(*db_version as i64)
             .body(json!(stat))
             .send()
             .await?
