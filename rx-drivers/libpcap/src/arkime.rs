@@ -16,9 +16,17 @@ use arkime::stat::Stat;
 use crate::{gather_stats, NetworkInterface};
 
 pub(crate) async fn main_loop(cfg: Arc<Config>, caps: Vec<Arc<NetworkInterface>>) -> Result<()> {
+    let now = SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)?
+        .as_secs();
     let mut stats: Vec<Stat> = Vec::with_capacity(4);
     for _ in 0..stats.capacity() {
-        stats.push(Stat::default());
+        let mut stat = Stat::default();
+        stat.node_name = cfg.node.clone();
+        stat.host_name = cfg.hostname.clone();
+        stat.ver = "2.7.1".to_string();
+        stat.start_time = now;
+        stats.push(stat);
     }
 
     let mut db_version = 0;
@@ -57,6 +65,7 @@ pub(crate) async fn main_loop(cfg: Arc<Config>, caps: Vec<Arc<NetworkInterface>>
                 stats[i].delta_overload_dropped =
                     rx_stats.overload_dropped - stats[i].delta_overload_dropped;
                 stats[i].delta_bytes = rx_stats.rx_bytes - stats[i].delta_bytes;
+                stats[i].current_time = now;
 
                 update_stats(&cfg, &es, stats[i].clone(), i, &mut db_version).await?;
 

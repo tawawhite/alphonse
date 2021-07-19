@@ -9,6 +9,7 @@ pub struct Stat {
     /// alphonse version
     pub ver: String,
     pub node_name: String,
+    #[serde(rename = "hostname")]
     pub host_name: String,
     pub interval: u32,
     pub current_time: u64,
@@ -50,6 +51,7 @@ pub struct Stat {
     pub es_health_ms: u64,
     #[serde(rename = "deltaMS")]
     pub delta_ms: u64,
+    pub start_time: u64,
 }
 
 pub async fn send_stat(es: &Elasticsearch, prefix: &str, stat: &Stat) -> Result<()> {
