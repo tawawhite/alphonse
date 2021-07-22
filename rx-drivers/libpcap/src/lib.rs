@@ -87,7 +87,7 @@ impl RxDriver for Driver {
         #[cfg(feature = "arkime")]
         {
             let caps = self.caps.clone();
-            let hdl = rt.spawn(arkime::main_loop(cfg, caps));
+            let hdl = rt.spawn_blocking(move || arkime::main_loop(cfg, caps));
             self.handles.push(hdl);
         }
 
