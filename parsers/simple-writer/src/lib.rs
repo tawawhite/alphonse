@@ -22,6 +22,8 @@ use api::plugins::{Plugin, PluginType};
 use api::session::Session;
 use api::utils::yaml::Yaml;
 
+#[cfg(feature = "arkime")]
+mod arkime;
 mod scheuler;
 mod threadings;
 mod writer;
@@ -107,8 +109,6 @@ where
 #[derive(Clone, Debug, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct PcapFileInfo {
-    // #[cfg_attr(feature = "arkime", serde(rename = "_id"))]
-    // id: String,
     filesize: usize,
     first: u64,
     last: u64,
@@ -254,7 +254,7 @@ impl Plugin for SimpleWriterProcessor {
             let cfg = cfg.clone();
             let ts = Transport::single_node(cfg.es_host.as_str())?;
             let es = Arc::new(Elasticsearch::new(ts));
-            let id = rt.block_on(async { threadings::get_sequence_number(&es, &cfg).await })?;
+            let id = rt.block_on(async { arkime::get_sequence_number(&es, &cfg).await })?;
             FILE_ID.store(id as u32, Ordering::SeqCst);
         }
         #[cfg(not(feature = "arkime"))]

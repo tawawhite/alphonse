@@ -1,16 +1,15 @@
 use std::io::Write;
 use std::path::PathBuf;
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
 
-use elasticsearch::params::Refresh;
 use elasticsearch::Elasticsearch;
-use serde_json::json;
 use tokio::runtime::Handle;
 
-use crate::{FileMsg, PacketInfo, PcapFileInfo, FILE_ID};
+#[cfg(feature = "arkime")]
+use crate::arkime::index_file_info;
+use crate::{FileMsg, PacketInfo};
 
 #[repr(C)]
 #[derive(Debug)]
@@ -112,7 +111,7 @@ impl SimpleWriter {
                 let es = es.clone();
                 let info = Box::new(info.clone());
                 Handle::current().spawn(async {
-                    match send_file_info(es, info).await {
+                    match index_file_info(es, info).await {
                         Ok(_) => {}
                         Err(e) => {
                             eprintln!("{}", e);
@@ -151,28 +150,4 @@ impl SimpleWriter {
 
         Ok(())
     }
-}
-
-#[cfg(feature = "arkime")]
-async fn send_file_info(es: Arc<Elasticsearch>, mut info: Box<PcapFileInfo>) -> Result<()> {
-    // Index new file information into Elasticsearch
-    info.num = FILE_ID.load(Ordering::Relaxed);
-
-    let resp = es
-        .index(elasticsearch::IndexParts::Index("files"))
-        .body(json!(info))
-        .refresh(Refresh::True)
-        .send()
-        .await?;
-
-    match resp.status_code().as_u16() {
-        code if (code / 100) == 2 => {}
-        code => {
-            eprintln!("Send file info failed");
-            eprintln!("code: {}", code);
-            eprintln!("text: {}", resp.text().await.unwrap());
-        }
-    }
-
-    Ok(())
 }
