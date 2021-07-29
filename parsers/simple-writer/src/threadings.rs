@@ -1,51 +1,28 @@
 use std::sync::atomic::Ordering;
+use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{anyhow, Result};
 use crossbeam_channel::Receiver;
 use elasticsearch::http::{headers::HeaderMap, transport::Transport, Method};
-use elasticsearch::Elasticsearch;
+use elasticsearch::{Elasticsearch, UpdateParts};
+use serde_json::json;
+use tokio::runtime::Handle;
 
 use crate::{Config, PacketInfo, SimpleWriter, FILE_ID};
 
-pub fn writing_thread(cfg: Config, receiver: Receiver<Box<PacketInfo>>) -> Result<()> {
-    let rt = tokio::runtime::Builder::new_current_thread()
-        .thread_name("alphonse-simple-writer-tokio")
-        .enable_all()
-        .build()?;
-
-    rt.block_on(async {
-        match main_loop(cfg.clone(), receiver).await {
-            Ok(_) => {}
-            Err(e) => eprintln!("{}", e),
-        };
-        cfg.exit.store(true, Ordering::SeqCst);
-    });
-
-    Ok(())
-}
-
-async fn main_loop(cfg: Config, receiver: Receiver<Box<PacketInfo>>) -> Result<()> {
+pub(crate) fn main_loop(cfg: Arc<Config>, receiver: Receiver<Box<PacketInfo>>) -> Result<()> {
     let mut writer = SimpleWriter::default();
     let ts = Transport::single_node(cfg.es_host.as_str())?;
-    let es = Elasticsearch::new(ts);
+    let es = Arc::new(Elasticsearch::new(ts));
 
     loop {
-        if FILE_ID.load(Ordering::Relaxed) == 0 {
-            #[cfg(feature = "arkime")]
-            let id = get_sequence_number(&es).await?;
-            #[cfg(not(feature = "arkime"))]
-            let id = get_sequence_number();
-
-            FILE_ID.store(id as u32, Ordering::SeqCst);
-        }
-
         let info = match receiver.try_recv() {
             Ok(info) => info,
             Err(err) => match err {
-                crossbeam_channel::TryRecvError::Disconnected => return Ok(()),
+                crossbeam_channel::TryRecvError::Disconnected => break,
                 _ => {
-                    tokio::time::sleep(Duration::from_micros(500000)).await;
+                    std::thread::sleep(Duration::from_micros(500000));
                     continue;
                 }
             },
@@ -53,50 +30,100 @@ async fn main_loop(cfg: Config, receiver: Receiver<Box<PacketInfo>>) -> Result<(
 
         if info.closing {
             #[cfg(feature = "arkime")]
-            let id = get_sequence_number(&es).await?;
+            {
+                let cfg = cfg.clone();
+                let es = es.clone();
+                let id = FILE_ID.load(Ordering::Relaxed) as u64;
+                // Handle::current().spawn(async move { update_file_size(es, cfg, id, filesize) });
+            }
+            // If current pcap file is about to close, update global file ID
+            #[cfg(feature = "arkime")]
+            {
+                let cfg = cfg.clone();
+                let es = es.clone();
+                Handle::current().block_on(async move {
+                    let mut result = get_sequence_number(&es, &cfg).await;
+                    while result.is_err() {
+                        result = get_sequence_number(&es, &cfg).await;
+                    }
+                    let id = match result {
+                        Ok(id) => id,
+                        Err(e) => return Err(anyhow!("{}", e)),
+                    };
+                    FILE_ID.store(id as u32, Ordering::SeqCst);
+                    Ok(())
+                })?;
+            }
             #[cfg(not(feature = "arkime"))]
-            let id = get_sequence_number();
-
-            FILE_ID.store(id as u32, Ordering::SeqCst);
+            {
+                let id = get_sequence_number(&es, &cfg)?;
+                FILE_ID.store(id as u32, Ordering::SeqCst);
+            }
         }
 
-        writer.write(info.buf.as_slice(), &info).await?;
+        writer.write(info, &es)?;
     }
+
+    Ok(())
 }
 
 #[cfg(not(feature = "arkime"))]
-fn get_sequence_number() -> u64 {
-    (FILE_ID.load(Ordering::Relaxed) + 1) as u64
+fn get_sequence_number(_: &Arc<Elasticsearch>, _: &Arc<Config>) -> Result<u64> {
+    Ok((FILE_ID.load(Ordering::Relaxed) + 1) as u64)
 }
 
+/// Get next pcap file's sequence number
 #[cfg(feature = "arkime")]
-async fn get_sequence_number(es: &Elasticsearch) -> Result<u64> {
+pub async fn get_sequence_number(es: &Arc<Elasticsearch>, cfg: &Arc<Config>) -> Result<u64> {
     let resp = es
         .send::<&str, String>(
             Method::Post,
-            format!("sequence/_doc/{}", "test").as_str(),
+            format!("sequence/_doc/fn-{}", cfg.node).as_str(),
             HeaderMap::default(),
             None,
             Some("{}"),
             None,
         )
-        .await;
-    let resp = match resp {
-        Ok(r) => r,
-        Err(e) => return Err(anyhow!("{}", e)),
-    };
+        .await?;
 
     match resp.status_code().as_u16() {
-        code if code >= 200 && code < 300 => {
-            let text = resp.text().await.unwrap();
-            let a: serde_json::Value = serde_json::from_str(text.as_str()).unwrap();
-            let version = a.get("_version").unwrap().as_u64().unwrap();
-            Ok(version)
+        code if code / 100 == 2 => {
+            let text = resp.text().await?;
+            let data: serde_json::Map<_, _> = serde_json::from_str(text.as_str())?;
+            let version = data
+                .get("_version")
+                .ok_or(anyhow!("Couldn't fetch sequence"))?
+                .as_u64()
+                .ok_or(anyhow!("Sequence could be parsed as u64"))?;
+            println!("sequence: {}", version);
+            return Ok(version);
         }
         code => {
             println!("code: {}", code);
-            println!("text: {}", resp.text().await.unwrap());
-            Err(anyhow!("Handle status code is {}", code))
+            println!("text: {}", resp.text().await?);
+            return Err(anyhow!("Couldn't fetch sequence"));
         }
     }
+}
+
+#[cfg(feature = "arkime")]
+async fn update_file_size(
+    es: Arc<Elasticsearch>,
+    cfg: Arc<Config>,
+    id: u64,
+    filesize: usize,
+) -> Result<()> {
+    let index = format!("{}files", cfg.prefix);
+    let id = format!("{}-{}", cfg.node, id);
+    let parts = UpdateParts::IndexId(&index, &id);
+    let body = json!({"doc":{"filesize":filesize}});
+    let resp = es.update(parts).body(body).send().await?;
+    match resp.status_code().as_u16() {
+        code if code / 100 == 2 => {}
+        code => {
+            eprintln!("code: {}", code);
+            eprintln!("text: {}", resp.text().await.unwrap());
+        }
+    }
+    Ok(())
 }

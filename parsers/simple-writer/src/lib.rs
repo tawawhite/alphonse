@@ -1,15 +1,17 @@
 use std::hash::Hasher;
 use std::hash::{BuildHasher, Hash};
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, AtomicU32};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
-use std::thread::JoinHandle;
 
 use anyhow::{anyhow, Result};
 use crossbeam_channel::{Receiver, Sender};
+use elasticsearch::http::transport::Transport;
+use elasticsearch::Elasticsearch;
 use fnv::FnvHasher;
 use once_cell::sync::OnceCell;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize, Serializer};
+use tokio::task::JoinHandle;
 use yaml_rust::YamlEmitter;
 
 use alphonse_api as api;
@@ -25,7 +27,7 @@ mod threadings;
 mod writer;
 
 use scheuler::Scheduler;
-use threadings::writing_thread;
+use threadings::main_loop;
 use writer::SimpleWriter;
 
 const PKG_NAME: &'static str = env!("CARGO_PKG_NAME");
@@ -34,6 +36,7 @@ static mut HANDLES: OnceCell<Vec<JoinHandle<Result<()>>>> = OnceCell::new();
 static mut SCHEDULERS: OnceCell<Vec<Scheduler>> = OnceCell::new();
 static mut CHANNEL: OnceCell<(Sender<Box<PacketInfo>>, Receiver<Box<PacketInfo>>)> =
     OnceCell::new();
+static RT: OnceCell<tokio::runtime::Runtime> = OnceCell::new();
 
 #[derive(Clone, Debug, Default, Deserialize)]
 pub struct Config {
@@ -56,6 +59,10 @@ pub struct Config {
     /// Current alphonse node name
     #[serde(skip_deserializing)]
     pub node: String,
+
+    /// Current alphonse node name
+    #[serde(skip_deserializing)]
+    pub prefix: String,
 
     /// Original yaml config
     #[serde(skip_deserializing)]
@@ -87,16 +94,43 @@ pub enum PcapDirAlgorithm {
     RoundRobin,
 }
 
-/// The structure contains the file information
-#[derive(Clone, Debug)]
-enum File {
-    ID(u32),
-    Name(PathBuf),
+#[allow(dead_code)]
+fn bool_serialize<S>(locked: &bool, s: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let locked = if *locked { 1 } else { 0 };
+    s.serialize_u8(locked)
 }
 
-impl Default for File {
+/// Arkime files Index document data structure
+#[derive(Clone, Debug, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PcapFileInfo {
+    // #[cfg_attr(feature = "arkime", serde(rename = "_id"))]
+    // id: String,
+    filesize: usize,
+    first: u64,
+    last: u64,
+    #[cfg_attr(feature = "arkime", serde(serialize_with = "bool_serialize"))]
+    locked: bool,
+    name: PathBuf,
+    node: String,
+    /// Pcap file ID number
+    num: u32,
+    packet_pos_encoding: String,
+}
+
+/// The structure contains the file information
+#[derive(Clone, Debug)]
+enum FileMsg {
+    ID(u32),
+    Info(PcapFileInfo),
+}
+
+impl Default for FileMsg {
     fn default() -> Self {
-        File::ID(0)
+        FileMsg::ID(0)
     }
 }
 
@@ -109,15 +143,13 @@ pub struct PacketInfo {
     /// Formatted pcap/pcapng packet buffer
     buf: Vec<u8>,
     /// Current writing file name
-    file_info: File,
+    file_info: FileMsg,
 }
 
 #[derive(Default)]
 struct SimpleWriterProcessor {
     /// Processor ID
     id: ProcessorID,
-    /// Whether current packet is registered with this processer
-    classified: bool,
     /// Actual packet disk position
     packet_pos: Vec<isize>,
     /// Hasher to decide which scheduler to use
@@ -130,7 +162,6 @@ impl Clone for SimpleWriterProcessor {
     fn clone(&self) -> Self {
         Self {
             id: self.id,
-            classified: self.classified,
             packet_pos: self.packet_pos.clone(),
             hasher: fnv::FnvBuildHasher::default().build_hasher(),
             fid: self.fid,
@@ -147,7 +178,7 @@ impl Plugin for SimpleWriterProcessor {
         PKG_NAME
     }
 
-    fn init(&self, alcfg: &api::config::Config) -> Result<()> {
+    fn init(&mut self, alcfg: &api::config::Config) -> Result<()> {
         let root = "simple-writer";
         let yaml = match alcfg.doc.as_ref()[root] {
             yaml_rust::Yaml::Hash(_) => {
@@ -177,16 +208,18 @@ impl Plugin for SimpleWriterProcessor {
         let mut cfg: Config = serde_yaml::from_str(&yaml)?;
         cfg.doc = alcfg.doc.clone();
         cfg.exit = alcfg.exit.clone();
+        cfg.node = alcfg.node.clone();
         #[cfg(feature = "arkime")]
         {
             cfg.es_host = alcfg.get_str("elasticsearch", "http://localhost:9200");
+            cfg.prefix = alcfg.get_str("prefix", "");
         }
 
         // Prepare global packet write info writer
         let (sender, receiver) = crossbeam_channel::bounded(100000);
         let mut schedulers = vec![];
         for i in 0..alcfg.pkt_threads {
-            let mut scheduler = Scheduler::new(i, sender.clone());
+            let mut scheduler = Scheduler::new(i, cfg.node.clone(), sender.clone());
             scheduler.pcap_dirs = cfg
                 .pcap_dirs
                 .iter()
@@ -203,11 +236,37 @@ impl Plugin for SimpleWriterProcessor {
                 .ok_or(anyhow!("{} SCHEDULERS are already set", self.name()))?
         };
 
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(1)
+            .thread_name("alphonse-libpcap")
+            .enable_all()
+            .build()?;
+        RT.set(rt)
+            .or(Err(anyhow!("simple writer tokio runtime is already set")))?;
+        let rt = RT
+            .get()
+            .ok_or(anyhow!("simple writer tokio runtime is None"))?;
+
+        let cfg = Arc::new(cfg);
+        // Initialize pcap file sequence ID number
+        #[cfg(feature = "arkime")]
+        {
+            let cfg = cfg.clone();
+            let ts = Transport::single_node(cfg.es_host.as_str())?;
+            let es = Arc::new(Elasticsearch::new(ts));
+            let id = rt.block_on(async { threadings::get_sequence_number(&es, &cfg).await })?;
+            FILE_ID.store(id as u32, Ordering::SeqCst);
+        }
+        #[cfg(not(feature = "arkime"))]
+        {
+            let id = get_sequence_number(&es, &cfg)?;
+            FILE_ID.store(id as u32, Ordering::SeqCst);
+        }
+
         // Prepare packet info writer and spawn a writer thread
-        let builder = std::thread::Builder::new().name(self.name().to_string());
         let recv = receiver.clone();
-        let handle = builder.spawn(move || writing_thread(cfg, recv))?;
-        let handles = vec![handle];
+        let hdl = rt.spawn_blocking(move || main_loop(cfg, recv));
+        let handles = vec![hdl];
 
         unsafe {
             HANDLES
@@ -226,21 +285,22 @@ impl Plugin for SimpleWriterProcessor {
         // so cleanup all existing schedulers. Once all the schedulers were dropped, PacketInfo channel
         // would be closed, so the packet writing thread would be closed too.
         let mut schedulers = unsafe { SCHEDULERS.take().ok_or(anyhow!(""))? };
+        // TODO: update file info in Elasticsearch
         schedulers.clear();
 
         let (sender, receiver) = unsafe { CHANNEL.take().ok_or(anyhow!(""))? };
         drop(sender);
         drop(receiver);
 
+        let rt = RT
+            .get()
+            .ok_or(anyhow!("simple writer tokio runtime is None"))?;
         let handles = unsafe { HANDLES.take().ok_or(anyhow!(""))? };
-        for hdl in handles {
-            match hdl.join() {
-                Ok(_) => {}
-                Err(e) => {
-                    eprintln!("{:?}", e);
-                }
-            };
-        }
+
+        rt.block_on(async {
+            futures::future::join_all(handles).await;
+        });
+
         Ok(())
     }
 }
@@ -279,6 +339,7 @@ impl Processor for SimpleWriterProcessor {
                 .get()
                 .ok_or(anyhow!("{}: SCHEDULERS is not initialized", self.name()))?
         };
+
         let hash = self.hasher.finish() as usize % schedulers.len();
         self.hasher = FnvHasher::default();
         let info = schedulers[hash].gen(pkt);
