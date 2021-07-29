@@ -10,6 +10,7 @@ use path_absolutize::Absolutize;
 use alphonse_api as api;
 use api::packet::Packet;
 
+use crate::writer::PcapFileHeader;
 use crate::{FileMsg, Mode, PacketInfo, PcapDirAlgorithm, PcapFileInfo, FILE_ID};
 
 pub struct Timeval {
@@ -117,7 +118,7 @@ impl Scheduler {
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or_default()
                 .as_secs();
-            file_info.filesize = 0;
+            file_info.filesize = std::mem::size_of::<PcapFileHeader>();
             file_info.locked = true;
             let msg = FileMsg::Info(file_info.clone());
             msg

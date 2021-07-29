@@ -14,7 +14,7 @@ use crate::{FileMsg, PacketInfo, PcapFileInfo, FILE_ID};
 
 #[repr(C)]
 #[derive(Debug)]
-struct PcapFileHeader {
+pub struct PcapFileHeader {
     magic: u32,
     version_major: u16,
     version_minor: u16,
