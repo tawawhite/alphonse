@@ -65,7 +65,6 @@ unsafe impl Sync for Scheduler {}
 impl Scheduler {
     pub fn new(id: u8, node: String, sender: Sender<Box<PacketInfo>>) -> Self {
         let mut file_info = PcapFileInfo::default();
-        println!("node: {}", node);
         file_info.node = node;
         let file_info = RefCell::new(file_info);
         Self {
@@ -114,9 +113,13 @@ impl Scheduler {
                 Mode::XOR2048 => unimplemented!(),
                 Mode::AES256CTR => unimplemented!(),
             };
-            let msg = FileMsg::Info(file_info.clone());
-            // TODO: reset pcap file info
+            file_info.first = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs();
             file_info.filesize = 0;
+            file_info.locked = true;
+            let msg = FileMsg::Info(file_info.clone());
             msg
         } else {
             FileMsg::ID(file_info.num)
