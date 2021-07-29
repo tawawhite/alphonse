@@ -11,7 +11,7 @@ use alphonse_api as api;
 use api::packet::Packet;
 
 use crate::writer::PcapFileHeader;
-use crate::{FileMsg, Mode, PacketInfo, PcapDirAlgorithm, PcapFileInfo, FILE_ID};
+use crate::{Mode, PacketInfo, PcapDirAlgorithm, PcapFileInfo, FILE_ID};
 
 pub struct Timeval {
     _tv_sec: u32,
@@ -88,7 +88,7 @@ impl Scheduler {
         file_info.filesize += pkt.raw().len();
 
         let closing = file_info.filesize >= self.max_file_size;
-        let msg = if closing || file_info.name.as_os_str().is_empty() {
+        let file_info = if closing || file_info.name.as_os_str().is_empty() {
             // if current pcap file is gonna close, send a new name to the pcap writer
             let mut fid = FILE_ID.load(Ordering::Relaxed);
             if !file_info.name.as_os_str().is_empty() {
@@ -120,10 +120,9 @@ impl Scheduler {
                 .as_secs();
             file_info.filesize = std::mem::size_of::<PcapFileHeader>();
             file_info.locked = true;
-            let msg = FileMsg::Info(file_info.clone());
-            msg
+            Some(file_info.clone())
         } else {
-            FileMsg::ID(file_info.num)
+            None
         };
 
         // construct a pcap packet from a raw packet
@@ -143,7 +142,7 @@ impl Scheduler {
             thread: self.id,
             closing,
             buf,
-            file_info: msg,
+            file_info,
         })
     }
 

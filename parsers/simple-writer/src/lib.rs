@@ -121,20 +121,7 @@ struct PcapFileInfo {
     packet_pos_encoding: String,
 }
 
-/// The structure contains the file information
-#[derive(Clone, Debug)]
-enum FileMsg {
-    ID(u32),
-    Info(PcapFileInfo),
-}
-
-impl Default for FileMsg {
-    fn default() -> Self {
-        FileMsg::ID(0)
-    }
-}
-
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct PacketInfo {
     /// Packet thread id, which is also the scheduler thread ID
     thread: u8,
@@ -143,7 +130,7 @@ pub struct PacketInfo {
     /// Formatted pcap/pcapng packet buffer
     buf: Vec<u8>,
     /// Current writing file name
-    file_info: FileMsg,
+    file_info: Option<PcapFileInfo>,
 }
 
 #[derive(Default)]

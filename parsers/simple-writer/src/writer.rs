@@ -9,7 +9,7 @@ use tokio::runtime::Handle;
 
 #[cfg(feature = "arkime")]
 use crate::arkime::index_file_info;
-use crate::{FileMsg, PacketInfo};
+use crate::PacketInfo;
 
 #[repr(C)]
 #[derive(Debug)]
@@ -98,8 +98,8 @@ impl SimpleWriter {
         if info.closing || self.file.is_none() {
             // Open new pcap file for writing
             let info = match &info.file_info {
-                FileMsg::Info(info) => info,
-                FileMsg::ID(_) => {
+                Some(info) => info,
+                None => {
                     unreachable!("If a pcap file is about to close or no file is opened for writing, file info must not be a ID")
                 }
             };
