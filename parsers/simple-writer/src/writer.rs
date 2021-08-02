@@ -98,7 +98,7 @@ impl SimpleWriter {
         if info.closing || self.file.is_none() {
             // Open new pcap file for writing
             let info = match &info.file_info {
-                Some(info) => info,
+                Some((info, _)) => info,
                 None => {
                     unreachable!("If a pcap file is about to close or no file is opened for writing, file info must not be a ID")
                 }

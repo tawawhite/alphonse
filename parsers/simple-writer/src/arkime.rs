@@ -67,11 +67,11 @@ pub(crate) async fn get_sequence_number(es: &Arc<Elasticsearch>, cfg: &Arc<Confi
 pub(crate) async fn update_file_size(
     es: Arc<Elasticsearch>,
     cfg: Arc<Config>,
-    id: u64,
+    num: u64,
     filesize: usize,
 ) -> Result<()> {
     let index = format!("{}files", cfg.prefix);
-    let id = format!("{}-{}", cfg.node, id);
+    let id = format!("{}-{}", cfg.node, num);
     let parts = UpdateParts::IndexId(&index, &id);
     let body = json!({"doc":{"filesize":filesize}});
     let resp = es.update(parts).body(body).send().await?;

@@ -87,6 +87,7 @@ impl Scheduler {
         file_info.filesize += std::mem::size_of::<PacketHeader>();
         file_info.filesize += pkt.raw().len();
 
+        let filesize = file_info.filesize;
         let closing = file_info.filesize >= self.max_file_size;
         let file_info = if closing || file_info.name.as_os_str().is_empty() {
             // if current pcap file is gonna close, send a new name to the pcap writer
@@ -120,7 +121,7 @@ impl Scheduler {
                 .as_secs();
             file_info.filesize = std::mem::size_of::<PcapFileHeader>();
             file_info.locked = true;
-            Some(file_info.clone())
+            Some((file_info.clone(), filesize))
         } else {
             None
         };

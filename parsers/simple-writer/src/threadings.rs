@@ -9,7 +9,7 @@ use elasticsearch::Elasticsearch;
 use tokio::runtime::Handle;
 
 #[cfg(feature = "arkime")]
-use crate::arkime::get_sequence_number;
+use crate::arkime::{get_sequence_number, update_file_size};
 use crate::{Config, PacketInfo, SimpleWriter, FILE_ID};
 
 pub(crate) fn main_loop(cfg: Arc<Config>, receiver: Receiver<Box<PacketInfo>>) -> Result<()> {
@@ -30,13 +30,25 @@ pub(crate) fn main_loop(cfg: Arc<Config>, receiver: Receiver<Box<PacketInfo>>) -
         };
 
         if info.closing {
+            // Update last pcap file's filesize
             #[cfg(feature = "arkime")]
             {
                 let cfg = cfg.clone();
                 let es = es.clone();
                 let id = FILE_ID.load(Ordering::Relaxed) as u64;
-                // Handle::current().spawn(async move { update_file_size(es, cfg, id, filesize) });
+                match info.file_info {
+                    None => unreachable!("should never happens"),
+                    Some((_, filesize)) => {
+                        Handle::current().spawn(async move {
+                            match update_file_size(es, cfg, id, filesize).await {
+                                Ok(_) => {}
+                                Err(e) => eprintln!("{}", e),
+                            }
+                        });
+                    }
+                }
             }
+
             // If current pcap file is about to close, update global file ID
             #[cfg(feature = "arkime")]
             {

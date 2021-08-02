@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::hash::Hasher;
 use std::hash::{BuildHasher, Hash};
 use std::path::PathBuf;
@@ -11,6 +12,7 @@ use elasticsearch::Elasticsearch;
 use fnv::FnvHasher;
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize, Serializer};
+use serde_json::json;
 use tokio::task::JoinHandle;
 use yaml_rust::YamlEmitter;
 
@@ -130,7 +132,7 @@ pub struct PacketInfo {
     /// Formatted pcap/pcapng packet buffer
     buf: Vec<u8>,
     /// Current writing file name
-    file_info: Option<PcapFileInfo>,
+    file_info: Option<(PcapFileInfo, usize)>,
 }
 
 #[derive(Default)]
@@ -138,7 +140,9 @@ struct SimpleWriterProcessor {
     /// Processor ID
     id: ProcessorID,
     /// Actual packet disk position
-    packet_pos: Vec<isize>,
+    packet_pos: Box<Vec<isize>>,
+    /// File sequence ID
+    file_id: Box<HashSet<u32>>,
     /// Hasher to decide which scheduler to use
     hasher: fnv::FnvHasher,
     /// Current file ID
@@ -149,9 +153,10 @@ impl Clone for SimpleWriterProcessor {
     fn clone(&self) -> Self {
         Self {
             id: self.id,
-            packet_pos: self.packet_pos.clone(),
+            packet_pos: Default::default(),
+            file_id: Default::default(),
             hasher: fnv::FnvBuildHasher::default().build_hasher(),
-            fid: self.fid,
+            fid: 0,
         }
     }
 }
@@ -332,6 +337,7 @@ impl Processor for SimpleWriterProcessor {
         let info = schedulers[hash].gen(pkt);
         if schedulers[hash].current_fid() != self.fid {
             self.fid = schedulers[hash].current_fid();
+            self.file_id.insert(schedulers[hash].current_fid());
             self.packet_pos
                 .push(-(schedulers[hash].current_fid() as isize));
         }
@@ -344,20 +350,15 @@ impl Processor for SimpleWriterProcessor {
 
     fn mid_save(&mut self, ses: &mut Session) {
         self.save(ses);
-        // Cleanup previous packet positions
-        self.packet_pos.clear();
-        self.fid = 0;
     }
 
     /// Add packet positions into session after session is about to timeout or closed
     fn save(&mut self, ses: &mut Session) {
-        let value = serde_json::Value::Array(
-            self.packet_pos
-                .iter()
-                .map(|pos| serde_json::json!(pos))
-                .collect(),
-        );
-        ses.add_field(&"packetPos", value);
+        let packet_pos = std::mem::take(&mut self.packet_pos);
+        ses.add_field(&"packetPos", json!(packet_pos));
+
+        let file_id = std::mem::take(&mut self.file_id);
+        ses.add_field(&"fileId", json!(file_id));
     }
 }
 
@@ -378,7 +379,7 @@ mod tests {
     #[test]
     fn finish() {
         let mut processor = SimpleWriterProcessor::default();
-        processor.packet_pos = vec![-1, 1, 2, 3, 4, 5];
+        processor.packet_pos = Box::new(vec![-1, 1, 2, 3, 4, 5]);
 
         let mut ses = Session::new();
         processor.save(&mut ses);
