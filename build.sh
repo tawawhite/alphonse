@@ -6,7 +6,7 @@ export LD_LIBRARY_PATH=$(pwd)/build/install/lib:$(pwd)/build/install/lib64:$(pwd
 export RUSTC_VERSION=$(rustc --version | awk '{print $2}')
 
 echo $PKG_CONFIG_PATH
-cargo build --all
+cargo build --all ${BUILD_FLAGS}
 cargo test --all
 
 unset PKG_CONFIG_PATH

@@ -8,7 +8,7 @@ ENV RUSTFLAGS="-C target-feature=-crt-static" \
 
 RUN apk add cmake make gcc g++ git openssl-dev flex linux-headers python3 libpcap libpcap-dev clang-libs bison; \
     cd /alphonse; \
-    /alphonse/build.sh
+    /alphonse/build.sh --release
 
 CMD ["/bin/sh"]
 
