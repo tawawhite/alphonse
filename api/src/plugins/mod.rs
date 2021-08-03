@@ -27,7 +27,7 @@ pub trait Plugin {
     fn plugin_type(&self) -> PluginType;
 
     /// Initialize plugin required global resources
-    fn init(&self, _cfg: &Config) -> Result<()> {
+    fn init(&mut self, _cfg: &Config) -> Result<()> {
         Ok(())
     }
 

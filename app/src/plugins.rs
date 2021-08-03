@@ -160,7 +160,7 @@ pub fn init_plugins(
                         .lib
                         .get::<rx::NewRxDriverFunc>(rx::NEW_RX_DRIVER_FUNC_NAME.as_bytes())
                         .map_err(|e| anyhow!("{}", e))?;
-                    let driver = *func();
+                    let mut driver = *func();
                     println!("Initializing {} rx driver", driver.name());
                     driver.init(cfg)?;
                     match &warehouse.rx_driver {
@@ -196,7 +196,7 @@ pub fn init_plugins(
                             output::NEW_OUTPUT_PLUGIN_FUNC_NAME.as_bytes(),
                         )
                         .map_err(|e| anyhow!("{}", e))?;
-                    let plugin = *func();
+                    let mut plugin = *func();
                     println!("Initializing {} output plugin", plugin.name());
                     plugin.init(cfg)?;
                     warehouse.output_plugins.push(plugin)

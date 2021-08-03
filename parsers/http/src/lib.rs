@@ -126,7 +126,7 @@ impl<'a> Plugin for HttpProcessor<'a> {
         &self.name.as_str()
     }
 
-    fn init(&self, cfg: &Config) -> Result<()> {
+    fn init(&mut self, cfg: &Config) -> Result<()> {
         // initialize global llhttp settings
         let mut settings = llhttp::Settings::default();
 

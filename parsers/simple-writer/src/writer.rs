@@ -1,12 +1,19 @@
+use std::io::Write;
+use std::path::PathBuf;
+use std::sync::Arc;
+
 use anyhow::{anyhow, Result};
 
-use tokio::io::AsyncWriteExt;
+use elasticsearch::Elasticsearch;
+use tokio::runtime::Handle;
 
-use crate::{File, PacketInfo};
+#[cfg(feature = "arkime")]
+use crate::arkime::index_file_info;
+use crate::PacketInfo;
 
 #[repr(C)]
 #[derive(Debug)]
-struct PcapFileHeader {
+pub struct PcapFileHeader {
     magic: u32,
     version_major: u16,
     version_minor: u16,
@@ -60,8 +67,9 @@ enum WriteError {
 /// Pcap writer, write pacp to disk or remote filesystem or whatever
 #[derive(Debug)]
 pub struct SimpleWriter {
+    fname: PathBuf,
     /// Current opened pcap file handle
-    file: Option<tokio::fs::File>,
+    file: Option<std::fs::File>,
     format: Format,
     pcap_file_header: PcapFileHeader,
 }
@@ -69,6 +77,7 @@ pub struct SimpleWriter {
 impl Default for SimpleWriter {
     fn default() -> Self {
         Self {
+            fname: PathBuf::default(),
             file: None,
             format: Format::default(),
             pcap_file_header: PcapFileHeader::default(),
@@ -84,16 +93,32 @@ impl Clone for SimpleWriter {
 
 impl SimpleWriter {
     /// Wirte packet to disk
-    pub async fn write(&mut self, pkt: &[u8], info: &PacketInfo) -> Result<()> {
+    pub fn write(&mut self, info: Box<PacketInfo>, es: &Arc<Elasticsearch>) -> Result<()> {
+        let pkt = info.buf.as_slice();
         if info.closing || self.file.is_none() {
             // Open new pcap file for writing
-            let fname = match &info.file_info {
-                File::Name(name) => name,
-                File::ID(_) => {
+            let info = match &info.file_info {
+                Some((info, _)) => info,
+                None => {
                     unreachable!("If a pcap file is about to close or no file is opened for writing, file info must not be a ID")
                 }
             };
-            let mut file = tokio::fs::File::create(fname).await?;
+            let mut file = std::fs::File::create(&info.name)?;
+
+            // Update file information in Elasticsearch
+            #[cfg(feature = "arkime")]
+            {
+                let es = es.clone();
+                let info = Box::new(info.clone());
+                Handle::current().spawn(async {
+                    match index_file_info(es, info).await {
+                        Ok(_) => {}
+                        Err(e) => {
+                            eprintln!("{}", e);
+                        }
+                    }
+                });
+            }
 
             match self.format {
                 Format::Pcap => {}
@@ -103,9 +128,13 @@ impl SimpleWriter {
             };
 
             let hdr_len = std::mem::size_of::<PcapFileHeader>();
-            let hdr = (&self.pcap_file_header) as *const PcapFileHeader as *const u8;
-            let hdr = unsafe { std::slice::from_raw_parts(hdr, hdr_len) };
-            file.write(hdr).await?;
+            let hdr = unsafe {
+                let hdr = (&self.pcap_file_header) as *const PcapFileHeader as *const u8;
+                std::slice::from_raw_parts(hdr, hdr_len)
+            };
+            file.write(hdr)?;
+
+            self.fname = info.name.clone();
             self.file = Some(file);
         }
 
@@ -114,7 +143,7 @@ impl SimpleWriter {
             None => return Err(anyhow!("{:?}", WriteError::FileOpenError)),
         };
 
-        match file.write(pkt).await {
+        match file.write(pkt) {
             Ok(_) => {}
             Err(e) => return Err(anyhow!("{}", e)),
         };

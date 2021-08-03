@@ -128,7 +128,7 @@ impl Plugin for IPProcessor {
         "ip"
     }
 
-    fn init(&self, alcfg: &api::config::Config) -> Result<()> {
+    fn init(&mut self, alcfg: &api::config::Config) -> Result<()> {
         let db_dir = PathBuf::from(alcfg.get_str(&"ip.db.directory", "etc"));
         let db_path = db_dir.join("GeoLite2-ASN.mmdb");
         ASN_DB
