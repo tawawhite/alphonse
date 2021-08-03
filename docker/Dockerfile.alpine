@@ -1,0 +1,25 @@
+FROM rust:1.54-alpine3.14 AS Base
+
+COPY . /alphonse
+
+ENV RUSTFLAGS="-C target-feature=-crt-static" \
+    PKG_CONFIG_PATH=/alphonse/build/install/lib/pkgconfig:/alphonse/build/install/lib64/pkgconfig:/alphonse/build/install/lib/x86_64-linux-gnu/pkgconfig \
+    LD_LIBRARY_PATH=/alphonse/build/install/lib:/alphonse/build/install/lib64:/alphonse/build/install/lib/x86_64-linux-gnu
+
+RUN apk add cmake make gcc g++ git openssl-dev flex linux-headers python3 libpcap libpcap-dev clang-libs bison; \
+    cd /alphonse; \
+    /alphonse/build.sh
+
+CMD ["/bin/sh"]
+
+FROM alpine:3.14
+
+COPY --from=Base /alphonse/target/debug/alphonse /usr/local/bin/
+COPY --from=Base /alphonse/target/debug/*.so /usr/local/lib/
+COPY --from=Base /alphonse/alphonse.example.yml /usr/local/etc/
+COPY --from=Base /alphonse/etc/*.mmdb /usr/local/etc/
+COPY --from=Base /alphonse/etc/*.csv /usr/local/etc/
+
+RUN apk add --no-cache libstdc++ libpcap
+
+CMD ["/bin/sh"]
