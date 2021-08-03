@@ -11,3 +11,15 @@ RUN apk add cmake make gcc g++ git openssl-dev flex linux-headers python3 libpca
     /alphonse/build.sh
 
 CMD ["/bin/sh"]
+
+FROM alpine:3.14
+
+COPY --from=Base /alphonse/target/debug/alphonse /usr/local/bin/
+COPY --from=Base /alphonse/target/debug/*.so /usr/local/lib/
+COPY --from=Base /alphonse/alphonse.example.yml /usr/local/etc/
+COPY --from=Base /alphonse/etc/*.mmdb /usr/local/etc/
+COPY --from=Base /alphonse/etc/*.csv /usr/local/etc/
+
+RUN apk add --no-cache libstdc++ libpcap
+
+CMD ["/bin/sh"]
