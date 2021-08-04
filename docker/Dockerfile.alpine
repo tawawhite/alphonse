@@ -15,8 +15,8 @@ CMD ["/bin/sh"]
 
 FROM alpine:3.14
 
-COPY --from=Base /alphonse/target/relase/alphonse /usr/local/bin/
-COPY --from=Base /alphonse/target/relase/*.so /usr/local/lib/
+COPY --from=Base /alphonse/target/release/alphonse /usr/local/bin/
+COPY --from=Base /alphonse/target/release/*.so /usr/local/lib/
 COPY --from=Base /alphonse/alphonse.example.yml /usr/local/etc/
 COPY --from=Base /alphonse/etc/*.mmdb /usr/local/etc/
 COPY --from=Base /alphonse/etc/*.csv /usr/local/etc/
