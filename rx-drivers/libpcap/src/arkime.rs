@@ -4,8 +4,7 @@ use std::time::{Duration, SystemTime};
 
 use anyhow::{anyhow, Result};
 use elasticsearch::{
-    http::response::Response, http::transport::Transport, params::VersionType, Elasticsearch,
-    GetParts, IndexParts,
+    http::transport::Transport, params::VersionType, Elasticsearch, GetParts, IndexParts,
 };
 use serde_json::json;
 use tokio::runtime::Handle;
@@ -13,6 +12,7 @@ use tokio::runtime::Handle;
 use alphonse_api as api;
 use alphonse_arkime as arkime;
 use api::config::Config;
+use api::utils::elasticsearch::handle_resp;
 use arkime::stat::Stat;
 
 use crate::{gather_stats, NetworkInterface};
@@ -39,9 +39,10 @@ pub(crate) fn main_loop(cfg: Arc<Config>, caps: Vec<Arc<NetworkInterface>>) -> R
 
     let host = cfg.get_str("elasticsearch", "http://localhost:9200");
     let es = Arc::new(Elasticsearch::new(Transport::single_node(host.as_str())?));
+    let prefix = cfg.get_str("arkime.prefix", "");
 
     Handle::current().block_on(async {
-        match load_stats(&cfg, &es, &db_version).await {
+        match load_stats(&cfg, &es, prefix.clone(), &db_version).await {
             Ok(_) => Ok(()),
             Err(e) => Err(anyhow!("{}", e)),
         }
@@ -78,8 +79,9 @@ pub(crate) fn main_loop(cfg: Arc<Config>, caps: Vec<Arc<NetworkInterface>>) -> R
                 let es = es.clone();
                 let stats = stats[i].clone();
                 let db_version = db_version.clone();
+                let prefix = prefix.clone();
                 Handle::current().spawn(async move {
-                    match update_stats(cfg, es, stats, i, db_version).await {
+                    match update_stats(cfg, es, prefix, stats, i, db_version).await {
                         Ok(_) => Ok(()),
                         Err(e) => Err(anyhow!("{}", e)),
                     }
@@ -93,8 +95,12 @@ pub(crate) fn main_loop(cfg: Arc<Config>, caps: Vec<Arc<NetworkInterface>>) -> R
     Ok(())
 }
 
-async fn load_stats(cfg: &Arc<Config>, es: &Elasticsearch, db_version: &AtomicU64) -> Result<()> {
-    let prefix = cfg.get_str("arkime.prefix", "");
+async fn load_stats(
+    cfg: &Arc<Config>,
+    es: &Elasticsearch,
+    prefix: String,
+    db_version: &AtomicU64,
+) -> Result<()> {
     let index = format!("{}stats", prefix);
     let parts = GetParts::IndexId(&index, &cfg.node);
     let resp = es.get(parts).send().await?;
@@ -110,7 +116,7 @@ async fn load_stats(cfg: &Arc<Config>, es: &Elasticsearch, db_version: &AtomicU6
         }
         code => {
             println!("status code: {}", code);
-            println!("response message: {}", resp.text().await.unwrap());
+            println!("response message: {}", resp.text().await?);
         }
     };
     Ok(())
@@ -119,6 +125,7 @@ async fn load_stats(cfg: &Arc<Config>, es: &Elasticsearch, db_version: &AtomicU6
 async fn update_stats(
     cfg: Arc<Config>,
     es: Arc<Elasticsearch>,
+    prefix: String,
     stat: Stat,
     i: usize,
     db_version: Arc<AtomicU64>,
@@ -128,8 +135,6 @@ async fn update_stats(
     let now = SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)?
         .as_secs();
-
-    let prefix = cfg.get_str("arkime.prefix", "");
 
     let resp = if i == 0 {
         let index = format!("{}stats", prefix);
@@ -155,16 +160,5 @@ async fn update_stats(
 
     handle_resp(resp).await?;
 
-    Ok(())
-}
-
-async fn handle_resp(resp: Response) -> Result<()> {
-    match resp.status_code().as_u16() {
-        code if code / 100 == 2 => {}
-        c => {
-            println!("status code: {}", c);
-            println!("response message: {}", resp.text().await.unwrap());
-        }
-    };
     Ok(())
 }
