@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use crossbeam_channel::Receiver;
+use serde_json::json;
 
 use alphonse_api as api;
 use api::classifiers::ClassifierManager;
