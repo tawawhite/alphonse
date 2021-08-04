@@ -11,7 +11,7 @@ use serde_json::json;
 use crate::packet;
 
 /// Wrapper type for libc::timeval
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 #[repr(C)]
 pub struct TimeVal(pub timeval);
 
@@ -53,6 +53,12 @@ impl DerefMut for TimeVal {
     }
 }
 
+impl std::fmt::Debug for TimeVal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.serialize_u64(self.tv_sec as u64 * 1000 + self.tv_usec as u64 / 1000)
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -60,7 +66,7 @@ mod test {
 
     #[test]
     fn serialize() {
-        let tv = TimeVal::<precision::Millisecond>::new(timeval {
+        let tv = TimeVal::new(timeval {
             tv_sec: 1608011935,
             tv_usec: 807924,
         });
