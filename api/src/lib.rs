@@ -19,4 +19,3 @@ pub mod dissectors;
 pub mod packet;
 pub mod plugins;
 pub mod session;
-pub mod utils;

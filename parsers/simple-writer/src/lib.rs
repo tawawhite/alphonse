@@ -18,11 +18,11 @@ use yaml_rust::YamlEmitter;
 
 use alphonse_api as api;
 use api::classifiers::{matched::Rule, ClassifierManager};
+use api::config::Yaml;
 use api::packet::{Packet, PacketHashKey};
 use api::plugins::processor::{Processor, ProcessorID};
 use api::plugins::{Plugin, PluginType};
 use api::session::Session;
-use api::utils::yaml::Yaml;
 
 #[cfg(feature = "arkime")]
 mod arkime;
