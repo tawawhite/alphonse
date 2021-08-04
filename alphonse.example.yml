@@ -30,7 +30,19 @@ timeout.sctp: 60
 timeout.ses.save: 180
 ses.max.packets: 10000
 threads.pkt: 1
-plugins.processors: ["dns", "http", "ip", "misc", "tcp", "tls", "udp", "es"]
+plugins.processors:
+  [
+    "dns",
+    "ethernet",
+    "http",
+    "ip",
+    "misc",
+    "tcp",
+    "tls",
+    "udp",
+    "es",
+    "simplewriter",
+  ]
 plugins.rx-driver: rxfiles
 plugins.dirs: ["target/debug"]
 
