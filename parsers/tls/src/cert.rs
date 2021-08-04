@@ -6,8 +6,6 @@ use serde::{Serialize, Serializer};
 use tls_parser::TlsCertificateContents;
 use x509_parser::prelude::{oid2sn, parse_x509_certificate, GeneralName, ParsedExtension};
 
-use alphonse_api as api;
-
 use crate::TlsProcessor;
 
 #[derive(Clone, Debug, Default, Serialize)]
@@ -149,9 +147,11 @@ impl TlsProcessor {
                     }
 
                     // match cer.signature_algorithm.algorithm {};
-                    cert.public_algorithm = oid2sn(&cer.signature_algorithm.algorithm)
-                        .unwrap_or("corrupt")
-                        .to_string();
+                    let oid_registry = x509_parser::objects::oid_registry();
+                    cert.public_algorithm =
+                        oid2sn(&cer.signature_algorithm.algorithm, oid_registry)
+                            .unwrap_or("corrupt")
+                            .to_string();
 
                     if cer.tbs_certificate.subject_pki.algorithm.algorithm
                         == x509_parser::oid_registry::OID_KEY_TYPE_EC_PUBLIC_KEY
@@ -164,7 +164,9 @@ impl TlsProcessor {
                                     Ok(oid) => {
                                         // TODO: x509-parser::objects::OID_REGISTRY is not public, so probably
                                         // all the curves would be recoginzed as unknown
-                                        cert.curve = oid2sn(oid).unwrap_or("unknown").to_string();
+                                        cert.curve = oid2sn(oid, oid_registry)
+                                            .unwrap_or("unknown")
+                                            .to_string();
                                     }
                                 };
                             }
@@ -172,7 +174,7 @@ impl TlsProcessor {
                     }
 
                     // get extension infomation
-                    for ext in cer.extensions().values() {
+                    for ext in cer.extensions() {
                         match ext.parsed_extension() {
                             ParsedExtension::BasicConstraints(bc) => {
                                 cert.ca = bc.ca;
