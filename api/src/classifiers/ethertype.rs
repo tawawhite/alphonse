@@ -67,8 +67,8 @@ mod test {
     use super::*;
 
     use crate::classifiers::{self, Classifier as ClassifierTrait};
+    use crate::packet::test::Packet;
     use crate::packet::{self, Packet as PacketTrait};
-    use crate::utils;
 
     #[test]
     fn add_same_etype_rule() {
@@ -110,7 +110,7 @@ mod test {
         rule.rule_type = crate::classifiers::RuleType::EtherType(etype_rule);
         classifier.add_rule(&mut rule).unwrap();
 
-        let mut pkt = Box::new(utils::packet::Packet::default());
+        let mut pkt = Box::new(Packet::default());
         pkt.layers_mut().data_link = packet::Layer {
             offset: 0,
             protocol: packet::Protocol::ETHERNET,

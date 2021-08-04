@@ -27,7 +27,6 @@ rustc_version = "0.4"
 [dev-dependencies]
 twox-hash = "*"
 rand = "*"
-alphonse-utils = { path = "../utils" }
 
 [features]
 default = ["pkt-hash-mac"]

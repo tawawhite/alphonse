@@ -65,8 +65,8 @@ mod test {
     use super::super::RuleID;
     use super::*;
     use crate::classifiers::Classifier as ClassifierTrait;
+    use crate::packet::test::Packet;
     use crate::packet::Packet as PacketTrait;
-    use crate::utils;
 
     #[test]
     fn add_rule_with_same_processor_id() {
@@ -108,7 +108,8 @@ mod test {
 
         assert!(matches!(classifier.add_rule(&rule), Ok(_)));
 
-        let mut pkt: Box<dyn PacketTrait> = Box::new(utils::packet::Packet::default());
+        let a = Packet::default();
+        let mut pkt: Box<dyn PacketTrait> = Box::new(a);
         classifier.classify(pkt.as_mut());
         assert_eq!(pkt.rules().len(), 1);
     }
@@ -116,7 +117,7 @@ mod test {
     #[test]
     fn classify_without_any_processors() {
         let classifier = Classifier::default();
-        let mut pkt: Box<dyn PacketTrait> = Box::new(utils::packet::Packet::default());
+        let mut pkt: Box<dyn PacketTrait> = Box::new(Packet::default());
         classifier.classify(pkt.as_mut());
         assert_eq!(pkt.rules().len(), 0);
     }
