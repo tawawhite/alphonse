@@ -7,7 +7,7 @@ export RUSTC_VERSION=$(rustc --version | awk '{print $2}')
 
 echo $PKG_CONFIG_PATH
 cargo build --all ${BUILD_FLAGS}
-cargo test --all
+cargo test --all ${BUILD_FLAGS}
 
 unset PKG_CONFIG_PATH
 unset LD_LIBRARY_PATH
