@@ -6,6 +6,7 @@ members = [
     "output/disk",
     "output/elasticsearch",
     "parsers/dns",
+    "parsers/ethernet",
     "parsers/http",
     "parsers/misc",
     "parsers/simple-writer",
