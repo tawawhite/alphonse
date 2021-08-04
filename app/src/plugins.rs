@@ -75,11 +75,11 @@ impl PluginWarehouse {
     }
 
     pub fn start_output_plugins(
-        &self,
+        &mut self,
         cfg: &Arc<Config>,
         receivers: &[Receiver<Arc<Box<Session>>>],
     ) -> Result<()> {
-        for (i, plugin) in self.output_plugins.iter().enumerate() {
+        for (i, plugin) in self.output_plugins.iter_mut().enumerate() {
             match plugin.start(cfg.clone(), &receivers[i]) {
                 Err(e) => return Err(anyhow!("{}", e)),
                 Ok(_) => println!("output plugin {} started", plugin.name()),

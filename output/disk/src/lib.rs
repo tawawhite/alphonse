@@ -55,7 +55,7 @@ impl OutputPlugin for Output {
         Box::new(self.clone())
     }
 
-    fn start(&self, cfg: Arc<Config>, receiver: &Receiver<Arc<Box<Session>>>) -> Result<()> {
+    fn start(&mut self, cfg: Arc<Config>, receiver: &Receiver<Arc<Box<Session>>>) -> Result<()> {
         let mut handles = vec![];
         let dirs = cfg.get_str_arr("output.disk.dirs");
         if dirs.is_empty() {

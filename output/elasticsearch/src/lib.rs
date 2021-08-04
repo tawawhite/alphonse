@@ -1,17 +1,20 @@
 use std::convert::TryFrom;
-use std::sync::{Arc, RwLock};
-use std::thread::JoinHandle;
+use std::sync::Arc;
+use std::time::{Duration, SystemTime};
 
 use anyhow::{anyhow, Result};
 use chrono::{Datelike, Timelike};
 use crossbeam_channel::Receiver;
-use elasticsearch::{http::transport::Transport, Elasticsearch};
+use elasticsearch::{http::transport::Transport, BulkOperation, BulkParts, Elasticsearch};
+use tokio::runtime::Handle;
+use tokio::task::JoinHandle;
 
 use alphonse_api as api;
 use api::config::Config;
 use api::plugins::output::OutputPlugin;
 use api::plugins::{Plugin, PluginType};
 use api::session::Session;
+use api::utils::elasticsearch::handle_bulk_index_resp;
 use api::utils::serde::get_ser_json_size;
 use api::utils::timeval::{precision::Millisecond, TimeVal};
 
@@ -76,9 +79,19 @@ fn to_index_suffix(rotate: Rotate, ts: &TimeVal<Millisecond>) -> String {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Default)]
 struct Output {
-    handles: Arc<RwLock<Vec<JoinHandle<Result<()>>>>>,
+    handles: Vec<JoinHandle<Result<()>>>,
+    rt: Option<Arc<tokio::runtime::Runtime>>,
+}
+
+impl Clone for Output {
+    fn clone(&self) -> Self {
+        Self {
+            handles: vec![],
+            rt: self.rt.clone(),
+        }
+    }
 }
 
 impl Plugin for Output {
@@ -91,20 +104,16 @@ impl Plugin for Output {
     }
 
     fn cleanup(&mut self) -> Result<()> {
-        let mut handles = match self.handles.write() {
-            Ok(h) => h,
-            Err(e) => return Err(anyhow!("{}", e)),
-        };
+        let mut handles = vec![];
+        while let Some(hdl) = self.handles.pop() {
+            handles.push(hdl);
+        }
 
-        while handles.len() > 0 {
-            let hdl = handles.pop();
-            match hdl {
-                None => continue,
-                Some(hdl) => match hdl.join() {
-                    Ok(_) => {}
-                    Err(e) => eprintln!("{:?}", e),
-                },
-            }
+        match &self.rt {
+            None => unreachable!("this should never happen"),
+            Some(rt) => rt.block_on(async {
+                futures::future::join_all(handles).await;
+            }),
         }
 
         Ok(())
@@ -116,72 +125,64 @@ impl OutputPlugin for Output {
         Box::new(self.clone())
     }
 
-    fn start(&self, cfg: Arc<Config>, receiver: &Receiver<Arc<Box<Session>>>) -> Result<()> {
-        let mut handles = vec![];
-        let cfg = cfg.clone();
-        let max_bulk_size =
-            cfg.get_integer("output.elasticsearch.maxBulkSize", 1000, 1000, 1000000000) as usize;
-        let mut thread = OutputThread::new(receiver.clone(), max_bulk_size);
-        let builder = std::thread::Builder::new().name(thread.name());
-        let handle = builder.spawn(move || thread.spawn(cfg)).unwrap();
-        handles.push(handle);
+    fn start(&mut self, cfg: Arc<Config>, receiver: &Receiver<Arc<Box<Session>>>) -> Result<()> {
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(1)
+            .thread_name("alphonse-output-tokio")
+            .enable_all()
+            .build()?;
 
-        match self.handles.write() {
-            Ok(mut h) => {
-                *h.as_mut() = handles;
-            }
-            Err(e) => return Err(anyhow!("{}", e)),
-        };
+        let mut thread = OutputThread::new(receiver.clone());
+        let hdl = rt.spawn_blocking(move || thread.main_loop(cfg));
+        self.handles.push(hdl);
+
+        self.rt = Some(Arc::new(rt));
         Ok(())
     }
 }
 
 struct OutputThread {
     receiver: Receiver<Arc<Box<Session>>>,
-    max_bulk_size: usize,
 }
 
 impl OutputThread {
-    pub fn new(receiver: Receiver<Arc<Box<Session>>>, max_bulk_size: usize) -> Self {
-        OutputThread {
-            receiver,
-            max_bulk_size,
-        }
+    pub fn new(receiver: Receiver<Arc<Box<Session>>>) -> Self {
+        OutputThread { receiver }
     }
 
-    pub fn spawn(&mut self, cfg: Arc<Config>) -> Result<()> {
-        let rt = tokio::runtime::Builder::new_multi_thread()
-            .worker_threads(4)
-            .thread_name("alphonse-output-tokio")
-            .enable_all()
-            .build()
-            .unwrap();
+    fn main_loop(&mut self, cfg: Arc<Config>) -> Result<()> {
+        let max_bulk_size =
+            cfg.get_integer("output.elasticsearch.maxBulkSize", 1000, 1000, 1000000000) as usize;
+        let mut bulk_size = 0;
+        let mut sessions = vec![];
         let host = cfg.get_str("elasticsearch", "http://localhost:9200");
         let es = Arc::new(Elasticsearch::new(Transport::single_node(host.as_str())?));
+        let mut last_send_time = SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)?
+            .as_secs();
 
         println!("{} started", self.name());
 
-        rt.block_on(async {
-            match self.main_loop(&cfg, &es).await {
-                Ok(_) => {}
-                Err(e) => eprintln!("{}", e),
-            }
-        });
-
-        println!("{} exit", self.name());
-
-        Ok(())
-    }
-
-    async fn main_loop(&mut self, cfg: &Arc<Config>, es: &Arc<Elasticsearch>) -> Result<()> {
-        let mut bulk_size = 0;
-        let mut sessions = vec![];
         loop {
             let ses = match self.receiver.try_recv() {
                 Ok(ses) => ses,
                 Err(err) => match err {
                     crossbeam_channel::TryRecvError::Disconnected => break,
-                    _ => continue,
+                    _ => {
+                        let now = SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)?
+                            .as_secs();
+                        if now - last_send_time >= 60 && !cfg.dry_run && sessions.len() > 0 {
+                            let cfg = cfg.clone();
+                            let es = es.clone();
+                            let sess = sessions.clone();
+                            save_sessions_sync(cfg, es, sess, &mut sessions, &mut bulk_size)?;
+                            last_send_time = now;
+                        } else {
+                            std::thread::sleep(Duration::from_micros(100000));
+                        }
+                        continue;
+                    }
                 },
             };
 
@@ -190,12 +191,14 @@ impl OutputThread {
             }
 
             let size = get_ser_json_size(&ses)?;
-            if bulk_size != 0 && bulk_size + size >= self.max_bulk_size {
+            if bulk_size != 0 && bulk_size + size >= max_bulk_size {
                 let cfg = cfg.clone();
                 let es = es.clone();
-                Self::save_sessions(cfg, es, &sessions).await?;
-                sessions.clear();
-                bulk_size = 0;
+                let sess = sessions.clone();
+                save_sessions_sync(cfg, es, sess, &mut sessions, &mut bulk_size)?;
+                last_send_time = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)?
+                    .as_secs();
             }
 
             sessions.push(ses);
@@ -208,41 +211,14 @@ impl OutputThread {
 
         let cfg = cfg.clone();
         let es = es.clone();
-        Self::save_sessions(cfg, es, &sessions).await?;
-
-        Ok(())
-    }
-
-    async fn save_sessions(
-        _cfg: Arc<Config>,
-        es: Arc<Elasticsearch>,
-        sessions: &Vec<Arc<Box<Session>>>,
-    ) -> Result<()> {
-        let body = sessions
-            .iter()
-            .map(|ses| {
-                let index = format!(
-                    "sessions2-{}",
-                    to_index_suffix(Rotate::Daily, &ses.start_time)
-                );
-                elasticsearch::BulkOperation::from(
-                    elasticsearch::BulkOperation::index(ses.as_ref()).index(index),
-                )
-            })
-            .collect();
-        let resp = es
-            .bulk(elasticsearch::BulkParts::None)
-            .body(body)
-            .send()
-            .await?;
-        let code = resp.status_code();
-        match code.as_u16() {
-            code if code >= 200 && code < 300 => {}
-            c => {
-                println!("status code: {}", c);
-                println!("response message: {}", resp.text().await.unwrap());
+        Handle::current().spawn(async {
+            match save_sessions(cfg, es, sessions).await {
+                Ok(_) => Ok(()),
+                Err(e) => Err(anyhow!("{}", e)),
             }
-        };
+        });
+
+        println!("{} exit", self.name());
 
         Ok(())
     }
@@ -250,6 +226,44 @@ impl OutputThread {
     pub fn name(&self) -> String {
         format!("alphonse-output-es")
     }
+}
+
+/// Sync wrapper function of save_sessions
+fn save_sessions_sync(
+    cfg: Arc<Config>,
+    es: Arc<Elasticsearch>,
+    sess: Vec<Arc<Box<Session>>>,
+    sessions: &mut Vec<Arc<Box<Session>>>,
+    bulk_size: &mut usize,
+) -> Result<()> {
+    Handle::current().spawn(async {
+        match save_sessions(cfg, es, sess).await {
+            Ok(_) => Ok(()),
+            Err(e) => Err(anyhow!("{}", e)),
+        }
+    });
+    sessions.clear();
+    *bulk_size = 0;
+    Ok(())
+}
+
+async fn save_sessions(
+    _cfg: Arc<Config>,
+    es: Arc<Elasticsearch>,
+    sessions: Vec<Arc<Box<Session>>>,
+) -> Result<()> {
+    let body = sessions
+        .into_iter()
+        .map(|ses| {
+            let index = format!(
+                "sessions2-{}",
+                to_index_suffix(Rotate::Daily, &ses.start_time)
+            );
+            BulkOperation::from(BulkOperation::index(ses).index(index))
+        })
+        .collect();
+    let resp = es.bulk(BulkParts::None).body(body).send().await?;
+    handle_bulk_index_resp(resp).await
 }
 
 #[no_mangle]
