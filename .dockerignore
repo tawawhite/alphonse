@@ -1,7 +1,15 @@
+# Cargo related directories
 vendor/
 target/
+# Third party C/C++ library build directory
 build/
 build.alpine/
+# Pcap storage directory
 raw/
 pcaps/
+# Docker image build related
 docker/
+# Python virtualenv directory
+venv/
+# Third party source code archive files
+third_party/
