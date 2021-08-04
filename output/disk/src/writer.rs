@@ -7,8 +7,9 @@ use anyhow::Result;
 use uuid::Uuid;
 
 use alphonse_api as api;
+use alphonse_utils as utils;
 use api::session::Session;
-use api::utils::serde::get_ser_json_size;
+use utils::serde::get_ser_json_size;
 
 #[derive(Clone, Debug, Default)]
 pub struct OutputPath {

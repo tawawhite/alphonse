@@ -7,7 +7,6 @@ use yaml_rust::YamlLoader;
 
 use alphonse_api as api;
 use api::config::Config;
-use api::utils::yaml::{get_integer, get_str, get_str_arr};
 
 use super::commands::CliArg;
 
@@ -46,30 +45,30 @@ fn parse_config_file(config_file: &str, config: &mut Config) -> Result<()> {
 
     let docs = YamlLoader::load_from_str(&s)?;
     let doc = &docs[0];
-    config.doc = api::utils::yaml::Yaml(doc.clone());
+    config.doc = api::config::Yaml(doc.clone());
 
     config.pkt_channel_size =
-        get_integer(doc, "channel.pkt.size", 1000000, 100000, 10000000) as u32;
-    config.timeout_interval = get_integer(doc, "timeout.interval", 1, 1, 10) as u64;
-    config.default_timeout = get_integer(doc, "timeout.default", 60, 10, 180) as u16;
-    config.tcp_timeout = get_integer(doc, "timeout.tcp", 60, 10, 180) as u16;
-    config.udp_timeout = get_integer(doc, "timeout.udp", 60, 10, 180) as u16;
-    config.sctp_timeout = get_integer(doc, "timeout.sctp", 60, 10, 180) as u16;
-    config.ses_save_timeout = get_integer(doc, "timeout.ses.save", 180, 60, 360) as u16;
+        config.get_integer("channel.pkt.size", 1000000, 100000, 10000000) as u32;
+    config.timeout_interval = config.get_integer("timeout.interval", 1, 1, 10) as u64;
+    config.default_timeout = config.get_integer("timeout.default", 60, 10, 180) as u16;
+    config.tcp_timeout = config.get_integer("timeout.tcp", 60, 10, 180) as u16;
+    config.udp_timeout = config.get_integer("timeout.udp", 60, 10, 180) as u16;
+    config.sctp_timeout = config.get_integer("timeout.sctp", 60, 10, 180) as u16;
+    config.ses_save_timeout = config.get_integer("timeout.ses.save", 180, 60, 360) as u16;
 
     config.ses_max_packets =
-        get_integer(doc, "ses.max.packets", 10000, 1000, u16::MAX as i64) as u16;
+        config.get_integer("ses.max.packets", 10000, 1000, u16::MAX as i64) as u16;
 
-    config.pkt_threads = get_integer(doc, "threads.pkt", 1, 1, 24) as u8;
+    config.pkt_threads = config.get_integer("threads.pkt", 1, 1, 24) as u8;
 
-    config.rx_driver = get_str(doc, "plugins.rx-driver", "rxlibpcap");
-    config.processors = get_str_arr(doc, "plugins.processors");
+    config.rx_driver = config.get_str("plugins.rx-driver", "rxlibpcap");
+    config.processors = config.get_str_arr("plugins.processors");
 
     // If there is a node in configuration file, use that, other wise use current machine's hostname
-    config.node = get_str(doc, "node", config.hostname.as_str());
+    config.node = config.get_str("node", config.hostname.as_str());
 
     config.rx_stat_log_interval =
-        get_integer(doc, "rx.stats.log.interval", 10000, 10000, i64::MAX) as u64;
+        config.get_integer("rx.stats.log.interval", 10000, 10000, i64::MAX) as u64;
 
     #[cfg(all(target_os = "linux", feature = "dpdk"))]
     {

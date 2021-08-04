@@ -1,13 +1,73 @@
 use std::collections::HashSet;
+use std::ops::{Deref, DerefMut};
 use std::os::raw::c_long;
 
 use anyhow::Result;
+use libc::timeval;
 use serde::ser::SerializeStruct;
 use serde::{Serialize, Serializer};
 use serde_json::json;
 
 use crate::packet;
-use crate::utils::timeval::{precision, TimeVal};
+
+/// Wrapper type for libc::timeval
+#[derive(Clone, Debug)]
+#[repr(C)]
+pub struct TimeVal(pub timeval);
+
+impl TimeVal {
+    pub fn new(tv: timeval) -> Self {
+        TimeVal(tv)
+    }
+}
+
+impl Default for TimeVal {
+    fn default() -> Self {
+        TimeVal(timeval {
+            tv_sec: 0,
+            tv_usec: 0,
+        })
+    }
+}
+
+impl Serialize for TimeVal {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_u64(self.tv_sec as u64 * 1000 + self.tv_usec as u64 / 1000)
+    }
+}
+
+impl Deref for TimeVal {
+    type Target = libc::timeval;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for TimeVal {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use serde_json;
+
+    #[test]
+    fn serialize() {
+        let tv = TimeVal::<precision::Millisecond>::new(timeval {
+            tv_sec: 1608011935,
+            tv_usec: 807924,
+        });
+        let s = serde_json::to_string_pretty(&tv).unwrap();
+        assert_eq!(s, "1608011935807");
+    }
+}
 
 #[allow(dead_code)]
 fn packets_serialize<S>(packets: &[u32; 2], s: S) -> Result<S::Ok, S::Error>
@@ -69,7 +129,7 @@ struct Protocols {
 }
 
 /// Network session
-#[derive(Clone, Default, Serialize)]
+#[derive(Clone, Debug, Default, Serialize)]
 #[cfg_attr(feature = "arkime", serde(rename_all = "camelCase"))]
 pub struct Session {
     #[serde(skip_serializing_if = "String::is_empty")]
@@ -101,11 +161,11 @@ pub struct Session {
 
     /// session start time
     #[cfg_attr(feature = "arkime", serde(rename = "firstPacket"))]
-    pub start_time: TimeVal<precision::Millisecond>,
+    pub start_time: TimeVal,
 
     /// session end time
     #[cfg_attr(feature = "arkime", serde(rename = "lastPacket"))]
-    pub end_time: TimeVal<precision::Millisecond>,
+    pub end_time: TimeVal,
 
     /// Session next save time, used for long connection with few packets
     #[serde(skip_serializing)]

@@ -1,6 +1,7 @@
+use std::io::{self, Write};
+
 use anyhow::Result;
 use serde::Serialize;
-use std::io::{self, Write};
 
 #[derive(Clone, Copy, Debug, Default)]
 struct ByteCount(usize);

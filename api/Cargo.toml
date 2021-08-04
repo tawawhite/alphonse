@@ -9,7 +9,6 @@ anyhow = "1.0"
 bitflags = "1.2"
 chrono = "0.4"
 crossbeam-channel = "0.5"
-elasticsearch = { version = "7.12.1-alpha.1", features = ["rustls-tls"] }
 enum-primitive-derive = "0.2"
 fnv = "1"
 hyperscan = { version = "0.2", features = ["static"] }
@@ -28,6 +27,7 @@ rustc_version = "0.4"
 [dev-dependencies]
 twox-hash = "*"
 rand = "*"
+alphonse-utils = { path = "../utils" }
 
 [features]
 default = ["pkt-hash-mac"]

@@ -555,9 +555,9 @@ impl Serialize for Tunnel {
 
 #[cfg(test)]
 pub mod test {
-    use super::Packet as PacketTrait;
     use super::*;
-    use crate::utils::packet::Packet;
+    use crate::packet::Packet as PacketTrait;
+    use alphonse_utils::packet::Packet;
 
     #[test]
     fn test_data_bytes() {}

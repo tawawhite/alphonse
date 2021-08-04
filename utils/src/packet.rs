@@ -1,5 +1,6 @@
-use crate::classifiers::matched::Rule;
-use crate::packet::{Layers, Packet as PacketTrait, Rules, Tunnel};
+use alphonse_api as api;
+use api::classifiers::matched::Rule;
+use api::packet::{Layers, Packet as PacketTrait, Rules, Tunnel};
 
 // Packet structure only for test use
 #[derive(Clone)]

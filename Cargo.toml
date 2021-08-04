@@ -16,5 +16,6 @@ members = [
     "parsers/udp",
     "rx-drivers/libpcap",
     "rx-drivers/files",
+    "utils",
 ]
 resolver = "2"

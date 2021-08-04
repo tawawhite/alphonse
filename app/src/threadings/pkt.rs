@@ -10,7 +10,7 @@ use api::classifiers::ClassifierManager;
 use api::config::Config;
 use api::packet::{Packet, PacketHashKey};
 use api::plugins::processor::Processor;
-use api::utils::timeval::TimeVal;
+use api::session::TimeVal;
 
 use crate::threadings::{SessionData, SessionTable};
 

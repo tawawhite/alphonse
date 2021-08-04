@@ -1,5 +1,7 @@
 use std::sync::{atomic::AtomicBool, Arc};
 
+use anyhow::{anyhow, Result};
+
 #[derive(Default, Clone)]
 pub struct Config {
     pub exit: Arc<AtomicBool>,
@@ -30,19 +32,155 @@ pub struct Config {
     pub tcp_timeout: u16,
     pub timeout_interval: u64,
     pub udp_timeout: u16,
-    pub doc: crate::utils::yaml::Yaml,
+    pub doc: Yaml,
 }
 
 impl Config {
     pub fn get_integer(&self, key: &str, default: i64, min: i64, max: i64) -> i64 {
-        crate::utils::yaml::get_integer(&self.doc.as_ref(), key, default, min, max)
+        get_integer(&self.doc.as_ref(), key, default, min, max)
     }
 
     pub fn get_str(&self, key: &str, default: &str) -> String {
-        crate::utils::yaml::get_str(&self.doc.as_ref(), key, default)
+        get_str(&self.doc.as_ref(), key, default)
     }
 
     pub fn get_str_arr(&self, key: &str) -> Vec<String> {
-        crate::utils::yaml::get_str_arr(&self.doc.as_ref(), key)
+        get_str_arr(&self.doc.as_ref(), key)
     }
+
+    pub fn get_boolean(&self, key: &str, default: bool) -> bool {
+        get_boolean(&self.doc.as_ref(), key, default)
+    }
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+/// Simple wrapper struct to implement Default trait for toml::Value
+pub struct Yaml(pub yaml_rust::Yaml);
+
+impl Default for Yaml {
+    fn default() -> Self {
+        Self(yaml_rust::Yaml::Null)
+    }
+}
+
+impl AsRef<yaml_rust::Yaml> for Yaml {
+    fn as_ref(&self) -> &yaml_rust::Yaml {
+        &self.0
+    }
+}
+
+impl AsMut<yaml_rust::Yaml> for Yaml {
+    fn as_mut(&mut self) -> &mut yaml_rust::Yaml {
+        &mut self.0
+    }
+}
+
+fn get_str(doc: &yaml_rust::Yaml, key: &str, default: &str) -> String {
+    match &doc[key] {
+        yaml_rust::Yaml::String(s) => s.clone(),
+        yaml_rust::Yaml::BadValue => {
+            println!(
+                "Option {} not found or bad string value, set {} to {}",
+                key, key, default
+            );
+            default.to_string()
+        }
+        _ => {
+            println!(
+                "Wrong value type for {}, expecting string, set {} to {}",
+                key, key, default
+            );
+            default.to_string()
+        }
+    }
+}
+
+fn get_str_without_default(doc: &yaml_rust::Yaml, key: &str) -> Result<String> {
+    match &doc[key] {
+        yaml_rust::Yaml::String(s) => Ok(s.clone()),
+        yaml_rust::Yaml::BadValue => Err(anyhow!("Option {} not found or bad string value", key,)),
+        _ => Err(anyhow!("Wrong value type for {}, expecting string", key,)),
+    }
+}
+
+fn get_boolean(doc: &yaml_rust::Yaml, key: &str, default: bool) -> bool {
+    match doc[key] {
+        yaml_rust::Yaml::Boolean(b) => b,
+        yaml_rust::Yaml::BadValue => {
+            println!(
+                "Option {} not found or bad boolean value, set {} to {}",
+                key, key, default
+            );
+            default
+        }
+        _ => {
+            println!(
+                "Wrong value type for {}, expecting boolean, set {} to {}",
+                key, key, default
+            );
+            default
+        }
+    }
+}
+
+fn get_boolean_without_default(doc: &yaml_rust::Yaml, key: &str) -> Result<bool> {
+    match &doc[key] {
+        yaml_rust::Yaml::Boolean(b) => Ok(b.clone()),
+        yaml_rust::Yaml::BadValue => Err(anyhow!("Option {} not found or bad boolean value", key,)),
+        _ => Err(anyhow!("Wrong value type for {}, expecting boolean", key,)),
+    }
+}
+
+fn get_integer(doc: &yaml_rust::Yaml, key: &str, default: i64, min: i64, max: i64) -> i64 {
+    match doc[key] {
+        yaml_rust::Yaml::Integer(i) => {
+            if i < min || i > max {
+                println!(
+                    "Option {} is less/greater than min/max value {}/{}, set {} to {}",
+                    key, min, max, key, default
+                );
+                default
+            } else {
+                i
+            }
+        }
+        yaml_rust::Yaml::BadValue => {
+            println!(
+                "Option {} not found or bad integer value, set {} to {}",
+                key, key, default
+            );
+            default
+        }
+        _ => {
+            println!(
+                "Wrong value type for {}, expecting string, set {} to {}",
+                key, key, default
+            );
+            default
+        }
+    }
+}
+
+fn get_str_arr(doc: &yaml_rust::Yaml, key: &str) -> Vec<String> {
+    let mut result = vec![];
+    match &doc[key] {
+        yaml_rust::Yaml::Array(a) => {
+            for element in a {
+                match element {
+                    yaml_rust::Yaml::String(s) => result.push(String::from(s)),
+                    yaml_rust::Yaml::BadValue => println!("Bad string value for {}'s element", key),
+                    _ => println!("Wrong value type for {}' element, expecting string", key),
+                }
+            }
+        }
+        yaml_rust::Yaml::BadValue => println!(
+            "Option {} not found or bad array value, set {} to empty array",
+            key, key
+        ),
+        _ => println!(
+            "Wrong value type for {}, expecting array, set {} to empty array",
+            key, key
+        ),
+    }
+    result
 }

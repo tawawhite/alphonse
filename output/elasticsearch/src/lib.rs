@@ -10,13 +10,14 @@ use tokio::runtime::Handle;
 use tokio::task::JoinHandle;
 
 use alphonse_api as api;
+use alphonse_utils as utils;
 use api::config::Config;
 use api::plugins::output::OutputPlugin;
 use api::plugins::{Plugin, PluginType};
 use api::session::Session;
-use api::utils::elasticsearch::handle_bulk_index_resp;
-use api::utils::serde::get_ser_json_size;
-use api::utils::timeval::{precision::Millisecond, TimeVal};
+use api::session::TimeVal;
+use utils::elasticsearch::handle_bulk_index_resp;
+use utils::serde::get_ser_json_size;
 
 enum Rotate {
     Hourly(u32),
@@ -52,7 +53,7 @@ impl TryFrom<&str> for Rotate {
 /// * `rotate` - index rotate way
 ///
 /// * `ts` - UTC timestamp
-fn to_index_suffix(rotate: Rotate, ts: &TimeVal<Millisecond>) -> String {
+fn to_index_suffix(rotate: Rotate, ts: &TimeVal) -> String {
     let stime = std::time::UNIX_EPOCH
         + std::time::Duration::from_nanos(ts.tv_sec as u64 * 1000000000 + ts.tv_usec as u64 * 1000);
     let datetime = chrono::DateTime::<chrono::Local>::from(stime);

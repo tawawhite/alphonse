@@ -11,9 +11,10 @@ use tokio::runtime::Handle;
 
 use alphonse_api as api;
 use alphonse_arkime as arkime;
+use alphonse_utils as utils;
 use api::config::Config;
-use api::utils::elasticsearch::handle_resp;
 use arkime::stat::Stat;
+use utils::elasticsearch::handle_resp;
 
 use crate::{gather_stats, NetworkInterface};
 
