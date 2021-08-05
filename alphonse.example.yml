@@ -52,6 +52,10 @@ simple-writer:
   max.file.size: 10737418240 # bytes, default 10GB
 ip.db.directory: "./etc"
 
+http.parseQSValue: true
+http.parseCookieValue: true
+http.parseHTTPHeaderRequestAll: false
+http.parseHTTPHeaderResponseAll: false
 # Headers listed below will be added as session fields
 http.headers:
   - x-forwarded-for

@@ -2,9 +2,8 @@ use std::borrow::Borrow;
 use std::cell::RefMut;
 use std::collections::HashSet;
 use std::ops::DerefMut;
-use std::sync::{Arc, RwLock};
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use combine::parser::byte::{byte, bytes, space, spaces, take_until_byte, take_until_byte2};
 use combine::parser::choice::optional;
 use combine::parser::range::{range, take_while1};
@@ -46,56 +45,48 @@ pub(crate) struct HTTPContext {
     pub direction: Direction,
     /// Current HTTP header
     header: Vec<u8>,
-    /// Headers to be added
-    pub headers: Arc<RwLock<HashSet<String>>>,
     /// Special case for cookie
     host: Vec<u8>,
     /// Body Md5
     md5: [Md5Context; 2],
-    /// Request headers to be added
-    pub req_headers: Arc<RwLock<HashSet<String>>>,
-    /// Response headers to be added
-    pub resp_headers: Arc<RwLock<HashSet<String>>>,
     /// Current HTTP header's value
     value: Vec<u8>,
     /// Special case for url
     url: Vec<u8>,
 }
 
-impl HTTPContext {
+#[derive(Clone, Debug, Default)]
+pub struct ParseConfig {
+    pub parse_qs_value: bool,
+    pub parse_cookie_value: bool,
+    pub parse_all_request_headers: bool,
+    pub parse_all_response_headers: bool,
+    pub headers: HashSet<String>,
+    pub req_headers: HashSet<String>,
+    pub resp_headers: HashSet<String>,
+}
+
+impl ParseConfig {
     /// Decide whether a header should be saved
-    fn find_header(&self, header: &str) -> Result<Vec<String>> {
+    fn find_header(&self, header: &str) -> Option<Vec<String>> {
         let mut headers = vec![];
-        match self
-            .headers
-            .read()
-            .or_else(|e| Err(anyhow!("{}", e)))?
-            .get(header)
-        {
+
+        match self.headers.get(header) {
+            None => {}
             Some(_) => headers.push(header.to_string()),
-            None => {}
         };
 
-        match self
-            .req_headers
-            .read()
-            .or_else(|e| Err(anyhow!("{}", e)))?
-            .get(header)
-        {
+        match self.req_headers.get(header) {
+            None => {}
             Some(_) => headers.push(format!("request-{}", header)),
-            None => {}
         };
 
-        match self
-            .resp_headers
-            .read()
-            .or_else(|e| Err(anyhow!("{}", e)))?
-            .get(&format!("response-{}", header))
-        {
-            Some(_) => headers.push(format!("response-{}", header)),
+        match self.resp_headers.get(header) {
             None => {}
-        }
-        Ok(headers)
+            Some(_) => headers.push(format!("response-{}", header)),
+        };
+
+        Some(headers)
     }
 }
 
@@ -120,10 +111,12 @@ fn parse_cookie(state: &mut State) -> Result<()> {
             .http
             .cookie_key
             .insert(String::from_utf8_lossy(k).to_string());
-        state
-            .http
-            .cookie_value
-            .insert(String::from_utf8_lossy(v).to_string());
+        if state.cfg.parse_cookie_value {
+            state
+                .http
+                .cookie_value
+                .insert(String::from_utf8_lossy(v).to_string());
+        }
     }
     Ok(())
 }
@@ -186,6 +179,10 @@ fn parse_url(state: &mut State) -> Result<()> {
     let url = Url::parse(std::str::from_utf8(url.as_slice())?)?;
     state.http.path.insert(url.path().to_string());
     for (key, value) in url.query_pairs() {
+        if !state.cfg.parse_qs_value {
+            continue;
+        }
+
         let key = match percent_decode_str(key.borrow()).decode_utf8() {
             Ok(k) => k,
             Err(_) => key,
@@ -241,7 +238,7 @@ fn save_header_value(state: &mut State) -> Result<()> {
         // if value is not empty, add it to header's values
         let header = state.ctx.header.to_ascii_lowercase();
         let header = String::from_utf8_lossy(header.as_slice()).to_string();
-        let headers = state.ctx.find_header(header.as_str())?;
+        let headers = state.cfg.find_header(header.as_str()).unwrap_or_default();
         let value = String::from_utf8_lossy(state.ctx.value.as_slice()).to_string();
 
         for header in headers {
@@ -291,7 +288,7 @@ pub(crate) fn on_header_value(parser: &mut llhttp::Parser<Data>, data: &[u8]) ->
         _ => {}
     };
 
-    let headers = state.ctx.find_header(hdr_low.as_str())?;
+    let headers = state.cfg.find_header(hdr_low.as_str()).unwrap_or_default();
     if headers.len() <= 0 {
         if state.ctx.direction == state.ctx.client_direction {
             state.http.request_header.insert(header);

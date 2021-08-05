@@ -1,8 +1,7 @@
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
-use std::ops::DerefMut;
 use std::rc::Rc;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
 use once_cell::sync::OnceCell;
@@ -22,29 +21,18 @@ mod parse;
 use parse::*;
 
 static SETTINGS: OnceCell<llhttp::Settings> = OnceCell::new();
+static PARSE_CFG: OnceCell<Arc<ParseConfig>> = OnceCell::new();
 
 #[derive(Clone, Default)]
 struct State {
     http: HTTP,
     ctx: HTTPContext,
+    cfg: Arc<ParseConfig>,
 }
 
 type Data = Rc<RefCell<State>>;
 
-#[derive(Clone)]
-struct HttpProcessor<'a> {
-    id: ProcessorID,
-    name: String,
-    classified: bool,
-    parsers: [llhttp::Parser<'a, Data>; 2],
-    resp_rule_id: RuleID,
-    client_direction: Direction,
-    headers: Arc<RwLock<HashSet<String>>>,
-    req_headers: Arc<RwLock<HashSet<String>>>,
-    resp_headers: Arc<RwLock<HashSet<String>>>,
-}
-
-#[derive(Clone, Default, Serialize)]
+#[derive(Clone, Debug, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct HTTP {
     #[serde(skip_serializing_if = "HashSet::is_empty")]
@@ -98,6 +86,16 @@ struct HTTP {
     value: HashSet<String>,
 }
 
+#[derive(Clone)]
+struct HttpProcessor<'a> {
+    id: ProcessorID,
+    name: String,
+    classified: bool,
+    parsers: [llhttp::Parser<'a, Data>; 2],
+    resp_rule_id: RuleID,
+    client_direction: Direction,
+}
+
 unsafe impl Send for HttpProcessor<'_> {}
 unsafe impl Sync for HttpProcessor<'_> {}
 
@@ -110,9 +108,6 @@ impl<'a> HttpProcessor<'a> {
             parsers: [llhttp::Parser::default(), llhttp::Parser::default()],
             resp_rule_id: 0,
             client_direction: Direction::Left,
-            headers: Arc::default(),
-            req_headers: Arc::default(),
-            resp_headers: Arc::default(),
         }
     }
 }
@@ -153,25 +148,27 @@ impl<'a> Plugin for HttpProcessor<'a> {
 
         SETTINGS.set(settings).unwrap();
 
-        let headers = cfg.get_str_arr("http.headers");
-        let mut hdrs = self.headers.write().or_else(|e| Err(anyhow!("{}", e)))?;
-        *hdrs = headers.into_iter().collect();
+        let mut parse_config = ParseConfig::default();
+        parse_config.parse_qs_value = cfg.get_boolean("http.parseQSValue", false);
+        parse_config.parse_cookie_value = cfg.get_boolean("http.parseCookieValue", false);
+        parse_config.parse_all_request_headers =
+            cfg.get_boolean("http.parseHTTPHeaderRequestAll", false);
+        parse_config.parse_all_response_headers =
+            cfg.get_boolean("http.parseHTTPHeaderResponseAll", false);
 
-        let headers = cfg.get_str_arr("http.request.headers");
-        let mut req_headers = self
-            .req_headers
-            .write()
-            .or_else(|e| Err(anyhow!("{}", e)))?;
-        let req_headers = req_headers.deref_mut();
-        *req_headers = headers.into_iter().collect();
+        parse_config.headers = cfg.get_str_arr("http.headers").into_iter().collect();
+        parse_config.req_headers = cfg
+            .get_str_arr("http.request.headers")
+            .into_iter()
+            .collect();
+        parse_config.resp_headers = cfg
+            .get_str_arr("http.response.headers")
+            .into_iter()
+            .collect();
 
-        let headers = cfg.get_str_arr("http.response.headers");
-        let mut resp_headers = self
-            .resp_headers
-            .write()
-            .or_else(|e| Err(anyhow!("{}", e)))?;
-        let resp_headers = resp_headers.deref_mut();
-        *resp_headers = headers.into_iter().collect();
+        PARSE_CFG.set(Arc::new(parse_config)).or(Err(anyhow!(
+            "http pkt parser's PARSE_CFG is already setted"
+        )))?;
 
         Ok(())
     }
@@ -290,9 +287,10 @@ impl<'a> Processor for HttpProcessor<'static> {
             let mut s = state.borrow_mut();
             s.ctx.direction = pkt.direction();
             s.ctx.client_direction = self.client_direction;
-            s.ctx.headers = self.headers.clone();
-            s.ctx.req_headers = self.req_headers.clone();
-            s.ctx.resp_headers = self.resp_headers.clone();
+            s.cfg = match PARSE_CFG.get() {
+                None => unreachable!("this should never happends"),
+                Some(cfg) => cfg.clone(),
+            };
             for parser in &mut self.parsers {
                 parser.init(settings, llhttp::Type::HTTP_BOTH);
                 parser.set_data(Some(Box::new(state.clone())));
