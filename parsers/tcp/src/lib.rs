@@ -126,7 +126,7 @@ impl Processor for ProtocolParser {
             self.src_dir = pkt.direction();
             // If this session is already classified as this protocol, skip
             self.classified = true;
-            ses.add_protocol(&self.name(), ProtocolLayer::Application);
+            ses.add_protocol(&self.name(), ProtocolLayer::Transport);
             unsafe {
                 ses.add_field(&"srcPort", json!(pkt.src_port()));
                 ses.add_field(&"dstPort", json!(pkt.dst_port()));
