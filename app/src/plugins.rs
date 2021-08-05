@@ -218,5 +218,9 @@ pub fn cleanup_plugins(warehouse: &mut PluginWarehouse) -> Result<()> {
     for processor in &mut warehouse.pkt_processors {
         processor.cleanup()?;
     }
+
+    for plugin in &mut warehouse.output_plugins {
+        plugin.cleanup()?;
+    }
     Ok(())
 }
