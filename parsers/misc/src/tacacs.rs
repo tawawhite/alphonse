@@ -36,9 +36,9 @@ mod test {
     use api::packet::Protocol;
     use api::plugins::processor::Processor;
     use api::session::Session;
-    use api::utils::packet::Packet as TestPacket;
 
     use crate::assert_has_protocol;
+    use crate::test::Packet;
 
     #[test]
     fn tacacs() {
@@ -48,7 +48,7 @@ mod test {
         manager.prepare().unwrap();
         let mut scratch = manager.alloc_scratch().unwrap();
 
-        let mut pkt: Box<TestPacket> = Box::new(TestPacket::default());
+        let mut pkt: Box<Packet> = Box::new(Packet::default());
         pkt.raw = Box::new(vec![
             0xe6, 0xcf, 0x00, 0x31, 0x39, 0x83, 0x1f, 0x05, 0x6d, 0x2e, 0xaf, 0x30, 0x50, 0x10,
             0x10, 0x20, 0x49, 0x93, 0x00, 0x00, 0xc0, 0x01, 0x01,

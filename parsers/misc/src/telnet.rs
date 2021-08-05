@@ -28,9 +28,9 @@ mod test {
     use super::*;
     use api::packet::Protocol;
     use api::plugins::processor::Processor;
-    use api::utils::packet::Packet as TestPacket;
 
     use crate::assert_has_protocol;
+    use crate::test::Packet;
 
     #[test]
     fn telnet() {
@@ -40,7 +40,7 @@ mod test {
         manager.prepare().unwrap();
         let mut scratch = manager.alloc_scratch().unwrap();
 
-        let mut pkt: Box<TestPacket> = Box::new(TestPacket::default());
+        let mut pkt: Box<Packet> = Box::new(Packet::default());
         pkt.raw = Box::new(vec![0x00, 0x17, 0, 0, 0xff, 0xff, 0]);
         pkt.layers.trans.protocol = Protocol::TCP;
         pkt.layers.app.offset = 4;

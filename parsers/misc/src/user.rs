@@ -42,8 +42,8 @@ mod test {
     use api::packet::Protocol;
     use api::plugins::processor::Processor;
     use api::session::Session;
-    use api::utils::packet::Packet as TestPacket;
 
+    use crate::test::Packet;
     use crate::Misc;
 
     #[test]
@@ -55,7 +55,7 @@ mod test {
         let mut scratch = manager.alloc_scratch().unwrap();
 
         // Windows branch 1
-        let mut pkt: Box<TestPacket> = Box::new(TestPacket::default());
+        let mut pkt: Box<Packet> = Box::new(Packet::default());
         pkt.raw = Box::new(b"USER test_user\nNICK:".to_vec());
         pkt.layers.trans.protocol = Protocol::TCP;
         let mut pkt: Box<dyn api::packet::Packet> = pkt;

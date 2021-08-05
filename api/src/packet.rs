@@ -553,7 +553,6 @@ impl Serialize for Tunnel {
     }
 }
 
-#[cfg(test)]
 pub mod test {
     use super::{Layers, Rule, Rules, Tunnel};
     use crate::packet::Packet as PacketTrait;

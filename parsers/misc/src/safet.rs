@@ -29,9 +29,9 @@ mod test {
     use api::packet::Protocol;
     use api::plugins::processor::Processor;
     use api::session::Session;
-    use api::utils::packet::Packet as TestPacket;
 
     use crate::assert_has_protocol;
+    use crate::test::Packet;
 
     #[test]
     fn safet() {
@@ -41,7 +41,7 @@ mod test {
         manager.prepare().unwrap();
         let mut scratch = manager.alloc_scratch().unwrap();
 
-        let mut pkt: Box<TestPacket> = Box::new(TestPacket::default());
+        let mut pkt: Box<Packet> = Box::new(Packet::default());
         pkt.raw = Box::new(vec![
             0x5a, 0xfe, 0, 0, 0, 0, 24, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             0,

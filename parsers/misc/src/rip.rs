@@ -30,9 +30,9 @@ mod test {
     use super::*;
     use api::packet::Protocol;
     use api::plugins::processor::Processor;
-    use api::utils::packet::Packet as TestPacket;
 
     use crate::assert_has_protocol;
+    use crate::test::Packet;
 
     #[test]
     fn rip() {
@@ -43,7 +43,7 @@ mod test {
         let mut scratch = manager.alloc_scratch().unwrap();
 
         // \x01\x01\x00\x00
-        let mut pkt: Box<TestPacket> = Box::new(TestPacket::default());
+        let mut pkt: Box<Packet> = Box::new(Packet::default());
         pkt.raw = Box::new(b"\x00\x00\x02\x08\x01\x01\x00\x00".to_vec());
         pkt.layers.trans.protocol = Protocol::UDP;
         pkt.layers.app.offset = 4;
@@ -60,7 +60,7 @@ mod test {
         assert_has_protocol!(ses, "rip");
 
         // \x01\x02\x00\x00
-        let mut pkt: Box<TestPacket> = Box::new(TestPacket::default());
+        let mut pkt: Box<Packet> = Box::new(Packet::default());
         pkt.raw = Box::new(b"\x00\x00\x02\x08\x01\x01\x00\x00".to_vec());
         pkt.layers.trans.protocol = Protocol::UDP;
         pkt.layers.app.offset = 4;
@@ -77,7 +77,7 @@ mod test {
         assert_has_protocol!(ses, "rip");
 
         // \x02\x01\x00\x00
-        let mut pkt: Box<TestPacket> = Box::new(TestPacket::default());
+        let mut pkt: Box<Packet> = Box::new(Packet::default());
         pkt.raw = Box::new(b"\x00\x00\x02\x08\x01\x01\x00\x00".to_vec());
         pkt.layers.trans.protocol = Protocol::UDP;
         pkt.layers.app.offset = 4;
@@ -94,7 +94,7 @@ mod test {
         assert_has_protocol!(ses, "rip");
 
         // \x02\x02\x00\x00
-        let mut pkt: Box<TestPacket> = Box::new(TestPacket::default());
+        let mut pkt: Box<Packet> = Box::new(Packet::default());
         pkt.raw = Box::new(b"\x00\x00\x02\x08\x01\x01\x00\x00".to_vec());
         pkt.layers.trans.protocol = Protocol::UDP;
         pkt.layers.app.offset = 4;

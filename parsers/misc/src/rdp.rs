@@ -43,9 +43,9 @@ mod test {
     use super::*;
     use api::packet::Protocol;
     use api::plugins::processor::Processor;
-    use api::utils::packet::Packet as TestPacket;
 
     use crate::assert_has_protocol;
+    use crate::test::Packet;
 
     #[test]
     fn rdp() {
@@ -55,7 +55,7 @@ mod test {
         manager.prepare().unwrap();
         let mut scratch = manager.alloc_scratch().unwrap();
 
-        let mut pkt: Box<TestPacket> = Box::new(TestPacket::default());
+        let mut pkt: Box<Packet> = Box::new(Packet::default());
         pkt.raw = Box::new(
             b"\x03\x00\x00\x05\x00\xe0\x00\x00\x00\x00\x00Cookie: mstshash=user\r\n".to_vec(),
         );

@@ -44,9 +44,9 @@ mod test {
     use api::packet::Protocol;
     use api::plugins::processor::Processor;
     use api::session::Session;
-    use api::utils::packet::Packet as TestPacket;
 
     use crate::assert_has_protocol;
+    use crate::test::Packet;
 
     #[test]
     fn other220() {
@@ -57,7 +57,7 @@ mod test {
         let mut scratch = manager.alloc_scratch().unwrap();
 
         // LMTP
-        let mut pkt: Box<TestPacket> = Box::new(TestPacket::default());
+        let mut pkt: Box<Packet> = Box::new(Packet::default());
         pkt.raw = Box::new(b"220 LMTP".to_vec());
         pkt.layers.trans.protocol = Protocol::TCP;
         let mut pkt: Box<dyn api::packet::Packet> = pkt;
@@ -71,7 +71,7 @@ mod test {
         assert_has_protocol!(ses, "lmtp");
 
         // ftp
-        let mut pkt: Box<TestPacket> = Box::new(TestPacket::default());
+        let mut pkt: Box<Packet> = Box::new(Packet::default());
         pkt.raw = Box::new(b"220 FTP".to_vec());
         pkt.layers.trans.protocol = Protocol::TCP;
         let mut pkt: Box<dyn api::packet::Packet> = pkt;

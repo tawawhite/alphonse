@@ -25,9 +25,9 @@ mod test {
     use api::packet::Protocol;
     use api::plugins::processor::Processor;
     use api::session::{ProtocolLayer, Session};
-    use api::utils::packet::Packet as TestPacket;
 
     use crate::assert_has_protocol;
+    use crate::test::Packet;
 
     #[test]
     fn memcached() {
@@ -38,7 +38,7 @@ mod test {
         let mut scratch = manager.alloc_scratch().unwrap();
 
         // flush_all
-        let mut pkt: Box<TestPacket> = Box::new(TestPacket::default());
+        let mut pkt: Box<Packet> = Box::new(Packet::default());
         pkt.raw = Box::new(b"flush_all".to_vec());
         pkt.layers.trans.protocol = Protocol::TCP;
         let mut pkt: Box<dyn api::packet::Packet> = pkt;
@@ -54,7 +54,7 @@ mod test {
         assert_has_protocol!(ses, "memcached");
 
         // STORED\r\n
-        let mut pkt: Box<TestPacket> = Box::new(TestPacket::default());
+        let mut pkt: Box<Packet> = Box::new(Packet::default());
         pkt.raw = Box::new(b"STORED\r\n".to_vec());
         pkt.layers.trans.protocol = Protocol::TCP;
         let mut pkt: Box<dyn api::packet::Packet> = pkt;
@@ -70,7 +70,7 @@ mod test {
         assert_has_protocol!(ses, "memcached");
 
         // END\r\n
-        let mut pkt: Box<TestPacket> = Box::new(TestPacket::default());
+        let mut pkt: Box<Packet> = Box::new(Packet::default());
         pkt.raw = Box::new(b"END\r\n".to_vec());
         pkt.layers.trans.protocol = Protocol::TCP;
         let mut pkt: Box<dyn api::packet::Packet> = pkt;
@@ -86,7 +86,7 @@ mod test {
         assert_has_protocol!(ses, "memcached");
 
         // VALUE
-        let mut pkt: Box<TestPacket> = Box::new(TestPacket::default());
+        let mut pkt: Box<Packet> = Box::new(Packet::default());
         pkt.raw = Box::new(b"VALUE ".to_vec());
         pkt.layers.trans.protocol = Protocol::TCP;
         let mut pkt: Box<dyn api::packet::Packet> = pkt;
@@ -102,7 +102,7 @@ mod test {
         assert_has_protocol!(ses, "memcached");
 
         // \x00\x00stats
-        let mut pkt: Box<TestPacket> = Box::new(TestPacket::default());
+        let mut pkt: Box<Packet> = Box::new(Packet::default());
         pkt.raw = Box::new(b"......\x00\x00stats".to_vec());
         pkt.layers.trans.protocol = Protocol::UDP;
         let mut pkt: Box<dyn api::packet::Packet> = pkt;
@@ -118,7 +118,7 @@ mod test {
         assert_has_protocol!(ses, "memcached");
 
         // \x00\x00gets
-        let mut pkt: Box<TestPacket> = Box::new(TestPacket::default());
+        let mut pkt: Box<Packet> = Box::new(Packet::default());
         pkt.raw = Box::new(b"......\x00\x00gets".to_vec());
         pkt.layers.trans.protocol = Protocol::UDP;
         let mut pkt: Box<dyn api::packet::Packet> = pkt;

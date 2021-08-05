@@ -41,9 +41,9 @@ mod test {
     use api::packet::Protocol;
     use api::plugins::processor::Processor;
     use api::session::Session;
-    use api::utils::packet::Packet as TestPacket;
 
     use crate::assert_has_protocol;
+    use crate::test::Packet;
 
     #[test]
     fn ntp() {
@@ -54,7 +54,7 @@ mod test {
         let mut scratch = manager.alloc_scratch().unwrap();
 
         // pattern 1
-        let mut pkt: Box<TestPacket> = Box::new(TestPacket::default());
+        let mut pkt: Box<Packet> = Box::new(Packet::default());
         pkt.raw = Box::new(vec![
             0x00, 0x7b, 0x00, 0x7b, 0x00, 0x38, 0xf8, 0xd2, 0xd9, 0x00, 0x0a, 0xfa, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x01, 0x02, 0x90, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,

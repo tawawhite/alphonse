@@ -29,9 +29,9 @@ mod test {
     use api::packet::Protocol;
     use api::plugins::processor::Processor;
     use api::session::{ProtocolLayer, Session};
-    use api::utils::packet::Packet as TestPacket;
 
     use crate::assert_has_protocol;
+    use crate::test::Packet;
 
     #[test]
     fn areospike() {
@@ -42,7 +42,7 @@ mod test {
         let mut scratch = manager.alloc_scratch().unwrap();
 
         // rule 1
-        let mut pkt: Box<TestPacket> = Box::new(TestPacket::default());
+        let mut pkt: Box<Packet> = Box::new(Packet::default());
         pkt.raw =
             Box::new(b"\x00\x00\x00\x25\x80\x01\x00\x01\x00\x00\x00\x0c\x73\x65\x74\x5f".to_vec());
         pkt.layers.trans.protocol = Protocol::TCP;
@@ -58,7 +58,7 @@ mod test {
         assert_has_protocol!(ses, "cassandra");
 
         // rule 2
-        let mut pkt: Box<TestPacket> = Box::new(TestPacket::default());
+        let mut pkt: Box<Packet> = Box::new(Packet::default());
         pkt.raw =
             Box::new(b"\x00\x00\x00\x1d\x80\x01\x00\x01\x00\x00\x00\x10\x64\x65\x73\x63".to_vec());
         pkt.layers.trans.protocol = Protocol::TCP;

@@ -17,9 +17,9 @@ mod test {
     use api::packet::Protocol;
     use api::plugins::processor::Processor;
     use api::session::{ProtocolLayer, Session};
-    use api::utils::packet::Packet as TestPacket;
 
     use crate::assert_has_protocol;
+    use crate::test::Packet;
 
     #[test]
     fn whois() {
@@ -29,7 +29,7 @@ mod test {
         manager.prepare().unwrap();
         let mut scratch = manager.alloc_scratch().unwrap();
 
-        let mut pkt: Box<TestPacket> = Box::new(TestPacket::default());
+        let mut pkt: Box<Packet> = Box::new(Packet::default());
         pkt.raw = Box::new(vec![0x00, 0x2b, 0, 0]);
         pkt.layers.trans.protocol = Protocol::TCP;
         let mut pkt: Box<dyn api::packet::Packet> = pkt;

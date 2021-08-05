@@ -49,9 +49,9 @@ mod test {
     use api::packet::Protocol;
     use api::plugins::processor::Processor;
     use api::session::Session;
-    use api::utils::packet::Packet as TestPacket;
 
     use crate::assert_has_protocol;
+    use crate::test::Packet;
 
     #[test]
     fn netflow() {
@@ -61,7 +61,7 @@ mod test {
         manager.prepare().unwrap();
         let mut scratch = manager.alloc_scratch().unwrap();
 
-        let mut pkt: Box<TestPacket> = Box::new(TestPacket::default());
+        let mut pkt: Box<Packet> = Box::new(Packet::default());
         pkt.raw = Box::new(vec![
             0xf3, 0x8b, 0x27, 0x0b, 0x00, 0x09, 0x00, 0x12, 0xc3, 0x0b, 0xfb, 0x2a, 0x53, 0xe0,
             0xbd, 0x96, 0xa5, 0xba, 0xb7, 0xef, 0x00, 0x00, 0x00, 0xc8, 0x00, 0x00, 0x00, 0x90,

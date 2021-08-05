@@ -254,9 +254,9 @@ impl TlsProcessor {
 mod test {
     use super::*;
     use api::classifiers::ClassifierManager;
+    use api::packet::test::Packet;
     use api::packet::Protocol;
     use api::plugins::processor::Processor;
-    use api::utils::packet::Packet as TestPacket;
 
     #[test]
     fn classify() {
@@ -267,7 +267,7 @@ mod test {
         let mut scratch = manager.alloc_scratch().unwrap();
 
         // \x16\x01\x00
-        let mut pkt: Box<TestPacket> = Box::new(TestPacket::default());
+        let mut pkt: Box<Packet> = Box::new(Packet::default());
         pkt.raw = Box::new(b"\x16\x01\x00".to_vec());
         pkt.layers.trans.protocol = Protocol::UDP;
         let mut pkt: Box<dyn api::packet::Packet> = pkt;
@@ -275,7 +275,7 @@ mod test {
         assert_eq!(pkt.rules().len(), 1);
 
         // \x16\xfe\xff
-        let mut pkt: Box<TestPacket> = Box::new(TestPacket::default());
+        let mut pkt: Box<Packet> = Box::new(Packet::default());
         pkt.raw = Box::new(b"\x16\xfe\xff".to_vec());
         pkt.layers.trans.protocol = Protocol::UDP;
         let mut pkt: Box<dyn api::packet::Packet> = pkt;
@@ -283,7 +283,7 @@ mod test {
         assert_eq!(pkt.rules().len(), 1);
 
         // \x16\xfe\xfe
-        let mut pkt: Box<TestPacket> = Box::new(TestPacket::default());
+        let mut pkt: Box<Packet> = Box::new(Packet::default());
         pkt.raw = Box::new(b"\x16\xfe\xfe".to_vec());
         pkt.layers.trans.protocol = Protocol::UDP;
         let mut pkt: Box<dyn api::packet::Packet> = pkt;
@@ -291,7 +291,7 @@ mod test {
         assert_eq!(pkt.rules().len(), 1);
 
         // \x16\xfe\xfd
-        let mut pkt: Box<TestPacket> = Box::new(TestPacket::default());
+        let mut pkt: Box<Packet> = Box::new(Packet::default());
         pkt.raw = Box::new(b"\x16\xfe\xfd".to_vec());
         pkt.layers.trans.protocol = Protocol::UDP;
         let mut pkt: Box<dyn api::packet::Packet> = pkt;
@@ -299,7 +299,7 @@ mod test {
         assert_eq!(pkt.rules().len(), 1);
 
         // \x16\x03
-        let mut pkt: Box<TestPacket> = Box::new(TestPacket::default());
+        let mut pkt: Box<Packet> = Box::new(Packet::default());
         pkt.raw = Box::new(b"\x16\x03".to_vec());
         pkt.layers.trans.protocol = Protocol::TCP;
         let mut pkt: Box<dyn api::packet::Packet> = pkt;

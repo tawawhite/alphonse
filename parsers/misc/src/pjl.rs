@@ -22,9 +22,9 @@ mod test {
     use api::packet::Protocol;
     use api::plugins::processor::Processor;
     use api::session::{ProtocolLayer, Session};
-    use api::utils::packet::Packet as TestPacket;
 
     use crate::assert_has_protocol;
+    use crate::test::Packet;
 
     #[test]
     fn pjl() {
@@ -35,7 +35,7 @@ mod test {
         let mut scratch = manager.alloc_scratch().unwrap();
 
         // pattern 1
-        let mut pkt: Box<TestPacket> = Box::new(TestPacket::default());
+        let mut pkt: Box<Packet> = Box::new(Packet::default());
         pkt.raw = Box::new(b"\x1b\x25\x2d\x31\x32\x33\x34\x35".to_vec());
         pkt.layers.trans.protocol = Protocol::TCP;
         let mut pkt: Box<dyn api::packet::Packet> = pkt;
@@ -49,7 +49,7 @@ mod test {
         assert_has_protocol!(ses, "pjl");
 
         // pattern 2
-        let mut pkt: Box<TestPacket> = Box::new(TestPacket::default());
+        let mut pkt: Box<Packet> = Box::new(Packet::default());
         pkt.raw = Box::new(b"\x40\x50\x4a\x4c\x20".to_vec());
         pkt.layers.trans.protocol = Protocol::TCP;
         let mut pkt: Box<dyn api::packet::Packet> = pkt;

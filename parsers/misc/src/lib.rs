@@ -203,3 +203,9 @@ pub extern "C" fn al_new_pkt_processor() -> Box<Box<dyn Processor>> {
 pub extern "C" fn al_plugin_type() -> PluginType {
     PluginType::PacketProcessor
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    pub use api::packet::test::Packet;
+}

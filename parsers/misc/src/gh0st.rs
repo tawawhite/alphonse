@@ -60,9 +60,9 @@ mod test {
     use api::packet::Protocol;
     use api::plugins::processor::Processor;
     use api::session::Session;
-    use api::utils::packet::Packet as TestPacket;
 
     use crate::assert_has_protocol;
+    use crate::test::Packet;
 
     #[test]
     fn gh0st() {
@@ -73,7 +73,7 @@ mod test {
         let mut scratch = manager.alloc_scratch().unwrap();
 
         // Windows branch 1
-        let mut pkt: Box<TestPacket> = Box::new(TestPacket::default());
+        let mut pkt: Box<Packet> = Box::new(Packet::default());
         pkt.raw = Box::new(b"Gh0st\x0f\x00\x00\x00\x09\x10\x11\x12\x78\x9c".to_vec());
         pkt.layers.trans.protocol = Protocol::TCP;
         let mut pkt: Box<dyn api::packet::Packet> = pkt;
@@ -87,7 +87,7 @@ mod test {
         assert_has_protocol!(ses, "gh0st");
 
         // Windows branch 2
-        let mut pkt: Box<TestPacket> = Box::new(TestPacket::default());
+        let mut pkt: Box<Packet> = Box::new(Packet::default());
         pkt.raw = Box::new(b"Gh0st\x05\x06\x00\x00\x09\x10\x00\x00\x78\x9c".to_vec());
         pkt.layers.trans.protocol = Protocol::TCP;
         let mut pkt: Box<dyn api::packet::Packet> = pkt;
@@ -101,7 +101,7 @@ mod test {
         assert_has_protocol!(ses, "gh0st");
 
         // mac
-        let mut pkt: Box<TestPacket> = Box::new(TestPacket::default());
+        let mut pkt: Box<Packet> = Box::new(Packet::default());
         pkt.raw = Box::new(b"Gh0st\x00\x00\x00\x0f\x09\x10\x11\x12\x78\x9c".to_vec());
         pkt.layers.trans.protocol = Protocol::TCP;
         let mut pkt: Box<dyn api::packet::Packet> = pkt;

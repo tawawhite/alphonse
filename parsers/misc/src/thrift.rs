@@ -18,9 +18,9 @@ mod test {
     use api::packet::Protocol;
     use api::plugins::processor::Processor;
     use api::session::{ProtocolLayer, Session};
-    use api::utils::packet::Packet as TestPacket;
 
     use crate::assert_has_protocol;
+    use crate::test::Packet;
 
     #[test]
     fn thrift() {
@@ -31,7 +31,7 @@ mod test {
         let mut scratch = manager.alloc_scratch().unwrap();
 
         // rule1
-        let mut pkt: Box<TestPacket> = Box::new(TestPacket::default());
+        let mut pkt: Box<Packet> = Box::new(Packet::default());
         pkt.raw = Box::new(b"\x80\x01\x00\x01\x00\x00\x00".to_vec());
         pkt.layers.trans.protocol = Protocol::TCP;
         let mut pkt: Box<dyn api::packet::Packet> = pkt;
@@ -45,7 +45,7 @@ mod test {
         assert_has_protocol!(ses, "thrift");
 
         // rule2
-        let mut pkt: Box<TestPacket> = Box::new(TestPacket::default());
+        let mut pkt: Box<Packet> = Box::new(Packet::default());
         pkt.raw = Box::new(b"\x00\x00\x02\x03\x80\x01\x00890123456789012345".to_vec());
         pkt.layers.trans.protocol = Protocol::TCP;
         let mut pkt: Box<dyn api::packet::Packet> = pkt;

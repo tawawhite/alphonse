@@ -31,9 +31,9 @@ mod test {
     use api::packet::Protocol;
     use api::plugins::processor::Processor;
     use api::session::Session;
-    use api::utils::packet::Packet as TestPacket;
 
     use crate::assert_has_protocol;
+    use crate::test::Packet;
 
     #[test]
     fn wudo() {
@@ -44,7 +44,7 @@ mod test {
         let mut scratch = manager.alloc_scratch().unwrap();
 
         // [0; 4]
-        let mut pkt: Box<TestPacket> = Box::new(TestPacket::default());
+        let mut pkt: Box<Packet> = Box::new(Packet::default());
         pkt.raw = Box::new(vec![
             0x1e, 0x00, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         ]);
@@ -62,7 +62,7 @@ mod test {
         assert_has_protocol!(ses, "wudo");
 
         // Swarm protocol
-        let mut pkt: Box<TestPacket> = Box::new(TestPacket::default());
+        let mut pkt: Box<Packet> = Box::new(Packet::default());
         pkt.raw = Box::new(b"\x1e\x00\x00\x00\x0eSwarm protocol".to_vec());
         pkt.layers.trans.protocol = Protocol::TCP;
         pkt.layers.app.offset = 4;

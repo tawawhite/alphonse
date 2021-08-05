@@ -34,9 +34,9 @@ mod test {
     use api::packet::Protocol;
     use api::plugins::processor::Processor;
     use api::session::Session;
-    use api::utils::packet::Packet as TestPacket;
 
     use crate::assert_has_protocol;
+    use crate::test::Packet;
 
     #[test]
     fn skinny() {
@@ -47,7 +47,7 @@ mod test {
         let mut scratch = manager.alloc_scratch().unwrap();
 
         // hsrp on port 1985
-        let mut pkt: Box<TestPacket> = Box::new(TestPacket::default());
+        let mut pkt: Box<Packet> = Box::new(Packet::default());
         pkt.raw = Box::new(vec![0x07, 0xc1, 0x07, 0xc1, 0x00, 0x03, 0x00]);
         pkt.layers.trans.protocol = Protocol::UDP;
         pkt.layers.app.offset = 4;
@@ -65,7 +65,7 @@ mod test {
         assert_has_protocol!(ses, "hsrp");
 
         // hsrp on port 2029
-        let mut pkt: Box<TestPacket> = Box::new(TestPacket::default());
+        let mut pkt: Box<Packet> = Box::new(Packet::default());
         pkt.raw = Box::new(vec![0x07, 0xed, 0x07, 0xed, 0x01, 40, 0x02]);
         pkt.layers.trans.protocol = Protocol::UDP;
         pkt.layers.app.offset = 4;

@@ -47,9 +47,9 @@ mod test {
     use super::*;
     use api::packet::Protocol;
     use api::plugins::processor::Processor;
-    use api::utils::packet::Packet as TestPacket;
 
     use crate::assert_has_protocol;
+    use crate::test::Packet;
 
     #[test]
     fn bgp() {
@@ -60,7 +60,7 @@ mod test {
         let mut scratch = manager.alloc_scratch().unwrap();
 
         // port does not match
-        let mut pkt: Box<TestPacket> = Box::new(TestPacket::default());
+        let mut pkt: Box<Packet> = Box::new(Packet::default());
         pkt.raw = Box::new(vec![
             0x64, 0xdc, 0x00, 0xb4, 0x9f, 0x49, 0x77, 0x8b, 0x08, 0x7c, 0xd2, 0x26, 0xa0, 0x18,
             0x40, 0x00, 0xf3, 0x65, 0x00, 0x00, 0x13, 0x12, 0x9a, 0xb9, 0x9d, 0x4a, 0x6d, 0x94,
@@ -72,7 +72,7 @@ mod test {
         assert_eq!(pkt.rules().len(), 0);
 
         // does not start with marker
-        let mut pkt: Box<TestPacket> = Box::new(TestPacket::default());
+        let mut pkt: Box<Packet> = Box::new(Packet::default());
         pkt.raw = Box::new(vec![
             0x64, 0xdc, 0x00, 0xb3, 0x9f, 0x49, 0x77, 0x8b, 0x08, 0x7c, 0xd2, 0x26, 0xa0, 0x18,
             0x40, 0x00, 0xf3, 0x65, 0x00, 0x00, 0x13, 0x12, 0x9a, 0xb9, 0x9d, 0x4a, 0x6d, 0x94,
@@ -98,7 +98,7 @@ mod test {
         assert!(!ses.has_protocol(&"bgp", ProtocolLayer::Application));
 
         // OPEN message type
-        let mut pkt: Box<TestPacket> = Box::new(TestPacket::default());
+        let mut pkt: Box<Packet> = Box::new(Packet::default());
         pkt.raw = Box::new(vec![
             0x64, 0xdc, 0x00, 0xb3, 0x9f, 0x49, 0x77, 0x8b, 0x08, 0x7c, 0xd2, 0x26, 0xa0, 0x18,
             0x40, 0x00, 0xf3, 0x65, 0x00, 0x00, 0x13, 0x12, 0x9a, 0xb9, 0x9d, 0x4a, 0x6d, 0x94,
