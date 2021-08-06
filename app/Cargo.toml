@@ -28,7 +28,7 @@ tokio = { version = "1", features = ["macros", "net", "rt-multi-thread", "time"]
 yaml-rust = ">=0.4.1"
 
 [features]
-arkime = ["alphonse-arkime", "alphonse-api/arkime"]
+arkime = ["alphonse-api/arkime"]
 heuristic-mpls = ["alphonse-api/tcmalloc"]
 use-tcmalloc = ["alphonse-api/tcmalloc"]
 use-mimalloc = ["alphonse-api/mimalloc"]
