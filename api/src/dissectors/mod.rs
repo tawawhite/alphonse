@@ -70,6 +70,8 @@ impl ProtocolDessector {
             Some(Box::new(link::ethernet::Dissector::default()));
         parser.callbacks[Protocol::NULL as u8 as usize] =
             Some(Box::new(link::null::Dissector::default()));
+        parser.callbacks[Protocol::FRAME_RELAY as u8 as usize] =
+            Some(Box::new(link::frame_relay::Dissector::default()));
 
         // tunnel protocol parsers
         parser.callbacks[Protocol::MPLS as u8 as usize] =
@@ -117,6 +119,14 @@ impl ProtocolDessector {
             }
             LinkType::ETHERNET => {
                 pkt.layers_mut().data_link.protocol = Protocol::ETHERNET;
+                let index = pkt.layers_mut().data_link.protocol as u8 as usize;
+                self.callbacks[index]
+                    .as_ref()
+                    .unwrap()
+                    .dissect(pkt.raw(), 0)
+            }
+            LinkType::FRAME_RELAY => {
+                pkt.layers_mut().data_link.protocol = Protocol::FRAME_RELAY;
                 let index = pkt.layers_mut().data_link.protocol as u8 as usize;
                 self.callbacks[index]
                     .as_ref()

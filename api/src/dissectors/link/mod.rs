@@ -4,6 +4,7 @@ use super::{Dissector, Error};
 use super::{Layer, Protocol};
 
 pub mod ethernet;
+pub mod frame_relay;
 pub mod null;
 
 #[repr(u16)]
@@ -12,6 +13,7 @@ pub enum LinkType {
     NULL = 0,
     ETHERNET = 1,
     RAW = 101,
+    FRAME_RELAY = 107,
     IPV4 = 228,
     IPV6 = 229,
 }

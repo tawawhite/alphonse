@@ -456,6 +456,7 @@ pub enum Protocol {
     NULL,
     ETHERNET,
     RAW,
+    FRAME_RELAY,
     PPP,
     MPLS,
     PPPOE,

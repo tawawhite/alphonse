@@ -12,23 +12,40 @@
 //! So what we actually doing here is parsing Cisco's HDLC protocol and its deriving protocols
 //! And in this specific case is Frame Relay protocol
 
-use super::super::network;
-use super::{packet, Error};
+use super::ethernet::EtherType;
+use super::{Error, Layer, Protocol};
 
-#[inline]
-pub fn parse(pkt: &mut packet::Packet, depth: usize) -> Result<packet::LayerType, Error> {
-    if pkt.len_of_layer(depth) < 4 {
-        return Err(Error::CorruptPacket);
+use nom::bytes::complete::take;
+use nom::number::streaming::be_u16;
+use nom::IResult;
+use num_traits::FromPrimitive;
+
+#[derive(Default)]
+pub struct Dissector {}
+
+impl super::Dissector for Dissector {
+    #[inline]
+    fn dissect(&self, buf: &[u8], offset: u16) -> Result<Option<Layer>, Error> {
+        if buf.len() < 4 {
+            return Err(Error::CorruptPacket(String::from(
+                "Corrupt FrameRelay packet",
+            )));
+        }
+
+        let (remain, protocol) = dissect(buf).or(Err(Error::CorruptPacket(String::from(
+            "Corrupt FrameRelay packet",
+        ))))?;
+        let offset = offset + (buf.len() - remain.len()) as u16;
+        Ok(Some(Layer { protocol, offset }))
     }
+}
 
-    // calculate next layers start byte position
-    pkt.layers[depth + 1].start_pos = pkt.layers[depth].start_pos + 4;
-
-    let pos = pkt.layers[depth].start_pos;
-    let protocol_type = (pkt.data()[pos + 2] as u16) << 8 | pkt.data()[pos + 3] as u16;
-    if protocol_type == 0x03cc {
-        return Ok(packet::LayerType::Network(network::NetworkType::IPV4));
-    }
-
-    Ok(())
+fn dissect(buf: &[u8]) -> IResult<&[u8], Protocol> {
+    let (buf, _) = take(2usize)(buf)?;
+    let (buf, proto) = be_u16(buf)?;
+    let proto = match EtherType::from_u16(proto) {
+        None => Protocol::UNKNOWN,
+        Some(proto) => proto.into(),
+    };
+    Ok((buf, proto))
 }

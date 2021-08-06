@@ -14,6 +14,7 @@ use path_absolutize::Absolutize;
 use alphonse_api as api;
 use api::classifiers::matched::Rule;
 use api::config::Config;
+use api::dissectors::link::LinkType;
 use api::packet::Packet as PacketTrait;
 use api::packet::{Layers, PacketHashKey, Rules, Tunnel};
 use api::plugins::rx::{RxDriver, RxStat};
@@ -141,9 +142,8 @@ impl RxThread {
             }
 
             let mut cap = Offline::try_from_path(file)?;
-            let link_type =
-                api::dissectors::link::LinkType::from_u16(cap.cap.get_datalink().0 as u16)
-                    .ok_or_else(|| anyhow!("Unrecognized link type"))?;
+            let link_type = LinkType::from_u16(cap.cap.get_datalink().0 as u16)
+                .ok_or_else(|| anyhow!("Unrecognized link type"))?;
             let parser = api::dissectors::ProtocolDessector::new(link_type);
 
             while !self.exit.load(Ordering::Relaxed) {

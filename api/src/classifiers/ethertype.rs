@@ -57,6 +57,14 @@ impl Classifier {
                     pkt.rules_mut().as_mut().push(self.rules[etype].clone());
                 }
             }
+            Protocol::FRAME_RELAY => {
+                let offset = pkt.layers().data_link.offset as usize;
+                let etype = (pkt.raw()[offset + 2] as u16) << 8 | (pkt.raw()[offset + 3] as u16);
+                let etype = etype as usize;
+                if self.rules[etype].processors.len() > 0 {
+                    pkt.rules_mut().as_mut().push(self.rules[etype].clone());
+                }
+            }
             _ => return,
         };
     }

@@ -188,6 +188,34 @@ pub const _3GPP2: u16 = 0x88D2;
 /// Infiniband RDMA over Converged Ethernet
 // const ROCE: u16 = 0x8915;
 
+#[derive(Primitive)]
+#[repr(u16)]
+pub enum EtherType {
+    IPV4 = 0x0800,
+    VLAN = 0x8100,
+    IPV6 = 0x86DD,
+    PPP = 0x880B,
+    MPLSUC = 0x8847,
+    PPPOES = 0x8864,
+    ERSPAN = 0x88Be,
+    _3GPP2 = 0x88D2,
+}
+
+impl Into<Protocol> for EtherType {
+    fn into(self) -> Protocol {
+        match self {
+            Self::IPV4 => Protocol::IPV4,
+            Self::VLAN => Protocol::VLAN,
+            Self::IPV6 => Protocol::IPV6,
+            Self::PPP => Protocol::PPP,
+            Self::MPLSUC => Protocol::MPLS,
+            Self::PPPOES => Protocol::PPPOE,
+            Self::ERSPAN => Protocol::ERSPAN,
+            _ => Protocol::UNKNOWN,
+        }
+    }
+}
+
 #[derive(Default)]
 pub struct Dissector {}
 
