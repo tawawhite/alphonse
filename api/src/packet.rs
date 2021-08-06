@@ -464,6 +464,7 @@ pub enum Protocol {
     // Tunnel protocols
     GRE,
     L2TP,
+    ERSPAN,
 
     // Network layer protocols
     IPV4,
