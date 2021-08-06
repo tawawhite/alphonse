@@ -82,6 +82,8 @@ impl ProtocolDessector {
             Some(Box::new(tunnel::ppp::Dissector::default()));
         parser.callbacks[Protocol::PPPOE as u8 as usize] =
             Some(Box::new(tunnel::pppoe::Dissector::default()));
+        parser.callbacks[Protocol::GRE as u8 as usize] =
+            Some(Box::new(tunnel::gre::Dissector::default()));
 
         // network layer protocl parsers
         parser.callbacks[Protocol::IPV4 as u8 as usize] =
