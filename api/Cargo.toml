@@ -30,8 +30,8 @@ twox-hash = "*"
 rand = "*"
 
 [features]
-default = ["pkt-hash-mac"]
 arkime = []
+heuristic-mpls = []
 pkt-hash-mac = []
 use-tcmalloc = ["tcmalloc"]
 use-mimalloc = ["mimalloc"]
