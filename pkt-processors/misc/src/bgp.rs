@@ -25,7 +25,6 @@ pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManage
 }
 
 fn classify(ses: &mut Session, pkt: &dyn Packet) -> Result<()> {
-    println!("{:?} {:?}", &pkt.payload()[0..16], MARKER);
     if pkt.data_len() < 19 || pkt.payload()[0..16] != MARKER {
         return Ok(());
     }
