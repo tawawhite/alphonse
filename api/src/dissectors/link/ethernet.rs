@@ -1,5 +1,6 @@
 use super::Error;
 use super::{Layer, Protocol};
+use num_traits::FromPrimitive;
 
 /// ETHER TYPES
 ///
@@ -221,7 +222,7 @@ pub struct Dissector {}
 
 impl super::Dissector for Dissector {
     #[inline]
-    fn dissect(&self, buf: &[u8], offset: u16) -> Result<Option<Layer>, Error> {
+    fn dissect(&self, buf: &[u8], mut offset: u16) -> Result<Option<Layer>, Error> {
         if buf.len() < 14 {
             return Err(Error::CorruptPacket(format!(
                 "The ethernet packet is corrupted, packet too short ({} bytes)",
@@ -229,32 +230,19 @@ impl super::Dissector for Dissector {
             )));
         }
 
-        let mut layer = Layer {
-            protocol: Protocol::default(),
-            offset,
-        };
-
+        offset += 6 + 6 + 2;
         let etype = (buf[12] as u16) << 8 | buf[12 + 1] as u16;
-        layer.offset = layer.offset + 6 + 6 + 2;
-        match etype {
-            IPV4 => layer.protocol = Protocol::IPV4,
-            IPV6 => layer.protocol = Protocol::IPV6,
-            PPP => layer.protocol = Protocol::PPP,
-            MPLSUC => layer.protocol = Protocol::MPLS,
-            PPPOES => layer.protocol = Protocol::PPPOE,
-            VLAN => {
-                layer.protocol = Protocol::VLAN;
-                layer.offset = layer.offset + 6 + 6;
-            }
-            _ => {
+        let protocol = match EtherType::from_u16(etype) {
+            None => {
                 return Err(Error::UnsupportProtocol(format!(
                     "Unsupport protocol, ether type: {:x}",
                     etype
-                )));
+                )))
             }
+            Some(proto) => proto.into(),
         };
 
-        Ok(Some(layer))
+        Ok(Some(Layer { protocol, offset }))
     }
 }
 

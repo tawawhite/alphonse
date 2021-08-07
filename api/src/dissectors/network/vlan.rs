@@ -1,7 +1,7 @@
-use super::{Error, Layer};
+use num_traits::FromPrimitive;
 
 use super::super::link;
-use super::Protocol;
+use super::{Error, Layer, Protocol};
 
 #[derive(Default)]
 pub struct Dissector {}
@@ -10,23 +10,13 @@ impl super::Dissector for Dissector {
     fn dissect(&self, buf: &[u8], offset: u16) -> Result<Option<Layer>, Error> {
         let mut layer = Layer {
             protocol: Protocol::default(),
-            offset: offset + 4 + 2,
+            offset: offset + 4,
         };
 
-        let etype = (buf[0] as u16) << 8 | buf[1] as u16;
-        match etype {
-            link::ethernet::IPV4 => layer.protocol = Protocol::IPV4,
-            link::ethernet::IPV6 => layer.protocol = Protocol::IPV6,
-            link::ethernet::PPP => layer.protocol = Protocol::PPP,
-            link::ethernet::MPLSUC => layer.protocol = Protocol::MPLS,
-            link::ethernet::PPPOES => layer.protocol = Protocol::PPPOE,
-            link::ethernet::VLAN => layer.protocol = Protocol::VLAN,
-            _ => {
-                return Err(Error::UnsupportProtocol(format!(
-                    "Unsupport protocol, ether type: {}",
-                    etype
-                )))
-            }
+        let etype = (buf[2] as u16) << 8 | buf[3] as u16;
+        layer.protocol = match link::ethernet::EtherType::from_u16(etype) {
+            None => Protocol::UNKNOWN,
+            Some(proto) => proto.into(),
         };
 
         Ok(Some(layer))
@@ -41,14 +31,16 @@ mod tests {
 
     #[test]
     fn test_ok() {
-        let buf = [0x08, 0x00, 0xc2, 0x00, 0x00, 0x00];
+        let buf = [0xc2, 0x00, 0x08, 0x00];
         let dissector = Dissector::default();
-        assert!(matches!(dissector.dissect(&buf, 0), Ok(_)));
+        assert!(
+            matches!(dissector.dissect(&buf, 0), Ok(Some(layer)) if layer.protocol == Protocol::IPV4 && layer.offset == 4)
+        );
     }
 
     #[test]
     fn test_err_unsupport_protocol() {
-        let buf = [0x08, 0x01, 0xc2, 0x00, 0x00, 0x00];
+        let buf = [0xc2, 0x00, 0x08, 0x01];
         let dissector = Dissector::default();
         let result = dissector.dissect(&buf, 0);
         let err = result.unwrap_err();
