@@ -72,6 +72,8 @@ impl ProtocolDessector {
             Some(Box::new(link::null::Dissector::default()));
         parser.callbacks[Protocol::FRAME_RELAY as u8 as usize] =
             Some(Box::new(link::frame_relay::Dissector::default()));
+        parser.callbacks[Protocol::ARP as u8 as usize] =
+            Some(Box::new(link::arp::Dissector::default()));
 
         // tunnel protocol parsers
         parser.callbacks[Protocol::MPLS as u8 as usize] =

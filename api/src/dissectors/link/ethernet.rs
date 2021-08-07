@@ -193,6 +193,7 @@ pub const _3GPP2: u16 = 0x88D2;
 #[repr(u16)]
 pub enum EtherType {
     IPV4 = 0x0800,
+    ARP = 0x0806,
     VLAN = 0x8100,
     IPV6 = 0x86DD,
     PPP = 0x880B,
@@ -206,6 +207,7 @@ impl Into<Protocol> for EtherType {
     fn into(self) -> Protocol {
         match self {
             Self::IPV4 => Protocol::IPV4,
+            Self::ARP => Protocol::ARP,
             Self::VLAN => Protocol::VLAN,
             Self::IPV6 => Protocol::IPV6,
             Self::PPP => Protocol::PPP,

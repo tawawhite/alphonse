@@ -460,6 +460,7 @@ pub enum Protocol {
     PPP,
     MPLS,
     PPPOE,
+    ARP,
 
     // Tunnel protocols
     GRE,
