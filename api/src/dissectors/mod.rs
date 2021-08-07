@@ -96,6 +96,8 @@ impl ProtocolDessector {
             Some(Box::new(network::vlan::Dissector::default()));
         parser.callbacks[Protocol::ICMP as u8 as usize] =
             Some(Box::new(network::icmp::Dissector::default()));
+        parser.callbacks[Protocol::ERSPAN as u8 as usize] =
+            Some(Box::new(network::erspan::Dissector::default()));
 
         // transport layer protocl parsers
         parser.callbacks[Protocol::TCP as u8 as usize] =

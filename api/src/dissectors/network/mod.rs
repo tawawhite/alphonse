@@ -1,5 +1,6 @@
 use super::{Dissector, Error, Layer, Protocol};
 
+pub mod erspan;
 pub mod icmp;
 pub mod ip_proto;
 pub mod ipv4;
