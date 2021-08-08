@@ -3,6 +3,7 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use fnv::FnvHashSet;
+use mac_address::MacAddress;
 use serde::Serialize;
 use serde_json::json;
 
@@ -13,22 +14,6 @@ use api::plugins::processor::{Processor, ProcessorID};
 use api::plugins::{Plugin, PluginType};
 use api::session::{ProtocolLayer, Session};
 
-#[derive(Clone, Debug, PartialEq, Serialize)]
-struct MacAddress(mac_address::MacAddress);
-
-impl Eq for MacAddress {}
-impl Hash for MacAddress {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.0.bytes().hash(state)
-    }
-}
-
-impl MacAddress {
-    pub fn new(bytes: [u8; 6]) -> Self {
-        Self(mac_address::MacAddress::new(bytes))
-    }
-}
-
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize)]
 struct MacInfo {
     addr: MacAddress,
@@ -37,7 +22,7 @@ struct MacInfo {
 impl Default for MacInfo {
     fn default() -> Self {
         Self {
-            addr: MacAddress(mac_address::MacAddress::new([0; 6])),
+            addr: MacAddress::new([0; 6]),
         }
     }
 }
