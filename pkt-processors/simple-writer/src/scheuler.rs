@@ -84,12 +84,9 @@ impl Scheduler {
     /// Generate packet write information of a packet
     pub fn gen(&self, pkt: &dyn Packet) -> Box<PacketInfo> {
         let mut file_info = self.file_info.borrow_mut();
-        file_info.filesize += std::mem::size_of::<PacketHeader>();
-        file_info.filesize += pkt.raw().len();
 
-        let filesize = file_info.filesize;
         let closing = file_info.filesize >= self.max_file_size;
-        let file_info = if closing || file_info.name.as_os_str().is_empty() {
+        let info = if closing || file_info.name.as_os_str().is_empty() {
             // if current pcap file is gonna close, send a new name to the pcap writer
             let mut fid = FILE_ID.load(Ordering::Relaxed);
             if !file_info.name.as_os_str().is_empty() {
@@ -121,10 +118,13 @@ impl Scheduler {
                 .as_secs();
             file_info.filesize = std::mem::size_of::<PcapFileHeader>();
             file_info.locked = true;
-            Some((file_info.clone(), filesize))
+            Some((file_info.clone(), file_info.filesize))
         } else {
             None
         };
+
+        file_info.filesize += std::mem::size_of::<PacketHeader>();
+        file_info.filesize += pkt.raw().len();
 
         // construct a pcap packet from a raw packet
         // TODO: in the future we may need to support pcapng format
@@ -143,7 +143,7 @@ impl Scheduler {
             thread: self.id,
             closing,
             buf,
-            file_info,
+            file_info: info,
         })
     }
 
