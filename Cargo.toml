@@ -5,6 +5,7 @@ members = [
     "arkime",
     "output/disk",
     "output/elasticsearch",
+    "pkt-processors/dhcp",
     "pkt-processors/dns",
     "pkt-processors/ethernet",
     "pkt-processors/http",

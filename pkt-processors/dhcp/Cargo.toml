@@ -1,0 +1,21 @@
+[package]
+name = "dhcp"
+version = "0.1.0"
+edition = "2018"
+
+[lib]
+crate-type = ["cdylib"]
+name = "dhcp"
+
+[dependencies]
+alphonse-api = { path = "../../api" }
+anyhow = "1.0"
+dhcp-parser2 = { git = "https://github.com/rusticata/dhcp-parser.git", branch = "master" }
+fnv = "1.0"
+mac_address = { version = "1.1", features = ["serde"] }
+nom = "6"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[features]
+arkime = ["alphonse-api/arkime"]
