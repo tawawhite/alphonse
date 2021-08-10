@@ -43,7 +43,7 @@ mod tests {
         let buf = [0xc2, 0x00, 0x08, 0x01];
         let dissector = Dissector::default();
         let result = dissector.dissect(&buf, 0);
-        let err = result.unwrap_err();
-        assert!(matches!(err, Error::UnsupportProtocol(_)));
+        let layer = result.unwrap().unwrap();
+        assert_eq!(layer.protocol, Protocol::UNKNOWN);
     }
 }
