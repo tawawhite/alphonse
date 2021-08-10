@@ -39,6 +39,7 @@ impl super::Dissector for Dissector {
 
         match ip_proto {
             ip_proto::ICMP => layer.protocol = Protocol::ICMP,
+            ip_proto::IGMP => layer.protocol = Protocol::IGMP,
             ip_proto::IPV4 => layer.protocol = Protocol::IPV4,
             ip_proto::TCP => layer.protocol = Protocol::TCP,
             ip_proto::UDP => layer.protocol = Protocol::UDP,

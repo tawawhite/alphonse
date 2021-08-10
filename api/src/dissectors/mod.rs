@@ -20,7 +20,9 @@ pub trait Dissector {
     /// * `buf` - Buffer of this layer and its payload
     ///
     /// * `offset` - Position to the start of the packet
-    fn dissect(&self, buf: &[u8], offset: u16) -> Result<Option<Layer>, Error>;
+    fn dissect(&self, _buf: &[u8], _offset: u16) -> Result<Option<Layer>, Error> {
+        Ok(None)
+    }
 }
 
 pub type Callback = fn(buf: &[u8], offset: u16) -> Result<Option<Layer>, Error>;
@@ -98,6 +100,10 @@ impl ProtocolDessector {
             Some(Box::new(network::icmp::Dissector::default()));
         parser.callbacks[Protocol::ERSPAN as u8 as usize] =
             Some(Box::new(network::erspan::Dissector::default()));
+        parser.callbacks[Protocol::ESP as u8 as usize] =
+            Some(Box::new(network::esp::Dissector::default()));
+        parser.callbacks[Protocol::IGMP as u8 as usize] =
+            Some(Box::new(network::igmp::Dissector::default()));
 
         // transport layer protocl parsers
         parser.callbacks[Protocol::TCP as u8 as usize] =

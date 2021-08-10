@@ -1,6 +1,6 @@
 // pub const HOPOPT: u8 = 0;
 pub const ICMP: u8 = 1;
-// pub const IGMP: u8 = 2;
+pub const IGMP: u8 = 2;
 // pub const GGP: u8 = 3;
 pub const IPV4: u8 = 4;
 // pub const ST: u8 = 5;
