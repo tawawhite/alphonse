@@ -1,4 +1,3 @@
-use std::cell::RefCell;
 use std::path::PathBuf;
 use std::sync::atomic::Ordering;
 
@@ -46,18 +45,16 @@ pub struct Scheduler {
     mode: Mode,
     /// Write info sender
     sender: Sender<Box<PacketInfo>>,
-    /// Packet write buffer size
-    write_size: usize,
     /// Maxium single pcap file size
     pub max_file_size: usize,
     /// All avaliable pcap write directoreis
     pub pcap_dirs: Vec<PathBuf>,
     /// Current using pcap file directory
-    pcap_dir: RefCell<PathBuf>,
+    pcap_dir: PathBuf,
     /// Pcap directory selecting algorithm
     dir_algorithm: PcapDirAlgorithm,
     /// Current pcap file information
-    file_info: RefCell<PcapFileInfo>,
+    file_info: PcapFileInfo,
 }
 
 unsafe impl Send for Scheduler {}
@@ -67,44 +64,39 @@ impl Scheduler {
     pub fn new(id: u8, node: String, sender: Sender<Box<PacketInfo>>) -> Self {
         let mut file_info = PcapFileInfo::default();
         file_info.node = node;
-        let file_info = RefCell::new(file_info);
         Self {
             id,
             mode: Mode::Normal,
             sender,
-            write_size: 0,
             max_file_size: 1,
             pcap_dirs: vec![],
-            pcap_dir: RefCell::new(PathBuf::from("")),
+            pcap_dir: PathBuf::from(""),
             dir_algorithm: PcapDirAlgorithm::RoundRobin,
             file_info,
         }
     }
 
     /// Generate packet write information of a packet
-    pub fn gen(&self, pkt: &dyn Packet) -> Box<PacketInfo> {
-        let mut file_info = self.file_info.borrow_mut();
-
-        let closing = file_info.filesize >= self.max_file_size;
-        let info = if closing || file_info.name.as_os_str().is_empty() {
+    pub fn gen(&mut self, pkt: &dyn Packet) -> Box<PacketInfo> {
+        let closing = self.file_info.filesize >= self.max_file_size;
+        let info = if closing || self.file_info.name.as_os_str().is_empty() {
             // if current pcap file is gonna close, send a new name to the pcap writer
             let mut fid = FILE_ID.load(Ordering::Relaxed);
-            if !file_info.name.as_os_str().is_empty() {
+            let last_file_size = if !self.file_info.name.as_os_str().is_empty() {
                 // Since the ES query is executed on another thread, it's a 'lazy' operation
                 // and is merely a mechanism to inform the elasticsearch to update the
                 // file sequence, so add scheduler's file id to prevent overwrite the first
                 // pcap file
                 fid += 1;
-            }
+                self.file_info.filesize
+            } else {
+                std::mem::size_of::<PcapFileHeader>()
+            };
 
-            file_info.num = fid;
-            file_info.name = match self.mode {
+            self.file_info.num = fid;
+            self.file_info.name = match self.mode {
                 Mode::Normal => {
-                    let fpath = self.gen_fname(
-                        pkt.ts().tv_sec as u64,
-                        &file_info.node,
-                        file_info.num as u64,
-                    );
+                    let fpath = self.gen_fname(pkt.ts().tv_sec as u64);
                     // absolutize always return OK(_)
                     let fpath = fpath.absolutize().unwrap();
                     PathBuf::from(fpath.as_ref())
@@ -112,19 +104,18 @@ impl Scheduler {
                 Mode::XOR2048 => unimplemented!(),
                 Mode::AES256CTR => unimplemented!(),
             };
-            file_info.first = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_secs();
-            file_info.filesize = std::mem::size_of::<PcapFileHeader>();
-            file_info.locked = true;
-            Some((file_info.clone(), file_info.filesize))
+            self.file_info.first = pkt.ts().tv_sec as u64;
+            self.file_info.last = pkt.ts().tv_sec as u64;
+            self.file_info.filesize = std::mem::size_of::<PcapFileHeader>();
+            self.file_info.locked = true;
+            Some((self.file_info.clone(), last_file_size))
         } else {
             None
         };
 
-        file_info.filesize += std::mem::size_of::<PacketHeader>();
-        file_info.filesize += pkt.raw().len();
+        self.file_info.filesize += std::mem::size_of::<PacketHeader>();
+        self.file_info.filesize += pkt.raw().len();
+        self.file_info.last = pkt.ts().tv_sec as u64;
 
         // construct a pcap packet from a raw packet
         // TODO: in the future we may need to support pcapng format
@@ -153,7 +144,7 @@ impl Scheduler {
     }
 
     /// Generate file name to write packets
-    fn gen_fname(&self, ts: u64, node: &str, id: u64) -> PathBuf {
+    fn gen_fname(&mut self, ts: u64) -> PathBuf {
         match self.dir_algorithm {
             PcapDirAlgorithm::MaxFreeBytes => {
                 let mut max_free_space_bytes = 0;
@@ -162,7 +153,7 @@ impl Scheduler {
                     let stat = nix::sys::statvfs::statvfs(dir.as_path()).unwrap();
                     if (stat.blocks_available() * stat.blocks_free()) >= max_free_space_bytes {
                         max_free_space_bytes = stat.blocks_available() * stat.blocks_free();
-                        self.pcap_dir.replace(dir.clone());
+                        self.pcap_dir = dir.clone();
                     }
                 }
             }
@@ -173,53 +164,52 @@ impl Scheduler {
                     let stat = nix::sys::statvfs::statvfs(dir.as_path()).unwrap();
                     if (stat.blocks_available() / stat.blocks()) as f64 >= max_free_space_percent {
                         max_free_space_percent = (stat.blocks_available() / stat.blocks()) as f64;
-                        self.pcap_dir.replace(dir.clone());
+                        self.pcap_dir = dir.clone();
                     }
                 }
             }
             PcapDirAlgorithm::RoundRobin => {
                 for (i, dir) in self.pcap_dirs.iter().enumerate() {
-                    let cmp = match self.pcap_dir.borrow().cmp(dir) {
-                        std::cmp::Ordering::Equal => true,
-                        _ => false,
-                    };
-                    if cmp {
+                    if &self.pcap_dir == dir {
                         match self.pcap_dirs.get(i + 1) {
-                            Some(dir) => self.pcap_dir.replace(dir.clone()),
-                            None => self.pcap_dir.replace(self.pcap_dirs[0].clone()),
+                            Some(dir) => self.pcap_dir = dir.clone(),
+                            None => self.pcap_dir = self.pcap_dirs[0].clone(),
                         };
                         break;
                     }
                 }
                 // ! Panic if pcap_dirs is empty, in real application this is very unlikely to happen
-                self.pcap_dir.replace(self.pcap_dirs[0].clone());
+                self.pcap_dir = self.pcap_dirs[0].clone();
             }
         };
 
         let datetime = chrono::Local.timestamp(ts as i64, 0);
         let fname = format!(
             "{}-{:2}{:0>2}{:0>2}-{:0>8}.pcap",
-            node,
+            self.file_info.node,
             datetime.year() % 100,
             datetime.month(),
             datetime.day(),
-            id
+            self.file_info.num
         );
-        self.pcap_dir.borrow().join(fname.as_str())
+        self.pcap_dir.join(fname.as_str())
     }
 
     pub fn current_pos(&self) -> usize {
-        self.file_info.borrow().filesize
+        self.file_info.filesize
     }
 
     pub fn current_fid(&self) -> u32 {
-        self.file_info.borrow().num
+        self.file_info.num
     }
 }
 
 #[cfg(test)]
 mod test {
-    use std::str::FromStr;
+    use std::mem::size_of;
+
+    use alphonse_api::packet::Packet as Pkt;
+    use api::packet::test::Packet;
 
     use super::*;
 
@@ -227,22 +217,117 @@ mod test {
     fn gen_fname() {
         let (sender, _) = crossbeam_channel::bounded(1);
         let mut scheduler = Scheduler::new(0, "node".to_string(), sender);
+        scheduler.pcap_dirs = vec![PathBuf::from("/test-dir")];
+        scheduler.pcap_dir = PathBuf::from("/test-dir");
+        scheduler.file_info.num = 1;
+        scheduler.file_info.node = "node".to_string();
 
-        scheduler.pcap_dirs = vec![PathBuf::from_str("/test-dir").unwrap()];
-        scheduler.pcap_dir = RefCell::new(PathBuf::from_str("/test-dir").unwrap());
-        let fname = scheduler.gen_fname(0, "node", 1);
-        assert_eq!(
-            fname,
-            PathBuf::from_str("/test-dir/node-700101-00000001.pcap").unwrap()
-        );
+        let fname = scheduler.gen_fname(0);
+        assert_eq!(fname, PathBuf::from("/test-dir/node-700101-00000001.pcap"));
 
-        scheduler.pcap_dirs = vec![PathBuf::from_str("/abc").unwrap()];
-        scheduler.pcap_dir = RefCell::new(PathBuf::from_str("/abc").unwrap());
-        scheduler.file_info.borrow_mut().node = "node1".to_string();
-        let fname = scheduler.gen_fname(1615295648, "node1", 2);
+        scheduler.pcap_dirs = vec![PathBuf::from("/abc")];
+        scheduler.pcap_dir = PathBuf::from("/abc");
+        scheduler.file_info.node = "node1".to_string();
+        scheduler.file_info.num = 2;
+        let fname = scheduler.gen_fname(1615295648);
+        assert_eq!(fname, PathBuf::from("/abc/node1-210309-00000002.pcap"));
+    }
+
+    #[test]
+    fn gen_pkt_info() -> Result<()> {
+        let (sender, _) = crossbeam_channel::bounded(1);
+        let mut scheduler = Scheduler::new(0, "node".to_string(), sender);
+        scheduler.max_file_size = 60;
+        scheduler.pcap_dirs = vec![PathBuf::from("/test-dir")];
+
+        // scheduler received first packet
+        let mut pkt1 = Packet::default();
+        pkt1.raw = Box::new(vec![0, 1, 2, 3, 4, 5]);
+        pkt1.ts.tv_sec = 12345;
+        let fileinfo = scheduler.gen(&pkt1);
+
+        let info = &scheduler.file_info;
+        assert_eq!(scheduler.current_fid(), 0);
         assert_eq!(
-            fname,
-            PathBuf::from_str("/abc/node1-210309-00000002.pcap").unwrap()
+            scheduler.current_pos(),
+            size_of::<PcapFileHeader>() + size_of::<PacketHeader>() + pkt1.raw().len()
         );
+        assert_eq!(info.first, pkt1.ts.tv_sec as u64);
+        assert_eq!(info.last, pkt1.ts.tv_sec as u64);
+        assert_eq!(info.locked, true);
+        assert_eq!(info.node, "node");
+        drop(info);
+
+        assert_eq!(fileinfo.closing, false);
+        assert_eq!(fileinfo.file_info.is_some(), true);
+        let (info, size) = fileinfo.file_info.unwrap();
+        assert_eq!(size, size_of::<PcapFileHeader>());
+        assert_eq!(info.num, 0);
+        assert_eq!(info.filesize, size_of::<PcapFileHeader>());
+        assert_eq!(info.first, pkt1.ts.tv_sec as u64);
+        assert_eq!(info.last, pkt1.ts.tv_sec as u64);
+        assert_eq!(info.locked, true);
+        assert_eq!(info.node, "node");
+
+        // scheduler received second packet
+        let mut pkt2 = Packet::default();
+        pkt2.raw = Box::new(vec![6, 7, 8, 9, 0]);
+        pkt2.ts.tv_sec = 12346;
+        let fileinfo = scheduler.gen(&pkt2);
+
+        let info = &scheduler.file_info;
+        assert_eq!(scheduler.current_fid(), 0);
+        assert_eq!(
+            scheduler.current_pos(),
+            size_of::<PcapFileHeader>()
+                + size_of::<PacketHeader>() * 2
+                + pkt1.raw.len()
+                + pkt2.raw().len()
+        );
+        assert_eq!(info.first, pkt1.ts.tv_sec as u64);
+        assert_eq!(info.last, pkt2.ts.tv_sec as u64);
+        assert_eq!(info.locked, true);
+        assert_eq!(info.node, "node");
+        drop(info);
+
+        assert_eq!(fileinfo.closing, false);
+        assert_eq!(fileinfo.file_info.is_none(), true);
+
+        // scheduler received third packet, this time should be writing pkt into a new file
+        let mut pkt3 = Packet::default();
+        pkt3.raw = Box::new(vec![6, 7, 8, 9, 0]);
+        pkt3.ts.tv_sec = 12347;
+        let fileinfo = scheduler.gen(&pkt3);
+
+        let info = &scheduler.file_info;
+        assert_eq!(scheduler.current_fid(), 1);
+        assert_eq!(
+            scheduler.current_pos(),
+            size_of::<PcapFileHeader>() + size_of::<PacketHeader>() + pkt3.raw().len()
+        );
+        assert_eq!(info.first, pkt3.ts.tv_sec as u64);
+        assert_eq!(info.last, pkt3.ts.tv_sec as u64);
+        assert_eq!(info.locked, true);
+        assert_eq!(info.node, "node");
+        drop(info);
+
+        assert_eq!(fileinfo.closing, true);
+        assert_eq!(fileinfo.file_info.is_some(), true);
+        let (info, size) = fileinfo.file_info.unwrap();
+        assert_eq!(
+            size,
+            size_of::<PcapFileHeader>()
+                + size_of::<PacketHeader>() * 2
+                + pkt1.raw().len()
+                + pkt2.raw().len()
+        );
+        assert_eq!(info.num, 1);
+        assert_eq!(info.filesize, size_of::<PcapFileHeader>());
+        assert_eq!(info.first, pkt3.ts.tv_sec as u64);
+        assert_eq!(info.last, pkt3.ts.tv_sec as u64);
+        assert_eq!(info.locked, true);
+        assert_eq!(info.node, "node");
+
+        Ok(())
     }
 }

@@ -3,7 +3,7 @@ use std::hash::Hasher;
 use std::hash::{BuildHasher, Hash};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, TryLockError};
 
 use anyhow::{anyhow, Result};
 use crossbeam_channel::{Receiver, Sender};
@@ -14,7 +14,6 @@ use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize, Serializer};
 use serde_json::json;
 use tokio::task::JoinHandle;
-use yaml_rust::YamlEmitter;
 
 use alphonse_api as api;
 use api::classifiers::{matched::Rule, ClassifierManager};
@@ -37,7 +36,7 @@ use writer::SimpleWriter;
 const PKG_NAME: &'static str = env!("CARGO_PKG_NAME");
 static FILE_ID: AtomicU32 = AtomicU32::new(0);
 static mut HANDLES: OnceCell<Vec<JoinHandle<Result<()>>>> = OnceCell::new();
-static mut SCHEDULERS: OnceCell<Vec<Scheduler>> = OnceCell::new();
+static mut SCHEDULERS: OnceCell<Vec<Mutex<Scheduler>>> = OnceCell::new();
 static mut CHANNEL: OnceCell<(Sender<Box<PacketInfo>>, Receiver<Box<PacketInfo>>)> =
     OnceCell::new();
 static RT: OnceCell<tokio::runtime::Runtime> = OnceCell::new();
@@ -112,6 +111,7 @@ where
 #[serde(rename_all = "camelCase")]
 struct PcapFileInfo {
     filesize: usize,
+    /// First packet timestamp
     first: u64,
     last: u64,
     #[cfg_attr(feature = "arkime", serde(serialize_with = "bool_serialize"))]
@@ -171,36 +171,17 @@ impl Plugin for SimpleWriterProcessor {
     }
 
     fn init(&mut self, alcfg: &api::config::Config) -> Result<()> {
-        let root = "simple-writer";
-        let yaml = match alcfg.doc.as_ref()[root] {
-            yaml_rust::Yaml::Hash(_) => {
-                let mut out = String::new();
-                let mut emitter = YamlEmitter::new(&mut out);
-                emitter.dump(&alcfg.doc.as_ref()[root])?;
-                out
-            }
-            yaml_rust::Yaml::BadValue => {
-                println!(
-                    "Option {} not found or bad hash value, {} initialization failed",
-                    root,
-                    self.name()
-                );
-                return Err(anyhow!(""));
-            }
-            _ => {
-                println!(
-                    "Wrong value type for {}, expecting string, {} initialization failed",
-                    root,
-                    self.name()
-                );
-                return Err(anyhow!(""));
-            }
-        };
-
-        let mut cfg: Config = serde_yaml::from_str(&yaml)?;
-        cfg.doc = alcfg.doc.clone();
+        let mut cfg = Config::default();
+        cfg.pcap_dirs = alcfg.get_str_arr("simple-writer.pcap.dirs");
+        cfg.max_file_size = alcfg.get_integer(
+            "simple-writer.max.file.size",
+            10737418240,
+            1048576,
+            21474836480,
+        ) as usize;
         cfg.exit = alcfg.exit.clone();
         cfg.node = alcfg.node.clone();
+
         #[cfg(feature = "arkime")]
         {
             cfg.es_host = alcfg.get_str("elasticsearch", "http://localhost:9200");
@@ -218,7 +199,7 @@ impl Plugin for SimpleWriterProcessor {
                 .map(|path| PathBuf::from(path))
                 .collect();
             scheduler.max_file_size = cfg.max_file_size;
-            schedulers.push(scheduler);
+            schedulers.push(Mutex::new(scheduler));
         }
         unsafe {
             // unlikely to failed
@@ -334,22 +315,29 @@ impl Processor for SimpleWriterProcessor {
 
         let hash = self.hasher.finish() as usize % schedulers.len();
         self.hasher = FnvHasher::default();
-        let info = schedulers[hash].gen(pkt);
-        if schedulers[hash].current_fid() != self.fid {
-            self.fid = schedulers[hash].current_fid();
-            self.file_id.insert(schedulers[hash].current_fid());
-            self.packet_pos
-                .push(-(schedulers[hash].current_fid() as isize));
+        let scheduler = &schedulers[hash];
+        loop {
+            match scheduler.try_lock() {
+                Err(e) => match e {
+                    TryLockError::Poisoned(e) => return Err(anyhow!("{}", e)),
+                    TryLockError::WouldBlock => continue,
+                },
+                Ok(mut scheduler) => {
+                    let info = scheduler.gen(pkt);
+                    if scheduler.current_fid() != self.fid {
+                        self.fid = scheduler.current_fid();
+                        self.file_id.insert(scheduler.current_fid());
+                        self.packet_pos.push(-(scheduler.current_fid() as isize));
+                    }
+                    self.packet_pos.push(scheduler.current_pos() as isize);
+
+                    scheduler.send(info)?;
+                    break;
+                }
+            }
         }
-        self.packet_pos
-            .push(schedulers[hash].current_pos() as isize);
 
-        schedulers[hash].send(info)?;
         Ok(())
-    }
-
-    fn mid_save(&mut self, ses: &mut Session) {
-        self.save(ses);
     }
 
     /// Add packet positions into session after session is about to timeout or closed
