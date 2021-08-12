@@ -1,7 +1,7 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use crossbeam_channel::Receiver;
 use serde_json::json;
 
@@ -72,7 +72,13 @@ impl PktThread {
                 // otherwise this pkt just belongs to the same session, parse without rule information
                 for id in rule.processors.iter() {
                     if *id == processor.id() {
-                        processor.parse_pkt(pkt, Some(rule), ses_data.info.as_mut())?;
+                        match processor.parse_pkt(pkt, Some(rule), ses_data.info.as_mut()) {
+                            Ok(_) => {}
+                            Err(e) => {
+                                eprintln!("{}: {}", processor.name(), e);
+                                return Err(e);
+                            }
+                        };
                         matched = true;
                     }
                 }
@@ -117,8 +123,7 @@ impl PktThread {
                         &mut processors,
                         pkt.as_mut(),
                         ses.as_mut(),
-                    )
-                    .unwrap();
+                    )?
                 }
                 None => {
                     let mut ses = Box::new(SessionData::default());
@@ -132,8 +137,7 @@ impl PktThread {
                         &mut processors,
                         pkt.as_mut(),
                         ses.as_mut(),
-                    )
-                    .unwrap();
+                    )?;
 
                     self.session_table.insert(key, ses);
                 }
