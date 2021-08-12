@@ -47,9 +47,9 @@ plugins.rx-driver: rxfiles
 plugins.dirs: ["target/debug"]
 
 # Configuration for simple writer
-simple-writer:
-  pcap.dirs: ["./raw"]
-  max.file.size: 10737418240 # bytes, default 10GB
+simple-writer.pcap.dirs: ["./raw"]
+simple-writer.max.file.size: 10737418240 # bytes, default 10GB
+
 ip.db.directory: "./etc"
 
 http.parseQSValue: true
