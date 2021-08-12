@@ -1,7 +1,6 @@
 [package]
 name = "tcp"
 version = "0.1.0"
-authors = ["Jack Liar"]
 edition = "2018"
 
 [lib]
@@ -9,9 +8,9 @@ crate-type = ["cdylib"]
 name = "tcp"
 
 [dependencies]
-alphonse-api = { path="../../api", optional=false }
+alphonse-api = { path = "../../api", optional = false }
 anyhow = "1.0"
-bitflags = "1.2"
+bitflags = "1.3"
 enum-primitive-derive = "0.2"
 num-traits = "0.2"
 serde = "1.0"
