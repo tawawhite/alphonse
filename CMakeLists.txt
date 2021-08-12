@@ -17,8 +17,24 @@ find_library(libpcap_LIBRARY pcap
 )
 
 option(BUILD_LIBPCAP "build libpcap" ON)
-if(NOT libpcap_LIBRARY OR BUILD_LIBPCAP)
+if(NOT libpcap_LIBRARY AND NOT BUILD_LIBPCAP)
+    option(BUILD_LIBPCAP "build libpcap" ON)
+endif()
+
+message(STATUS "${libpcap_LIBRARY}")
+if(BUILD_LIBPCAP)
     add_dependencies(alphonse libpcap)
+endif()
+
+find_library(libhs_LIBRARY hs
+    HINTS "${CMAKE_CURRENT_BINARY_DIR}/install/lib"
+)
+option(BUILD_HYPERSCAN "build hyperscan" ON)
+if(NOT libhs_LIBRARY AND NOT BUILD_HYPERSCAN)
+    option(BUILD_HYPERSCAN "build hyperscan" ON)
+endif()
+if(BUILD_HYPERSCAN)
+    add_dependencies(alphonse hyperscan)
 endif()
 
 # Currently DPDK is only for Linux, FreeBSD and Windows
@@ -38,6 +54,7 @@ if(BUILD_TCMALLOC)
     add_dependencies(alphonse gperftools)
 endif()
 
-add_dependencies(alphonse llhttp hyperscan)
+# add_dependencies(alphonse llhttp hyperscan)
+add_dependencies(alphonse llhttp)
 
 print_configuration()
