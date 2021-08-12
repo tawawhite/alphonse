@@ -7,9 +7,11 @@ ENV RUSTFLAGS="-C target-feature=-crt-static" \
     LD_LIBRARY_PATH=/alphonse/build/install/lib:/alphonse/build/install/lib64:/alphonse/build/install/lib/x86_64-linux-gnu \
     BUILD_FLAGS="--release"
 
-RUN apk add cmake make gcc g++ git openssl-dev flex linux-headers python3 libpcap libpcap-dev clang-libs bison; \
-    cd /alphonse; \
-    /alphonse/build.sh
+RUN apk add cmake make gcc g++ git openssl-dev flex linux-headers python3 libpcap libpcap-dev clang-libs bison
+RUN cd /alphonse; \
+    /alphonse/build.sh; \
+    strip /alphonse/target/release/alphonse; \
+    strip /alphonse/target/release/*.so
 
 CMD ["/bin/sh"]
 
