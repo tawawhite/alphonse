@@ -5,9 +5,10 @@ COPY . /alphonse
 ENV RUSTFLAGS="-C target-feature=-crt-static" \
     PKG_CONFIG_PATH=/alphonse/build/install/lib/pkgconfig:/alphonse/build/install/lib64/pkgconfig:/alphonse/build/install/lib/x86_64-linux-gnu/pkgconfig \
     LD_LIBRARY_PATH=/alphonse/build/install/lib:/alphonse/build/install/lib64:/alphonse/build/install/lib/x86_64-linux-gnu \
-    BUILD_FLAGS="--release"
+    BUILD_FLAGS="--release" \
+    CMAKE_OPTIONS="-DBUILD_LIBPCAP=OFF -DBUILD_HYPERSCAN=OFF"
 
-RUN apk add cmake make gcc g++ git openssl-dev flex linux-headers python3 libpcap libpcap-dev clang-libs bison
+RUN apk add cmake make gcc g++ git openssl-dev flex linux-headers python3 libpcap-dev vectorscan-dev clang-libs bison
 RUN cd /alphonse; \
     /alphonse/build.sh; \
     strip /alphonse/target/release/alphonse; \
@@ -23,6 +24,6 @@ COPY --from=Base /alphonse/alphonse.example.yml /usr/local/etc/
 COPY --from=Base /alphonse/etc/*.mmdb /usr/local/etc/
 COPY --from=Base /alphonse/etc/*.csv /usr/local/etc/
 
-RUN apk add --no-cache libstdc++ libpcap
+RUN apk add --no-cache libstdc++ libpcap vectorscan
 
 CMD ["/bin/sh"]
