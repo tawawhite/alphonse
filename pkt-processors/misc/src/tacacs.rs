@@ -1,29 +1,24 @@
 use anyhow::Result;
 
 use alphonse_api as api;
-use api::classifiers::{dpi, ClassifierManager};
+use api::classifiers::ClassifierManager;
 use api::packet::Packet;
-use api::session::{ProtocolLayer, Session};
+use api::session::Session;
 
-use super::{
-    add_dpi_rule_with_func, add_dpi_tcp_udp_rule_with_func, add_protocol, MatchCallBack, Misc,
-};
+use super::{add_protocol, Misc};
 
 pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManager) -> Result<()> {
-    add_dpi_tcp_udp_rule_with_func!(
+    parser.add_tcp_udp_dpi_rule_with_func(
         r"^(\xc0\x01[\x01\x02])|(\xc0\x02\x01)|(\xc0\x03[\x01\x02])|(\xc1\x01[\x01\x02])",
         classify,
-        parser,
-        manager
-    );
-
-    Ok(())
+        manager,
+    )
 }
 
 fn classify(ses: &mut Session, pkt: &dyn Packet) -> Result<()> {
     unsafe {
         if pkt.src_port() == 49 || pkt.dst_port() == 49 {
-            add_protocol!(ses, "tacacs");
+            add_protocol(ses, "tacacs");
         }
     }
 
@@ -37,8 +32,8 @@ mod test {
     use api::plugins::processor::Processor;
     use api::session::Session;
 
-    use crate::assert_has_protocol;
-    use crate::test::Packet;
+    
+    use crate::test::{assert_has_protocol, Packet};
 
     #[test]
     fn tacacs() {
@@ -63,6 +58,6 @@ mod test {
         parser
             .parse_pkt(pkt.as_ref(), Some(&pkt.rules()[0]), &mut ses)
             .unwrap();
-        assert_has_protocol!(ses, "tacacs");
+        assert_has_protocol(&ses, "tacacs");
     }
 }

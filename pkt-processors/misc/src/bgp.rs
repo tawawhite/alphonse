@@ -3,10 +3,10 @@ use serde_json::json;
 
 use alphonse_api as api;
 use api::classifiers::ClassifierManager;
-use api::packet::{Packet, Protocol};
-use api::session::{ProtocolLayer, Session};
+use api::packet::Packet;
+use api::session::Session;
 
-use crate::{add_port_rule_with_func, add_protocol, MatchCallBack, Misc};
+use crate::{add_protocol, Misc};
 
 const MARKER: [u8; 16] = [0xff; 16];
 const TYPE: &[&str] = &[
@@ -19,9 +19,7 @@ const TYPE: &[&str] = &[
 ];
 
 pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManager) -> Result<()> {
-    add_port_rule_with_func!(179, classify, Protocol::TCP, parser, manager);
-
-    Ok(())
+    parser.add_tcp_port_rule_with_func(179, classify, manager)
 }
 
 fn classify(ses: &mut Session, pkt: &dyn Packet) -> Result<()> {
@@ -29,7 +27,7 @@ fn classify(ses: &mut Session, pkt: &dyn Packet) -> Result<()> {
         return Ok(());
     }
 
-    add_protocol!(ses, "bgp");
+    add_protocol(ses, "bgp");
 
     let msg_type = pkt.payload()[18] as usize;
     if msg_type < TYPE.len() {
@@ -46,9 +44,9 @@ mod test {
     use super::*;
     use api::packet::Protocol;
     use api::plugins::processor::Processor;
+    use api::session::ProtocolLayer;
 
-    use crate::assert_has_protocol;
-    use crate::test::Packet;
+    use crate::test::{assert_has_protocol, Packet};
 
     #[test]
     fn bgp() {
@@ -118,7 +116,7 @@ mod test {
         parser
             .parse_pkt(pkt.as_ref(), Some(&pkt.rules()[0]), &mut ses)
             .unwrap();
-        assert_has_protocol!(ses, "bgp");
+        assert_has_protocol(&ses, "bgp");
         let a = &ses.fields.as_object().unwrap()["bgp.type"];
         assert_eq!(a.as_str().unwrap(), "OPEN");
     }

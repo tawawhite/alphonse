@@ -2,16 +2,14 @@ use anyhow::Result;
 
 use alphonse_api as api;
 use api::classifiers::ClassifierManager;
-use api::packet::{Packet, Protocol};
-use api::session::{ProtocolLayer, Session};
+use api::packet::Packet;
+use api::session::Session;
 
-use crate::{add_port_rule_with_func, add_protocol, MatchCallBack, Misc};
+use crate::{add_protocol, Misc};
 
 pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManager) -> Result<()> {
-    add_port_rule_with_func!(1985, classify, Protocol::UDP, parser, manager);
-    add_port_rule_with_func!(2029, classify, Protocol::UDP, parser, manager);
-
-    Ok(())
+    parser.add_udp_port_rule_with_func(1985, classify, manager)?;
+    parser.add_udp_port_rule_with_func(2029, classify, manager)
 }
 
 fn classify(ses: &mut Session, pkt: &dyn Packet) -> Result<()> {
@@ -21,9 +19,9 @@ fn classify(ses: &mut Session, pkt: &dyn Packet) -> Result<()> {
         }
     }
     if pkt.payload()[..2] == [0, 3] {
-        add_protocol!(ses, "hsrp");
+        add_protocol(ses, "hsrp");
     } else if pkt.payload()[..3] == [1, 40, 2] {
-        add_protocol!(ses, "hsrpv2");
+        add_protocol(ses, "hsrpv2");
     }
     Ok(())
 }
@@ -35,8 +33,8 @@ mod test {
     use api::plugins::processor::Processor;
     use api::session::Session;
 
-    use crate::assert_has_protocol;
-    use crate::test::Packet;
+    
+    use crate::test::{assert_has_protocol, Packet};
 
     #[test]
     fn skinny() {
@@ -62,7 +60,7 @@ mod test {
                 .parse_pkt(pkt.as_ref(), Some(rule), &mut ses)
                 .unwrap();
         }
-        assert_has_protocol!(ses, "hsrp");
+        assert_has_protocol(&ses, "hsrp");
 
         // hsrp on port 2029
         let mut pkt: Box<Packet> = Box::new(Packet::default());
@@ -80,6 +78,6 @@ mod test {
                 .parse_pkt(pkt.as_ref(), Some(rule), &mut ses)
                 .unwrap();
         }
-        assert_has_protocol!(ses, "hsrpv2");
+        assert_has_protocol(&ses, "hsrpv2");
     }
 }

@@ -1,20 +1,13 @@
 use anyhow::Result;
 
 use alphonse_api as api;
-use api::classifiers::{dpi, ClassifierManager};
+use api::classifiers::ClassifierManager;
 
-use crate::{add_simple_dpi_rule, add_simple_dpi_udp_rule, MatchCallBack, Misc};
+use crate::Misc;
 
 pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManager) -> Result<()> {
-    add_simple_dpi_udp_rule!(r"^VS01", "steam-friends", parser, manager);
-    add_simple_dpi_udp_rule!(
-        r"^\xff\xff\xff\xff\x54\x53\x6f\x75",
-        "valve-a2s",
-        parser,
-        manager
-    );
-
-    Ok(())
+    parser.add_simple_udp_dpi_rule(r"^VS01", "steam-friends", manager)?;
+    parser.add_simple_udp_dpi_rule(r"^\xff\xff\xff\xff\x54\x53\x6f\x75", "valve-a2s", manager)
 }
 
 #[cfg(test)]
@@ -22,10 +15,9 @@ mod test {
     use super::*;
     use api::packet::Protocol;
     use api::plugins::processor::Processor;
-    use api::session::{ProtocolLayer, Session};
+    use api::session::Session;
 
-    use crate::assert_has_protocol;
-    use crate::test::Packet;
+    use crate::test::{assert_has_protocol, Packet};
 
     #[test]
     fn steam() {
@@ -47,7 +39,7 @@ mod test {
         parser
             .parse_pkt(pkt.as_ref(), Some(&pkt.rules()[0]), &mut ses)
             .unwrap();
-        assert_has_protocol!(ses, "steam-friends");
+        assert_has_protocol(&ses, "steam-friends");
 
         // rule2
         let mut pkt: Box<Packet> = Box::new(Packet::default());
@@ -61,6 +53,6 @@ mod test {
         parser
             .parse_pkt(pkt.as_ref(), Some(&pkt.rules()[0]), &mut ses)
             .unwrap();
-        assert_has_protocol!(ses, "valve-a2s");
+        assert_has_protocol(&ses, "valve-a2s");
     }
 }

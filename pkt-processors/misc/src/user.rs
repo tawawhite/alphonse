@@ -1,16 +1,14 @@
 use anyhow::Result;
 
 use alphonse_api as api;
-use api::classifiers::{dpi, ClassifierManager};
+use api::classifiers::ClassifierManager;
 use api::packet::Packet;
 use api::session::Session;
 
-use crate::{add_dpi_rule_with_func, add_dpi_tcp_rule_with_func, MatchCallBack, Misc};
+use crate::Misc;
 
 pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManager) -> Result<()> {
-    add_dpi_tcp_rule_with_func!(r"^USER.*((\nNICK)|(\s\+iw))", classify, parser, manager);
-
-    Ok(())
+    parser.add_tcp_dpi_rule_with_func(r"^USER.*((\nNICK)|(\s\+iw))", classify, manager)
 }
 
 fn classify(ses: &mut Session, pkt: &dyn Packet) -> Result<()> {

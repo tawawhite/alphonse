@@ -1,19 +1,16 @@
 use anyhow::Result;
 
 use alphonse_api as api;
-use api::classifiers::{dpi, ClassifierManager};
+use api::classifiers::ClassifierManager;
 
-use crate::{add_simple_dpi_rule, add_simple_dpi_tcp_rule, MatchCallBack, Misc};
+use crate::Misc;
 
 pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManager) -> Result<()> {
-    add_simple_dpi_tcp_rule!(
+    parser.add_simple_tcp_dpi_rule(
         r"^\x43\x42\x4b\x50\x50\x52\x05\x50",
         "honeywell-tcc",
-        parser,
-        manager
-    );
-
-    Ok(())
+        manager,
+    )
 }
 
 #[cfg(test)]
@@ -21,10 +18,9 @@ mod test {
     use super::*;
     use api::packet::Protocol;
     use api::plugins::processor::Processor;
-    use api::session::{ProtocolLayer, Session};
+    use api::session::Session;
 
-    use crate::assert_has_protocol;
-    use crate::test::Packet;
+    use crate::test::{assert_has_protocol, Packet};
 
     #[test]
     fn honeywell_tcc() {
@@ -46,6 +42,6 @@ mod test {
         parser
             .parse_pkt(pkt.as_ref(), Some(&pkt.rules()[0]), &mut ses)
             .unwrap();
-        assert_has_protocol!(ses, "honeywell-tcc");
+        assert_has_protocol(&ses, "honeywell-tcc");
     }
 }

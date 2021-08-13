@@ -1,24 +1,20 @@
 use anyhow::Result;
 
 use alphonse_api as api;
-use api::classifiers::{dpi, ClassifierManager};
+use api::classifiers::ClassifierManager;
 use api::packet::Packet;
-use api::session::{ProtocolLayer, Session};
+use api::session::Session;
 
-use super::{
-    add_dpi_rule_with_func, add_dpi_tcp_rule_with_func, add_protocol, MatchCallBack, Misc,
-};
+use super::{add_protocol, Misc};
 
 pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManager) -> Result<()> {
-    add_dpi_tcp_rule_with_func!(r"^\*\sOK\s", classify, parser, manager);
-
-    Ok(())
+    parser.add_tcp_dpi_rule_with_func(r"^\*\sOK\s", classify, manager)
 }
 
 fn classify(ses: &mut Session, pkt: &dyn Packet) -> Result<()> {
     match &pkt.payload()[5..].windows(4).position(|win| win == b"IMAP") {
         Some(_) => {
-            add_protocol!(ses, "imap");
+            add_protocol(ses, "imap");
         }
         None => {}
     };
@@ -32,8 +28,8 @@ mod test {
     use api::plugins::processor::Processor;
     use api::session::Session;
 
-    use crate::assert_has_protocol;
-    use crate::test::Packet;
+    
+    use crate::test::{assert_has_protocol, Packet};
 
     #[test]
     fn imap() {
@@ -54,6 +50,6 @@ mod test {
         parser
             .parse_pkt(pkt.as_ref(), Some(&pkt.rules()[0]), &mut ses)
             .unwrap();
-        assert_has_protocol!(ses, "imap");
+        assert_has_protocol(&ses, "imap");
     }
 }

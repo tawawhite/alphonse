@@ -32,9 +32,9 @@ mod test {
     use api::packet::Protocol;
     use api::plugins::processor::Processor;
     use api::session::Session;
-    use api::utils::packet::Packet as Packet;
+    use api::utils::packet::Packet;
 
-    use crate::assert_has_protocol;
+    
 
     #[test]
     fn mysql() {
@@ -57,6 +57,6 @@ mod test {
                 .parse_pkt(pkt.as_ref(), Some(rule), &mut ses)
                 .unwrap();
         }
-        assert_has_protocol!(ses, "mysql");
+        assert_has_protocol(&ses, "mysql");
     }
 }

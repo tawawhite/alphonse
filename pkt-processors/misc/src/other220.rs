@@ -1,25 +1,21 @@
 use anyhow::Result;
 
 use alphonse_api as api;
-use api::classifiers::{dpi, ClassifierManager};
+use api::classifiers::ClassifierManager;
 use api::packet::Packet;
-use api::session::{ProtocolLayer, Session};
+use api::session::Session;
 
-use super::{
-    add_dpi_rule_with_func, add_dpi_tcp_rule_with_func, add_protocol, MatchCallBack, Misc,
-};
+use super::{add_protocol, Misc};
 
 pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManager) -> Result<()> {
-    add_dpi_tcp_rule_with_func!(r"^220\s", classify, parser, manager);
-
-    Ok(())
+    parser.add_tcp_dpi_rule_with_func(r"^220\s", classify, manager)
 }
 
 fn classify(ses: &mut Session, pkt: &dyn Packet) -> Result<()> {
     let payload = pkt.payload();
     match payload[4..].windows(4).position(|win| win == b"LMTP") {
         Some(_) => {
-            add_protocol!(ses, "lmtp");
+            add_protocol(ses, "lmtp");
             return Ok(());
         }
         None => {}
@@ -30,7 +26,7 @@ fn classify(ses: &mut Session, pkt: &dyn Packet) -> Result<()> {
         payload[4..].windows(4).position(|win| win == b"TLS"),
     ) {
         (None, None) => {
-            add_protocol!(ses, "ftp");
+            add_protocol(ses, "ftp");
         }
         _ => {}
     };
@@ -45,8 +41,8 @@ mod test {
     use api::plugins::processor::Processor;
     use api::session::Session;
 
-    use crate::assert_has_protocol;
-    use crate::test::Packet;
+    
+    use crate::test::{assert_has_protocol, Packet};
 
     #[test]
     fn other220() {
@@ -68,7 +64,7 @@ mod test {
         parser
             .parse_pkt(pkt.as_ref(), Some(&pkt.rules()[0]), &mut ses)
             .unwrap();
-        assert_has_protocol!(ses, "lmtp");
+        assert_has_protocol(&ses, "lmtp");
 
         // ftp
         let mut pkt: Box<Packet> = Box::new(Packet::default());
@@ -82,6 +78,6 @@ mod test {
         parser
             .parse_pkt(pkt.as_ref(), Some(&pkt.rules()[0]), &mut ses)
             .unwrap();
-        assert_has_protocol!(ses, "ftp");
+        assert_has_protocol(&ses, "ftp");
     }
 }

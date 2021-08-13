@@ -2,15 +2,13 @@ use anyhow::Result;
 
 use alphonse_api as api;
 use api::classifiers::ClassifierManager;
-use api::packet::{Packet, Protocol};
-use api::session::{ProtocolLayer, Session};
+use api::packet::Packet;
+use api::session::Session;
 
-use crate::{add_port_rule_with_func, add_protocol, MatchCallBack, Misc};
+use crate::{add_protocol, Misc};
 
 pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManager) -> Result<()> {
-    add_port_rule_with_func!(8211, classify, Protocol::UDP, parser, manager);
-
-    Ok(())
+    parser.add_udp_port_rule_with_func(8211, classify, manager)
 }
 
 fn classify(ses: &mut Session, pkt: &dyn Packet) -> Result<()> {
@@ -21,7 +19,7 @@ fn classify(ses: &mut Session, pkt: &dyn Packet) -> Result<()> {
         return Ok(());
     }
 
-    add_protocol!(ses, "aruba-papi");
+    add_protocol(ses, "aruba-papi");
     Ok(())
 }
 
@@ -32,8 +30,7 @@ mod test {
     use api::plugins::processor::Processor;
     use api::session::Session;
 
-    use crate::assert_has_protocol;
-    use crate::test::Packet;
+    use crate::test::{assert_has_protocol, Packet};
 
     #[test]
     fn aruba_papi() {
@@ -60,6 +57,6 @@ mod test {
         parser
             .parse_pkt(pkt.as_ref(), Some(&pkt.rules()[0]), &mut ses)
             .unwrap();
-        assert_has_protocol!(ses, "aruba-papi");
+        assert_has_protocol(&ses, "aruba-papi");
     }
 }

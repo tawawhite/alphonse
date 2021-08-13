@@ -2,13 +2,11 @@ use anyhow::Result;
 
 use alphonse_api as api;
 use api::classifiers::ClassifierManager;
-use api::packet::Protocol;
 
-use crate::{add_simple_port_rule, add_simple_tcp_port_rule, MatchCallBack, Misc};
+use crate::Misc;
 
 pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManager) -> Result<()> {
-    add_simple_tcp_port_rule!(43, "whois", parser, manager);
-    Ok(())
+    parser.add_simple_tcp_port_rule(43, "whois", manager)
 }
 
 #[cfg(test)]
@@ -16,10 +14,9 @@ mod test {
     use super::*;
     use api::packet::Protocol;
     use api::plugins::processor::Processor;
-    use api::session::{ProtocolLayer, Session};
+    use api::session::Session;
 
-    use crate::assert_has_protocol;
-    use crate::test::Packet;
+    use crate::test::{assert_has_protocol, Packet};
 
     #[test]
     fn whois() {
@@ -40,6 +37,6 @@ mod test {
         parser
             .parse_pkt(pkt.as_ref(), Some(&pkt.rules()[0]), &mut ses)
             .unwrap();
-        assert_has_protocol!(ses, "whois");
+        assert_has_protocol(&ses, "whois");
     }
 }

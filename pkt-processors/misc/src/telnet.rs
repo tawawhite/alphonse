@@ -2,16 +2,13 @@ use anyhow::Result;
 
 use alphonse_api as api;
 use api::classifiers::ClassifierManager;
-use api::packet::{Packet, Protocol};
-use api::session::{ProtocolLayer, Session};
+use api::packet::Packet;
+use api::session::Session;
 
-use crate::{
-    add_port_rule_with_func, add_protocol, add_tcp_port_rule_with_func, MatchCallBack, Misc,
-};
+use crate::{add_protocol, Misc};
 
 pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManager) -> Result<()> {
-    add_tcp_port_rule_with_func!(23, classify, parser, manager);
-    Ok(())
+    parser.add_tcp_port_rule_with_func(23, classify, manager)
 }
 
 fn classify(ses: &mut Session, pkt: &dyn Packet) -> Result<()> {
@@ -19,7 +16,7 @@ fn classify(ses: &mut Session, pkt: &dyn Packet) -> Result<()> {
         return Ok(());
     }
 
-    add_protocol!(ses, "telnet");
+    add_protocol(ses, "telnet");
     Ok(())
 }
 
@@ -29,8 +26,8 @@ mod test {
     use api::packet::Protocol;
     use api::plugins::processor::Processor;
 
-    use crate::assert_has_protocol;
-    use crate::test::Packet;
+    
+    use crate::test::{assert_has_protocol, Packet};
 
     #[test]
     fn telnet() {
@@ -53,6 +50,6 @@ mod test {
         parser
             .parse_pkt(pkt.as_ref(), Some(&pkt.rules()[0]), &mut ses)
             .unwrap();
-        assert_has_protocol!(ses, "telnet");
+        assert_has_protocol(&ses, "telnet");
     }
 }

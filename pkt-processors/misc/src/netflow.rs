@@ -3,18 +3,14 @@
 use anyhow::Result;
 
 use alphonse_api as api;
-use api::classifiers::{dpi, ClassifierManager};
+use api::classifiers::ClassifierManager;
 use api::packet::Packet;
-use api::session::{ProtocolLayer, Session};
+use api::session::Session;
 
-use super::{
-    add_dpi_rule_with_func, add_dpi_udp_rule_with_func, add_protocol, MatchCallBack, Misc,
-};
+use super::{add_protocol, Misc};
 
 pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManager) -> Result<()> {
-    add_dpi_udp_rule_with_func!(r"^\x00[\x05\x07\x09]", classify, parser, manager);
-
-    Ok(())
+    parser.add_udp_dpi_rule_with_func(r"^\x00[\x05\x07\x09]", classify, manager)
 }
 
 fn classify(ses: &mut Session, pkt: &dyn Packet) -> Result<()> {
@@ -38,7 +34,7 @@ fn classify(ses: &mut Session, pkt: &dyn Packet) -> Result<()> {
         return Ok(());
     }
 
-    add_protocol!(ses, "netflow");
+    add_protocol(ses, "netflow");
 
     Ok(())
 }
@@ -50,8 +46,8 @@ mod test {
     use api::plugins::processor::Processor;
     use api::session::Session;
 
-    use crate::assert_has_protocol;
-    use crate::test::Packet;
+    
+    use crate::test::{assert_has_protocol, Packet};
 
     #[test]
     fn netflow() {
@@ -128,6 +124,6 @@ mod test {
                 .parse_pkt(pkt.as_ref(), Some(rule), &mut ses)
                 .unwrap();
         }
-        assert_has_protocol!(ses, "netflow");
+        assert_has_protocol(&ses, "netflow");
     }
 }

@@ -2,18 +2,14 @@ use anyhow::Result;
 use serde_json::json;
 
 use alphonse_api as api;
-use api::classifiers::{dpi, ClassifierManager};
+use api::classifiers::ClassifierManager;
 use api::packet::Packet;
-use api::session::{ProtocolLayer, Session};
+use api::session::Session;
 
-use super::{
-    add_dpi_rule_with_func, add_dpi_tcp_rule_with_func, add_protocol, MatchCallBack, Misc,
-};
+use super::{add_protocol, Misc};
 
 pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManager) -> Result<()> {
-    add_dpi_tcp_rule_with_func!(r"^\x03\x00", classify, parser, manager);
-
-    Ok(())
+    parser.add_tcp_dpi_rule_with_func(r"^\x03\x00", classify, manager)
 }
 
 fn classify(ses: &mut Session, pkt: &dyn Packet) -> Result<()> {
@@ -24,7 +20,7 @@ fn classify(ses: &mut Session, pkt: &dyn Packet) -> Result<()> {
         && payload[4] == (payload[3] - 5)
         && payload[5] == 0xe0
     {
-        add_protocol!(ses, "rdp");
+        add_protocol(ses, "rdp");
         if payload.len() > 30 && &payload[11..28] == b"Cookie: mstshash=" {
             match payload[28..].windows(2).position(|win| win == b"\r\n") {
                 Some(pos) => ses.add_field(
@@ -44,8 +40,7 @@ mod test {
     use api::packet::Protocol;
     use api::plugins::processor::Processor;
 
-    use crate::assert_has_protocol;
-    use crate::test::Packet;
+    use crate::test::{assert_has_protocol, Packet};
 
     #[test]
     fn rdp() {
@@ -68,7 +63,7 @@ mod test {
         parser
             .parse_pkt(pkt.as_ref(), Some(&pkt.rules()[0]), &mut ses)
             .unwrap();
-        assert_has_protocol!(ses, "rdp");
+        assert_has_protocol(&ses, "rdp");
         assert_eq!(ses.fields.as_object().unwrap().get("user").unwrap(), "user");
     }
 }

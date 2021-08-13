@@ -1,23 +1,18 @@
 use anyhow::Result;
 
 use alphonse_api as api;
-use api::classifiers::{dpi, ClassifierManager};
+use api::classifiers::ClassifierManager;
 use api::packet::Packet;
-use api::session::{ProtocolLayer, Session};
+use api::session::Session;
 
-use super::{
-    add_dpi_rule_with_func, add_dpi_udp_rule_with_func, add_protocol, MatchCallBack, Misc,
-};
+use super::{add_protocol, Misc};
 
 pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManager) -> Result<()> {
-    add_dpi_udp_rule_with_func!(
+    parser.add_udp_dpi_rule_with_func(
         r"^[\x13\x19\x1a\x1b\x1cx21\x23\x24\xd9\xdb\xe3]",
         classify,
-        parser,
-        manager
-    );
-
-    Ok(())
+        manager,
+    )
 }
 
 fn classify(ses: &mut Session, pkt: &dyn Packet) -> Result<()> {
@@ -31,7 +26,7 @@ fn classify(ses: &mut Session, pkt: &dyn Packet) -> Result<()> {
         return Ok(());
     }
 
-    add_protocol!(ses, "ntp");
+    add_protocol(ses, "ntp");
     Ok(())
 }
 
@@ -42,8 +37,8 @@ mod test {
     use api::plugins::processor::Processor;
     use api::session::Session;
 
-    use crate::assert_has_protocol;
-    use crate::test::Packet;
+    
+    use crate::test::{assert_has_protocol, Packet};
 
     #[test]
     fn ntp() {
@@ -73,6 +68,6 @@ mod test {
                 .parse_pkt(pkt.as_ref(), Some(rule), &mut ses)
                 .unwrap();
         }
-        assert_has_protocol!(ses, "ntp");
+        assert_has_protocol(&ses, "ntp");
     }
 }

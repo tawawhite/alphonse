@@ -1,14 +1,12 @@
 use anyhow::Result;
 
 use alphonse_api as api;
-use api::classifiers::{dpi, ClassifierManager};
+use api::classifiers::ClassifierManager;
 
-use crate::{add_simple_dpi_rule, add_simple_dpi_tcp_rule, MatchCallBack, Misc};
+use crate::Misc;
 
 pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManager) -> Result<()> {
-    add_simple_dpi_tcp_rule!(r"^\x6c\x00\x0b\x00", "x11", parser, manager);
-
-    Ok(())
+    parser.add_simple_tcp_dpi_rule(r"^\x6c\x00\x0b\x00", "x11", manager)
 }
 
 #[cfg(test)]
@@ -16,10 +14,9 @@ mod test {
     use super::*;
     use api::packet::Protocol;
     use api::plugins::processor::Processor;
-    use api::session::{ProtocolLayer, Session};
+    use api::session::Session;
 
-    use crate::assert_has_protocol;
-    use crate::test::Packet;
+    use crate::test::{assert_has_protocol, Packet};
 
     #[test]
     fn x11() {
@@ -43,6 +40,6 @@ mod test {
                 .parse_pkt(pkt.as_ref(), Some(rule), &mut ses)
                 .unwrap();
         }
-        assert_has_protocol!(ses, "x11");
+        assert_has_protocol(&ses, "x11");
     }
 }

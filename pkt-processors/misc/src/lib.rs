@@ -2,7 +2,7 @@ use anyhow::Result;
 use fnv::FnvHashMap;
 
 use alphonse_api as api;
-use api::classifiers::{ClassifierManager, RuleID};
+use api::classifiers::{dpi, ClassifierManager, RuleID};
 use api::packet::Packet;
 use api::plugins::processor::{Processor, ProcessorID};
 use api::plugins::{Plugin, PluginType};
@@ -194,6 +194,166 @@ impl Processor for Misc {
     fn save(&mut self, _: &mut Session) {}
 }
 
+impl Misc {
+    fn add_simple_dpi_rule<S: AsRef<str>>(
+        &mut self,
+        pattern: S,
+        protocol: S,
+        trans_protocol: dpi::Protocol,
+        manager: &mut ClassifierManager,
+    ) -> Result<()> {
+        let rule_id = manager.add_simple_dpi_rule(self.id, pattern.as_ref(), trans_protocol)?;
+        self.match_cbs.insert(
+            rule_id,
+            MatchCallBack::ProtocolName(protocol.as_ref().to_string()),
+        );
+        Ok(())
+    }
+
+    fn add_simple_tcp_dpi_rule<S: AsRef<str>>(
+        &mut self,
+        pattern: S,
+        protocol: S,
+        manager: &mut ClassifierManager,
+    ) -> Result<()> {
+        self.add_simple_dpi_rule(pattern, protocol, dpi::Protocol::TCP, manager)
+    }
+
+    fn add_simple_udp_dpi_rule<S: AsRef<str>>(
+        &mut self,
+        pattern: S,
+        protocol: S,
+        manager: &mut ClassifierManager,
+    ) -> Result<()> {
+        self.add_simple_dpi_rule(pattern, protocol, dpi::Protocol::UDP, manager)
+    }
+
+    fn add_simple_tcp_udp_dpi_rule<S: AsRef<str>>(
+        &mut self,
+        pattern: S,
+        protocol: S,
+        manager: &mut ClassifierManager,
+    ) -> Result<()> {
+        self.add_simple_dpi_rule(
+            pattern,
+            protocol,
+            dpi::Protocol::TCP | dpi::Protocol::UDP,
+            manager,
+        )
+    }
+
+    fn add_simple_sctp_dpi_rule<S: AsRef<str>>(
+        &mut self,
+        pattern: S,
+        protocol: S,
+        manager: &mut ClassifierManager,
+    ) -> Result<()> {
+        self.add_simple_dpi_rule(pattern, protocol, dpi::Protocol::SCTP, manager)
+    }
+
+    fn add_dpi_rule_with_func<S: AsRef<str>>(
+        &mut self,
+        pattern: S,
+        trans_protocol: dpi::Protocol,
+        func: ClassifyFunc,
+        manager: &mut ClassifierManager,
+    ) -> Result<()> {
+        let rule_id = manager.add_simple_dpi_rule(self.id, pattern, trans_protocol)?;
+        self.match_cbs.insert(rule_id, MatchCallBack::Func(func));
+        Ok(())
+    }
+
+    fn add_tcp_dpi_rule_with_func<S: AsRef<str>>(
+        &mut self,
+        pattern: S,
+        func: ClassifyFunc,
+        manager: &mut ClassifierManager,
+    ) -> Result<()> {
+        self.add_dpi_rule_with_func(pattern, dpi::Protocol::TCP, func, manager)
+    }
+
+    fn add_udp_dpi_rule_with_func<S: AsRef<str>>(
+        &mut self,
+        pattern: S,
+        func: ClassifyFunc,
+        manager: &mut ClassifierManager,
+    ) -> Result<()> {
+        self.add_dpi_rule_with_func(pattern, dpi::Protocol::UDP, func, manager)
+    }
+
+    fn add_tcp_udp_dpi_rule_with_func<S: AsRef<str>>(
+        &mut self,
+        pattern: S,
+        func: ClassifyFunc,
+        manager: &mut ClassifierManager,
+    ) -> Result<()> {
+        self.add_dpi_rule_with_func(
+            pattern,
+            dpi::Protocol::TCP | dpi::Protocol::UDP,
+            func,
+            manager,
+        )
+    }
+
+    fn add_simple_port_rule<S: AsRef<str>>(
+        &mut self,
+        port: u16,
+        protocol: S,
+        trans_protocol: api::packet::Protocol,
+        manager: &mut ClassifierManager,
+    ) -> Result<()> {
+        let rule_id = manager.add_port_rule(self.id, port, trans_protocol)?;
+        self.match_cbs.insert(
+            rule_id,
+            MatchCallBack::ProtocolName(protocol.as_ref().to_string()),
+        );
+        Ok(())
+    }
+
+    fn add_simple_tcp_port_rule<S: AsRef<str>>(
+        &mut self,
+        port: u16,
+        protocol: S,
+        manager: &mut ClassifierManager,
+    ) -> Result<()> {
+        self.add_simple_port_rule(port, protocol, api::packet::Protocol::TCP, manager)
+    }
+
+    fn add_port_rule_with_func(
+        &mut self,
+        port: u16,
+        protocol: api::packet::Protocol,
+        func: ClassifyFunc,
+        manager: &mut ClassifierManager,
+    ) -> Result<()> {
+        let rule_id = manager.add_port_rule(self.id, port, protocol)?;
+        self.match_cbs.insert(rule_id, MatchCallBack::Func(func));
+        Ok(())
+    }
+
+    fn add_tcp_port_rule_with_func(
+        &mut self,
+        port: u16,
+        func: ClassifyFunc,
+        manager: &mut ClassifierManager,
+    ) -> Result<()> {
+        self.add_port_rule_with_func(port, api::packet::Protocol::TCP, func, manager)
+    }
+
+    fn add_udp_port_rule_with_func(
+        &mut self,
+        port: u16,
+        func: ClassifyFunc,
+        manager: &mut ClassifierManager,
+    ) -> Result<()> {
+        self.add_port_rule_with_func(port, api::packet::Protocol::UDP, func, manager)
+    }
+}
+
+fn add_protocol<S: AsRef<str>>(ses: &mut Session, protocol: S) {
+    ses.add_protocol(&protocol, ProtocolLayer::Application)
+}
+
 #[no_mangle]
 pub extern "C" fn al_new_pkt_processor() -> Box<Box<dyn Processor>> {
     Box::new(Box::new(Misc::default()))
@@ -208,4 +368,8 @@ pub extern "C" fn al_plugin_type() -> PluginType {
 mod test {
     use super::*;
     pub use api::packet::test::Packet;
+
+    pub fn assert_has_protocol<S: AsRef<str>>(ses: &Session, protocol: S) {
+        assert!(ses.has_protocol(&protocol, ProtocolLayer::Application))
+    }
 }

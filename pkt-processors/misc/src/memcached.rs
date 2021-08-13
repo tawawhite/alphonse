@@ -1,22 +1,18 @@
 use anyhow::Result;
 
 use alphonse_api as api;
-use api::classifiers::{dpi, ClassifierManager};
+use api::classifiers::ClassifierManager;
 
-use crate::{
-    add_simple_dpi_rule, add_simple_dpi_tcp_rule, add_simple_dpi_udp_rule, MatchCallBack, Misc,
-};
+use crate::Misc;
 
 pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManager) -> Result<()> {
-    add_simple_dpi_tcp_rule!(r"^flush_all", "memcached", parser, manager);
-    add_simple_dpi_tcp_rule!(r"^STORED\r\n", "memcached", parser, manager);
-    add_simple_dpi_tcp_rule!(r"^END\r\n", "memcached", parser, manager);
-    add_simple_dpi_tcp_rule!(r"^VALUE ", "memcached", parser, manager);
+    parser.add_simple_tcp_dpi_rule(r"^flush_all", "memcached", manager)?;
+    parser.add_simple_tcp_dpi_rule(r"^STORED\r\n", "memcached", manager)?;
+    parser.add_simple_tcp_dpi_rule(r"^END\r\n", "memcached", manager)?;
+    parser.add_simple_tcp_dpi_rule(r"^VALUE ", "memcached", manager)?;
 
-    add_simple_dpi_udp_rule!(r"^.{6}\x00\x00stats", "memcached", parser, manager);
-    add_simple_dpi_udp_rule!(r"^.{6}\x00\x00gets", "memcached", parser, manager);
-
-    Ok(())
+    parser.add_simple_udp_dpi_rule(r"^.{6}\x00\x00stats", "memcached", manager)?;
+    parser.add_simple_udp_dpi_rule(r"^.{6}\x00\x00gets", "memcached", manager)
 }
 
 #[cfg(test)]
@@ -24,10 +20,9 @@ mod test {
     use super::*;
     use api::packet::Protocol;
     use api::plugins::processor::Processor;
-    use api::session::{ProtocolLayer, Session};
+    use api::session::Session;
 
-    use crate::assert_has_protocol;
-    use crate::test::Packet;
+    use crate::test::{assert_has_protocol, Packet};
 
     #[test]
     fn memcached() {
@@ -51,7 +46,7 @@ mod test {
                 .parse_pkt(pkt.as_ref(), Some(rule), &mut ses)
                 .unwrap();
         }
-        assert_has_protocol!(ses, "memcached");
+        assert_has_protocol(&ses, "memcached");
 
         // STORED\r\n
         let mut pkt: Box<Packet> = Box::new(Packet::default());
@@ -67,7 +62,7 @@ mod test {
                 .parse_pkt(pkt.as_ref(), Some(rule), &mut ses)
                 .unwrap();
         }
-        assert_has_protocol!(ses, "memcached");
+        assert_has_protocol(&ses, "memcached");
 
         // END\r\n
         let mut pkt: Box<Packet> = Box::new(Packet::default());
@@ -83,7 +78,7 @@ mod test {
                 .parse_pkt(pkt.as_ref(), Some(rule), &mut ses)
                 .unwrap();
         }
-        assert_has_protocol!(ses, "memcached");
+        assert_has_protocol(&ses, "memcached");
 
         // VALUE
         let mut pkt: Box<Packet> = Box::new(Packet::default());
@@ -99,7 +94,7 @@ mod test {
                 .parse_pkt(pkt.as_ref(), Some(rule), &mut ses)
                 .unwrap();
         }
-        assert_has_protocol!(ses, "memcached");
+        assert_has_protocol(&ses, "memcached");
 
         // \x00\x00stats
         let mut pkt: Box<Packet> = Box::new(Packet::default());
@@ -115,7 +110,7 @@ mod test {
                 .parse_pkt(pkt.as_ref(), Some(rule), &mut ses)
                 .unwrap();
         }
-        assert_has_protocol!(ses, "memcached");
+        assert_has_protocol(&ses, "memcached");
 
         // \x00\x00gets
         let mut pkt: Box<Packet> = Box::new(Packet::default());
@@ -131,6 +126,6 @@ mod test {
                 .parse_pkt(pkt.as_ref(), Some(rule), &mut ses)
                 .unwrap();
         }
-        assert_has_protocol!(ses, "memcached");
+        assert_has_protocol(&ses, "memcached");
     }
 }
