@@ -77,7 +77,7 @@ impl Scheduler {
     }
 
     /// Generate packet write information of a packet
-    pub fn gen(&mut self, pkt: &dyn Packet) -> Box<PacketInfo> {
+    pub fn gen(&mut self, pkt: &dyn Packet) -> (Box<PacketInfo>, (u32, usize)) {
         let closing = self.file_info.filesize >= self.max_file_size;
         let info = if closing || self.file_info.name.as_os_str().is_empty() {
             // if current pcap file is gonna close, send a new name to the pcap writer
@@ -112,6 +112,8 @@ impl Scheduler {
         } else {
             None
         };
+        let fid = self.file_info.num;
+        let pos = self.file_info.filesize;
 
         self.file_info.filesize += std::mem::size_of::<PacketHeader>();
         self.file_info.filesize += pkt.raw().len();
@@ -130,12 +132,15 @@ impl Scheduler {
 
         buf[hdr_len..].copy_from_slice(pkt.raw());
 
-        Box::new(PacketInfo {
-            thread: self.id,
-            closing,
-            buf,
-            file_info: info,
-        })
+        (
+            Box::new(PacketInfo {
+                thread: self.id,
+                closing,
+                buf,
+                file_info: info,
+            }),
+            (fid, pos),
+        )
     }
 
     /// Send packet info to info channel
@@ -194,14 +199,6 @@ impl Scheduler {
         );
         self.pcap_dir.join(fname.as_str())
     }
-
-    pub fn current_pos(&self) -> usize {
-        self.file_info.filesize
-    }
-
-    pub fn current_fid(&self) -> u32 {
-        self.file_info.num
-    }
 }
 
 #[cfg(test)]
@@ -244,12 +241,12 @@ mod test {
         let mut pkt1 = Packet::default();
         pkt1.raw = Box::new(vec![0, 1, 2, 3, 4, 5]);
         pkt1.ts.tv_sec = 12345;
-        let fileinfo = scheduler.gen(&pkt1);
+        let (fileinfo, (fid, pos)) = scheduler.gen(&pkt1);
 
         let info = &scheduler.file_info;
-        assert_eq!(scheduler.current_fid(), 0);
+        assert_eq!(scheduler.file_info.num, 0);
         assert_eq!(
-            scheduler.current_pos(),
+            scheduler.file_info.filesize,
             size_of::<PcapFileHeader>() + size_of::<PacketHeader>() + pkt1.raw().len()
         );
         assert_eq!(info.first, pkt1.ts.tv_sec as u64);
@@ -269,16 +266,19 @@ mod test {
         assert_eq!(info.locked, true);
         assert_eq!(info.node, "node");
 
+        assert_eq!(fid, 0);
+        assert_eq!(pos, size_of::<PcapFileHeader>());
+
         // scheduler received second packet
         let mut pkt2 = Packet::default();
         pkt2.raw = Box::new(vec![6, 7, 8, 9, 0]);
         pkt2.ts.tv_sec = 12346;
-        let fileinfo = scheduler.gen(&pkt2);
+        let (fileinfo, (fid, pos)) = scheduler.gen(&pkt2);
 
         let info = &scheduler.file_info;
-        assert_eq!(scheduler.current_fid(), 0);
+        assert_eq!(scheduler.file_info.num, 0);
         assert_eq!(
-            scheduler.current_pos(),
+            scheduler.file_info.filesize,
             size_of::<PcapFileHeader>()
                 + size_of::<PacketHeader>() * 2
                 + pkt1.raw.len()
@@ -293,16 +293,22 @@ mod test {
         assert_eq!(fileinfo.closing, false);
         assert_eq!(fileinfo.file_info.is_none(), true);
 
+        assert_eq!(fid, 0);
+        assert_eq!(
+            pos,
+            size_of::<PcapFileHeader>() + size_of::<PacketHeader>() + pkt1.raw().len()
+        );
+
         // scheduler received third packet, this time should be writing pkt into a new file
         let mut pkt3 = Packet::default();
         pkt3.raw = Box::new(vec![6, 7, 8, 9, 0]);
         pkt3.ts.tv_sec = 12347;
-        let fileinfo = scheduler.gen(&pkt3);
+        let (fileinfo, (fid, pos)) = scheduler.gen(&pkt3);
 
         let info = &scheduler.file_info;
-        assert_eq!(scheduler.current_fid(), 1);
+        assert_eq!(scheduler.file_info.num, 1);
         assert_eq!(
-            scheduler.current_pos(),
+            scheduler.file_info.filesize,
             size_of::<PcapFileHeader>() + size_of::<PacketHeader>() + pkt3.raw().len()
         );
         assert_eq!(info.first, pkt3.ts.tv_sec as u64);
@@ -327,6 +333,9 @@ mod test {
         assert_eq!(info.last, pkt3.ts.tv_sec as u64);
         assert_eq!(info.locked, true);
         assert_eq!(info.node, "node");
+
+        assert_eq!(fid, 1);
+        assert_eq!(pos, size_of::<PcapFileHeader>());
 
         Ok(())
     }

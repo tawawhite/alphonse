@@ -323,13 +323,13 @@ impl Processor for SimpleWriterProcessor {
                     TryLockError::WouldBlock => continue,
                 },
                 Ok(mut scheduler) => {
-                    let info = scheduler.gen(pkt);
-                    if scheduler.current_fid() != self.fid {
-                        self.fid = scheduler.current_fid();
-                        self.file_id.insert(scheduler.current_fid());
-                        self.packet_pos.push(-(scheduler.current_fid() as isize));
+                    let (info, (fid, pos)) = scheduler.gen(pkt);
+                    if fid != self.fid {
+                        self.fid = fid;
+                        self.file_id.insert(fid);
+                        self.packet_pos.push(-(fid as isize));
                     }
-                    self.packet_pos.push(scheduler.current_pos() as isize);
+                    self.packet_pos.push(pos as isize);
 
                     scheduler.send(info)?;
                     break;
