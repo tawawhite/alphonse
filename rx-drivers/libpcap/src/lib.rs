@@ -9,13 +9,14 @@ use pcap::{Active, Capture};
 use tokio::task::JoinHandle;
 
 use alphonse_api as api;
+use alphonse_utils as utils;
 use api::classifiers::matched::Rule;
 use api::config::Config;
-use api::dissectors::{link::LinkType, ProtocolDessector};
 use api::packet::Packet as PacketTrait;
 use api::packet::{Layers, PacketHashKey, Rules, Tunnel};
 use api::plugins::rx::{RxDriver, RxStat};
 use api::plugins::{Plugin, PluginType};
+use utils::dissectors::{link::LinkType, ProtocolDessector};
 
 #[cfg(feature = "arkime")]
 mod arkime;
@@ -149,7 +150,7 @@ impl RxThread {
             match parser.parse_pkt(pkt.as_mut()) {
                 Ok(_) => {}
                 Err(e) => match e {
-                    api::dissectors::Error::UnsupportProtocol(_) => {}
+                    utils::dissectors::Error::UnsupportProtocol(_) => {}
                     _ => todo!(),
                 },
             };

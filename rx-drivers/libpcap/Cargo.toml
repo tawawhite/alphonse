@@ -11,7 +11,7 @@ name = "rxlibpcap"
 [dependencies]
 alphonse-api = { path = "../../api" }
 alphonse-arkime = { path = "../../arkime", optional = true }
-alphonse-utils = { path = "../../utils", optional = true }
+alphonse-utils = { path = "../../utils" }
 anyhow = "1.0"
 crossbeam-channel = "0.5"
 elasticsearch = { version = "7.12.1-alpha.1", features = ["rustls-tls"], optional = true }
@@ -24,4 +24,4 @@ serde_json = { version = "1.0", optional = true }
 tokio = { version = "1", features = ["net", "rt-multi-thread", "time"] }
 
 [features]
-arkime = ["alphonse-arkime", "alphonse-api/arkime", "alphonse-utils", "elasticsearch", "serde_json"]
+arkime = ["alphonse-arkime", "alphonse-api/arkime", "elasticsearch", "serde_json"]

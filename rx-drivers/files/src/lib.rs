@@ -12,13 +12,14 @@ use num_traits::cast::FromPrimitive;
 use path_absolutize::Absolutize;
 
 use alphonse_api as api;
+use alphonse_utils as utils;
 use api::classifiers::matched::Rule;
 use api::config::Config;
-use api::dissectors::link::LinkType;
 use api::packet::Packet as PacketTrait;
 use api::packet::{Layers, PacketHashKey, Rules, Tunnel};
 use api::plugins::rx::{RxDriver, RxStat};
 use api::plugins::{Plugin, PluginType};
+use utils::dissectors::link::LinkType;
 
 #[derive(Clone, Default)]
 struct Driver {
@@ -144,7 +145,7 @@ impl RxThread {
             let mut cap = Offline::try_from_path(file)?;
             let link_type = LinkType::from_u16(cap.cap.get_datalink().0 as u16)
                 .ok_or_else(|| anyhow!("Unrecognized link type"))?;
-            let parser = api::dissectors::ProtocolDessector::new(link_type);
+            let parser = utils::dissectors::ProtocolDessector::new(link_type);
 
             while !self.exit.load(Ordering::Relaxed) {
                 let mut pkt = match cap.next() {
@@ -161,7 +162,7 @@ impl RxThread {
                 match parser.parse_pkt(pkt.as_mut()) {
                     Ok(_) => {}
                     Err(e) => match e {
-                        api::dissectors::Error::UnsupportProtocol(_) => {}
+                        utils::dissectors::Error::UnsupportProtocol(_) => {}
                         _ => todo!(),
                     },
                 };
