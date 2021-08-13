@@ -268,7 +268,7 @@ impl Session {
         };
     }
 
-    pub fn has_protocol<S: AsRef<str>>(&mut self, protocol: &S, layer: ProtocolLayer) -> bool {
+    pub fn has_protocol<S: AsRef<str>>(&self, protocol: &S, layer: ProtocolLayer) -> bool {
         let contains = match layer {
             ProtocolLayer::Datalink => self.protocols.datalink.contains(protocol.as_ref()),
             ProtocolLayer::Network => self.protocols.network.contains(protocol.as_ref()),
