@@ -6,7 +6,6 @@ use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex, TryLockError};
 
 use anyhow::{anyhow, Result};
-use crossbeam_channel::{Receiver, Sender};
 use elasticsearch::http::transport::Transport;
 use elasticsearch::Elasticsearch;
 use fnv::FnvHasher;
@@ -37,8 +36,6 @@ const PKG_NAME: &'static str = env!("CARGO_PKG_NAME");
 static FILE_ID: AtomicU32 = AtomicU32::new(0);
 static mut HANDLES: OnceCell<Vec<JoinHandle<Result<()>>>> = OnceCell::new();
 static mut SCHEDULERS: OnceCell<Vec<Mutex<Scheduler>>> = OnceCell::new();
-static mut CHANNEL: OnceCell<(Sender<Box<PacketInfo>>, Receiver<Box<PacketInfo>>)> =
-    OnceCell::new();
 static RT: OnceCell<tokio::runtime::Runtime> = OnceCell::new();
 
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -245,9 +242,6 @@ impl Plugin for SimpleWriterProcessor {
             HANDLES
                 .set(handles)
                 .expect("Writer thread handles are already setted");
-            CHANNEL
-                .set((sender, receiver))
-                .expect("Packet info channel is already setted");
         }
 
         Ok(())
@@ -260,10 +254,6 @@ impl Plugin for SimpleWriterProcessor {
         let mut schedulers = unsafe { SCHEDULERS.take().ok_or(anyhow!(""))? };
         // TODO: update file info in Elasticsearch
         schedulers.clear();
-
-        let (sender, receiver) = unsafe { CHANNEL.take().ok_or(anyhow!(""))? };
-        drop(sender);
-        drop(receiver);
 
         let rt = RT
             .get()
