@@ -132,7 +132,7 @@ impl SeqInterval {
 
 /// Data struct to store each direction's packets and TCP seq info
 #[derive(Debug, Default)]
-struct PktBuffer {
+pub struct PktBuffer {
     /// The lowest seq number of current TCP flow
     seq_min: u32,
     /// Actual pkt buffer
@@ -146,7 +146,7 @@ struct PktBuffer {
 }
 
 impl PktBuffer {
-    fn with_capacity(capacity: usize) -> Self {
+    pub fn with_capacity(capacity: usize) -> Self {
         let mut buf = PktBuffer::default();
         buf.capacity = capacity;
         buf.seq_intervals = VecDeque::with_capacity(capacity);
@@ -155,7 +155,7 @@ impl PktBuffer {
     }
 
     /// Get current seq number
-    fn seq(&self) -> Option<u32> {
+    pub fn seq(&self) -> Option<u32> {
         if self.pkts.len() == 0 {
             None
         } else {
@@ -164,12 +164,12 @@ impl PktBuffer {
     }
 
     /// Whether this pkt buffer is full. If so, should call get_interval_pkts
-    fn full(&self) -> bool {
+    pub fn full(&self) -> bool {
         self.pkts.len() < self.capacity
     }
 
     /// Get pkts in the oldest interval
-    fn get_interval_pkts(&mut self) -> Vec<Box<dyn Packet>> {
+    pub fn get_interval_pkts(&mut self) -> Vec<Box<dyn Packet>> {
         let pkts = match self.seq_intervals.pop_front() {
             None => vec![],
             Some((_, indices)) => {
@@ -335,8 +335,7 @@ impl TcpReorder {
         self.snd_dir_setted = true;
     }
 
-    #[allow(dead_code)]
-    fn get_pkt_buffer_by_dir(&mut self, dir: Direction) -> &PktBuffer {
+    pub fn get_pkt_buffer_by_dir(&mut self, dir: Direction) -> &PktBuffer {
         if dir == self.snd_dir {
             &self.snd
         } else {
