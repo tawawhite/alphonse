@@ -1,6 +1,7 @@
 #[cfg(feature = "tcp-reassembly")]
 #[macro_use]
 extern crate bitflags;
+#[cfg(feature = "dissectors")]
 #[macro_use]
 extern crate enum_primitive_derive;
 
