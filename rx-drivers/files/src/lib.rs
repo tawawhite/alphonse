@@ -299,7 +299,7 @@ impl PacketTrait for Packet {
         &mut self.tunnel
     }
 
-    fn clone_box(&self) -> Box<dyn PacketTrait + '_> {
+    fn clone_box<'a, 'b>(&'a self) -> Box<dyn PacketTrait + 'b> {
         Box::new(self.clone())
     }
 }
