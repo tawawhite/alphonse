@@ -329,6 +329,13 @@ pub struct TcpReorder {
 }
 
 impl TcpReorder {
+    pub fn with_capacity(capacity: usize) -> Self {
+        let mut tr = Self::default();
+        tr.rcv = PktBuffer::with_capacity(capacity);
+        tr.snd = PktBuffer::with_capacity(capacity);
+        tr
+    }
+
     /// Provide a method to set sending side direction even before insert_and_reorder is called
     pub fn set_snd_direction(&mut self, dir: Direction) {
         self.snd_dir = dir;
