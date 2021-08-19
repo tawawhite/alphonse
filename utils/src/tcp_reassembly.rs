@@ -131,7 +131,7 @@ impl SeqInterval {
 }
 
 /// Data struct to store each direction's packets and TCP seq info
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct PktBuffer {
     /// The lowest seq number of current TCP flow
     seq_min: u32,
@@ -312,7 +312,7 @@ impl PktBuffer {
 }
 
 /// Reorder TCP packets for future parsing like HTTP body parsing
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct TcpReorder {
     /// Whether save TCP packets only have ACK flag
     save_ack_pkt: bool,
