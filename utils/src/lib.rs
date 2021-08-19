@@ -5,6 +5,7 @@ extern crate bitflags;
 extern crate enum_primitive_derive;
 
 pub mod dissectors;
+#[cfg(feature = "es")]
 pub mod elasticsearch;
 pub mod serde;
 #[cfg(feature = "tcp-reassembly")]

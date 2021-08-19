@@ -11,7 +11,7 @@ name = "rxlibpcap"
 [dependencies]
 alphonse-api = { path = "../../api" }
 alphonse-arkime = { path = "../../arkime", optional = true }
-alphonse-utils = { path = "../../utils" }
+alphonse-utils = { path = "../../utils", features = ["es"] }
 anyhow = "1.0"
 crossbeam-channel = "0.5"
 elasticsearch = { version = "7.12.1-alpha.1", features = ["rustls-tls"], optional = true }
