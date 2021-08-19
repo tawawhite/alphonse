@@ -10,7 +10,7 @@ name = "rxfiles"
 
 [dependencies]
 alphonse-api = { path = "../../api", optional = false }
-alphonse-utils = { path = "../../utils" }
+alphonse-utils = { path = "../../utils", features = ["dissectors"] }
 anyhow = "1.0"
 crossbeam-channel = "0.5"
 enum-primitive-derive = "0.2"

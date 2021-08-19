@@ -4,6 +4,7 @@ extern crate bitflags;
 #[macro_use]
 extern crate enum_primitive_derive;
 
+#[cfg(feature = "dissectors")]
 pub mod dissectors;
 #[cfg(feature = "es")]
 pub mod elasticsearch;
