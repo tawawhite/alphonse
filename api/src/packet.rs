@@ -306,7 +306,7 @@ pub trait Packet: Send {
     fn tunnel(&self) -> Tunnel;
     fn tunnel_mut(&mut self) -> &mut Tunnel;
 
-    fn clone_box(&self) -> Box<dyn Packet + '_>;
+    fn clone_box<'a, 'b>(&'a self) -> Box<dyn Packet + 'b>;
 
     #[inline]
     fn data_len(&self) -> u16 {
@@ -426,6 +426,12 @@ pub trait Packet: Send {
         }
 
         Direction::Right
+    }
+}
+
+impl Clone for Box<dyn Packet> {
+    fn clone(&self) -> Self {
+        self.clone_box()
     }
 }
 
@@ -632,7 +638,7 @@ pub mod test {
             &mut self.tunnel
         }
 
-        fn clone_box(&self) -> Box<dyn PacketTrait + '_> {
+        fn clone_box<'a, 'b>(&'a self) -> Box<dyn PacketTrait + 'b> {
             Box::new(self.clone())
         }
     }
