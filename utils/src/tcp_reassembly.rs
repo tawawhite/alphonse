@@ -2,7 +2,7 @@ use std::cmp::{max, min};
 use std::collections::VecDeque;
 
 use alphonse_api as api;
-use api::packet::{Direction, Packet};
+use api::packet::Packet;
 
 #[repr(C)]
 #[derive(Debug, Default)]
@@ -132,9 +132,12 @@ impl SeqInterval {
 
 /// Data struct to store each direction's packets and TCP seq info
 #[derive(Clone, Debug, Default)]
-pub struct PktBuffer {
+pub struct TcpReorder {
     /// The lowest seq number of current TCP flow
     seq_min: u32,
+    /// Highest seq number current TCP flow has delivered,
+    /// pkt lower than this seq would be dropped directly
+    seq_delivered: u32,
     /// Actual pkt buffer
     pkts: VecDeque<Box<dyn Packet>>,
     /// Continuative seq intervals
@@ -145,9 +148,9 @@ pub struct PktBuffer {
     capacity: usize,
 }
 
-impl PktBuffer {
+impl TcpReorder {
     pub fn with_capacity(capacity: usize) -> Self {
-        let mut buf = PktBuffer::default();
+        let mut buf = Self::default();
         buf.capacity = capacity;
         buf.seq_intervals = VecDeque::with_capacity(capacity);
         buf.seq_intervals.reserve_exact(capacity);
@@ -190,7 +193,37 @@ impl PktBuffer {
         pkts
     }
 
-    fn insert_and_reorder(&mut self, pkt: Box<dyn Packet>) {
+    /// Pop all pkts out of buffers
+    pub fn get_all_pkts(&mut self) -> Vec<Box<dyn Packet>> {
+        self.seq_intervals.clear();
+        let pkts = VecDeque::with_capacity(self.capacity);
+        let pkts = std::mem::replace(&mut self.pkts, pkts);
+        pkts.into_iter().collect()
+    }
+
+    /// Insert given tcp packet into packet buffer. It is the caller's responsibility to guarantee
+    /// `pkt` is a TCP packet
+    pub fn insert_and_reorder(&mut self, pkt: Box<dyn Packet>) {
+        let hdr = TcpHdr::from_pkt(pkt.as_ref());
+        let flags = hdr.flags();
+        let fin_rst_syn = flags.intersects(TcpFlags::FIN | TcpFlags::RST | TcpFlags::SYN);
+        if pkt.payload().len() == 0 && !fin_rst_syn {
+            // ignore ACK pkts or TCP pkts without payloads
+            // If sender side is over don't do anything and return
+            if flags.contains(TcpFlags::ACK) {
+                return;
+            }
+        }
+
+        if flags.contains(TcpFlags::SYN) {
+            self.seq_min = hdr.seq;
+            return;
+        }
+
+        self._insert_and_reorder(pkt);
+    }
+
+    fn _insert_and_reorder(&mut self, pkt: Box<dyn Packet>) {
         if pkt.payload().len() == 0 {
             return;
         }
@@ -311,89 +344,6 @@ impl PktBuffer {
     }
 }
 
-/// Reorder TCP packets for future parsing like HTTP body parsing
-#[derive(Clone, Debug, Default)]
-pub struct TcpReorder {
-    /// Whether save TCP packets only have ACK flag
-    save_ack_pkt: bool,
-    /// Sending direction
-    snd_dir: Direction,
-    /// Whether sending direction is setted
-    snd_dir_setted: bool,
-    /// Max packets stored in pkt container
-    max_pkts: usize,
-    /// Send side packets, the oldest sequence is at front
-    rcv: PktBuffer,
-    /// receive side packets, the oldest sequence is at front
-    snd: PktBuffer,
-}
-
-impl TcpReorder {
-    pub fn with_capacity(capacity: usize) -> Self {
-        let mut tr = Self::default();
-        tr.rcv = PktBuffer::with_capacity(capacity);
-        tr.snd = PktBuffer::with_capacity(capacity);
-        tr
-    }
-
-    /// Provide a method to set sending side direction even before insert_and_reorder is called
-    pub fn set_snd_direction(&mut self, dir: Direction) {
-        self.snd_dir = dir;
-        self.snd_dir_setted = true;
-    }
-
-    pub fn get_pkt_buffer_by_dir(&mut self, dir: Direction) -> &PktBuffer {
-        if dir == self.snd_dir {
-            &self.snd
-        } else {
-            &self.rcv
-        }
-    }
-
-    fn get_pkt_buffer_mut_by_dir(&mut self, dir: Direction) -> &mut PktBuffer {
-        if dir == self.snd_dir {
-            &mut self.snd
-        } else {
-            &mut self.rcv
-        }
-    }
-
-    /// Insert given tcp packet into packet buffer. It is the caller's responsibility to guarantee
-    /// `pkt` is a TCP packet
-    pub fn insert_and_reorder(&mut self, pkt: Box<dyn Packet>) {
-        let hdr = TcpHdr::from_pkt(pkt.as_ref());
-        let flags = hdr.flags();
-        let fin_rst_syn = flags.intersects(TcpFlags::FIN | TcpFlags::RST | TcpFlags::SYN);
-        if pkt.payload().len() == 0 && !fin_rst_syn {
-            // ignore ACK pkts or TCP pkts without payloads
-            // If sender side is over don't do anything and return
-            if flags.contains(TcpFlags::ACK) && !self.save_ack_pkt {
-                return;
-            }
-        }
-
-        if flags.contains(TcpFlags::SYN) {
-            if !self.snd_dir_setted && self.snd.pkts.is_empty() && self.rcv.pkts.is_empty() {
-                // If sending direction is not setted, and no SYN pkt was received before,
-                // set send direction according to current SYN pkt
-                if flags.contains(TcpFlags::ACK) {
-                    self.snd_dir = pkt.direction().reverse();
-                    self.rcv.seq_min = hdr.seq;
-                } else {
-                    self.snd_dir = pkt.direction();
-                    self.snd.seq_min = hdr.seq;
-                }
-                self.snd_dir_setted = true;
-            }
-
-            return;
-        }
-
-        let pktbuf = &mut self.get_pkt_buffer_mut_by_dir(pkt.direction());
-        pktbuf.insert_and_reorder(pkt);
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
@@ -428,26 +378,26 @@ mod test {
     }
 
     #[test]
-    fn pktbuf_insert_into_empty() {
-        let mut pktbuf = PktBuffer::default();
+    fn insert_into_empty() {
+        let mut tr = TcpReorder::default();
 
-        let mut pkt1 = Box::new(Packet::default());
-        pkt1.raw = Box::new(vec![0; 24]);
-        pkt1.layers_mut().trans.protocol = Protocol::TCP;
-        pkt1.layers_mut().app.offset = 20;
-        let intv1 = SeqInterval::from_pkt(pkt1.as_ref());
+        let mut pkt = Box::new(Packet::default());
+        pkt.raw = Box::new(vec![0; 24]);
+        pkt.layers_mut().trans.protocol = Protocol::TCP;
+        pkt.layers_mut().app.offset = 20;
+        let intv1 = SeqInterval::from_pkt(pkt.as_ref());
 
-        pktbuf.insert_and_reorder(pkt1);
+        tr.insert_and_reorder(pkt);
 
-        assert_eq!(pktbuf.seq_intervals.len(), 1);
-        assert_eq!(pktbuf.seq_intervals[0].0, intv1);
-        assert_eq!(pktbuf.seq_intervals[0].1, (0, 1));
-        assert_eq!(pktbuf.pkts.len(), 1);
+        assert_eq!(tr.seq_intervals.len(), 1);
+        assert_eq!(tr.seq_intervals[0].0, intv1);
+        assert_eq!(tr.seq_intervals[0].1, (0, 1));
+        assert_eq!(tr.pkts.len(), 1);
     }
 
     #[test]
-    fn pktbuf_insert_retransmission_pkt() {
-        let mut pktbuf = PktBuffer::default();
+    fn insert_retransmission_pkt() {
+        let mut tr = TcpReorder::default();
 
         let mut pkt1 = Box::new(Packet::default());
         pkt1.raw = Box::new(vec![0; 24]);
@@ -457,18 +407,18 @@ mod test {
 
         let pkt2 = pkt1.clone();
 
-        pktbuf.insert_and_reorder(pkt1);
-        pktbuf.insert_and_reorder(pkt2);
+        tr.insert_and_reorder(pkt1);
+        tr.insert_and_reorder(pkt2);
 
-        assert_eq!(pktbuf.seq_intervals.len(), 1);
-        assert_eq!(pktbuf.seq_intervals[0].0, intv1);
-        assert_eq!(pktbuf.seq_intervals[0].1, (0, 1));
-        assert_eq!(pktbuf.pkts.len(), 1);
+        assert_eq!(tr.seq_intervals.len(), 1);
+        assert_eq!(tr.seq_intervals[0].0, intv1);
+        assert_eq!(tr.seq_intervals[0].1, (0, 1));
+        assert_eq!(tr.pkts.len(), 1);
     }
 
     #[test]
-    fn pktbuf_insert_continuative_seq_pkt() {
-        let mut pktbuf = PktBuffer::default();
+    fn insert_continuative_seq_pkt() {
+        let mut pktbuf = TcpReorder::default();
 
         let mut pkt1 = Box::new(Packet::default());
         pkt1.raw = Box::new(vec![0; 24]);
@@ -497,8 +447,8 @@ mod test {
     }
 
     #[test]
-    fn pktbuf_insert_non_overlap_new_seq_pkt() {
-        let mut pktbuf = PktBuffer::default();
+    fn insert_non_overlap_new_seq_pkt() {
+        let mut tr = TcpReorder::default();
 
         let mut pkt1 = Box::new(Packet::default());
         pkt1.raw = Box::new(vec![0; 24]);
@@ -506,7 +456,7 @@ mod test {
         pkt1.layers_mut().app.offset = 20;
         let intv1 = SeqInterval::from_pkt(pkt1.as_ref());
 
-        pktbuf.insert_and_reorder(pkt1);
+        tr.insert_and_reorder(pkt1);
 
         let mut pkt2 = Box::new(Packet::default());
         pkt2.raw = Box::new(vec![0; 24]);
@@ -518,19 +468,19 @@ mod test {
 
         assert!(!intv1.overlaps(intv2));
 
-        pktbuf.insert_and_reorder(pkt2);
+        tr.insert_and_reorder(pkt2);
 
-        assert_eq!(pktbuf.seq_intervals.len(), 2);
-        assert_eq!(pktbuf.seq_intervals[0].0, intv1);
-        assert_eq!(pktbuf.seq_intervals[0].1, (0, 1));
-        assert_eq!(pktbuf.seq_intervals[1].0, intv2);
-        assert_eq!(pktbuf.seq_intervals[1].1, (1, 2));
-        assert_eq!(pktbuf.pkts.len(), 2);
+        assert_eq!(tr.seq_intervals.len(), 2);
+        assert_eq!(tr.seq_intervals[0].0, intv1);
+        assert_eq!(tr.seq_intervals[0].1, (0, 1));
+        assert_eq!(tr.seq_intervals[1].0, intv2);
+        assert_eq!(tr.seq_intervals[1].1, (1, 2));
+        assert_eq!(tr.pkts.len(), 2);
     }
 
     #[test]
-    fn pktbuf_insert_overlap_retransmission_old_seq_pkt() {
-        let mut pktbuf = PktBuffer::default();
+    fn insert_overlap_retransmission_old_seq_pkt() {
+        let mut tr = TcpReorder::default();
 
         let mut pkt = Box::new(Packet::default());
         pkt.raw = Box::new(vec![0; 24]);
@@ -539,7 +489,7 @@ mod test {
         // (0, 4)
         let intv1 = SeqInterval::from_pkt(pkt.as_ref());
 
-        pktbuf.insert_and_reorder(pkt);
+        tr.insert_and_reorder(pkt);
 
         let mut pkt = Box::new(Packet::default());
         pkt.raw = Box::new(vec![0; 24]);
@@ -550,7 +500,7 @@ mod test {
         // (5, 9)
         let intv2 = SeqInterval::from_pkt(pkt.as_ref());
 
-        pktbuf.insert_and_reorder(pkt);
+        tr.insert_and_reorder(pkt);
 
         let mut pkt = Box::new(Packet::default());
         pkt.raw = Box::new(vec![0; 24]);
@@ -561,31 +511,31 @@ mod test {
         // (4, 8)
         let intv3 = SeqInterval::from_pkt(pkt.as_ref());
 
-        pktbuf.insert_and_reorder(pkt);
+        tr.insert_and_reorder(pkt);
 
-        assert_eq!(pktbuf.seq_intervals.len(), 1);
+        assert_eq!(tr.seq_intervals.len(), 1);
         // (0, 9)
         assert_eq!(
-            pktbuf.seq_intervals[0].0,
+            tr.seq_intervals[0].0,
             intv1
                 .union_strict(intv3)
                 .unwrap()
                 .union_strict(intv2)
                 .unwrap()
         );
-        assert_eq!(pktbuf.seq_intervals[0].1, (0, 3));
-        assert_eq!(pktbuf.pkts.len(), 3);
+        assert_eq!(tr.seq_intervals[0].1, (0, 3));
+        assert_eq!(tr.pkts.len(), 3);
 
-        let hdr1 = TcpHdr::from_pkt(pktbuf.pkts[0].as_ref());
-        let hdr2 = TcpHdr::from_pkt(pktbuf.pkts[1].as_ref());
-        let hdr3 = TcpHdr::from_pkt(pktbuf.pkts[2].as_ref());
+        let hdr1 = TcpHdr::from_pkt(tr.pkts[0].as_ref());
+        let hdr2 = TcpHdr::from_pkt(tr.pkts[1].as_ref());
+        let hdr3 = TcpHdr::from_pkt(tr.pkts[2].as_ref());
         assert!(hdr1.seq < hdr2.seq);
         assert!(hdr2.seq < hdr3.seq);
     }
 
     #[test]
-    fn pktbuf_insert_overlap_retransmission_new_seq_pkt() {
-        let mut pktbuf = PktBuffer::default();
+    fn insert_overlap_retransmission_new_seq_pkt() {
+        let mut tr = TcpReorder::default();
 
         let mut pkt = Box::new(Packet::default());
         pkt.raw = Box::new(vec![0; 24]);
@@ -594,7 +544,7 @@ mod test {
         // (0, 4)
         let intv1 = SeqInterval::from_pkt(pkt.as_ref());
 
-        pktbuf.insert_and_reorder(pkt);
+        tr.insert_and_reorder(pkt);
 
         let mut pkt = Box::new(Packet::default());
         pkt.raw = Box::new(vec![0; 24]);
@@ -605,7 +555,7 @@ mod test {
         // (5, 9)
         let intv2 = SeqInterval::from_pkt(pkt.as_ref());
 
-        pktbuf.insert_and_reorder(pkt);
+        tr.insert_and_reorder(pkt);
 
         let mut pkt = Box::new(Packet::default());
         pkt.raw = Box::new(vec![0; 24]);
@@ -616,28 +566,28 @@ mod test {
         // (7, 11)
         let intv3 = SeqInterval::from_pkt(pkt.as_ref());
 
-        pktbuf.insert_and_reorder(pkt);
+        tr.insert_and_reorder(pkt);
 
-        assert_eq!(pktbuf.seq_intervals.len(), 2);
+        assert_eq!(tr.seq_intervals.len(), 2);
         // (0, 4)
-        assert_eq!(pktbuf.seq_intervals[0].0, intv1);
-        assert_eq!(pktbuf.seq_intervals[0].1, (0, 1));
+        assert_eq!(tr.seq_intervals[0].0, intv1);
+        assert_eq!(tr.seq_intervals[0].1, (0, 1));
 
         // (5, 11)
-        assert_eq!(pktbuf.seq_intervals[1].0, intv2.union(intv3));
-        assert_eq!(pktbuf.seq_intervals[1].1, (1, 3));
-        assert_eq!(pktbuf.pkts.len(), 3);
+        assert_eq!(tr.seq_intervals[1].0, intv2.union(intv3));
+        assert_eq!(tr.seq_intervals[1].1, (1, 3));
+        assert_eq!(tr.pkts.len(), 3);
 
-        let hdr1 = TcpHdr::from_pkt(pktbuf.pkts[0].as_ref());
-        let hdr2 = TcpHdr::from_pkt(pktbuf.pkts[1].as_ref());
-        let hdr3 = TcpHdr::from_pkt(pktbuf.pkts[2].as_ref());
+        let hdr1 = TcpHdr::from_pkt(tr.pkts[0].as_ref());
+        let hdr2 = TcpHdr::from_pkt(tr.pkts[1].as_ref());
+        let hdr3 = TcpHdr::from_pkt(tr.pkts[2].as_ref());
         assert!(hdr1.seq < hdr2.seq);
         assert!(hdr2.seq < hdr3.seq);
     }
 
     #[test]
-    fn pktbuf_insert_overlay_retransmission_pkt() {
-        let mut pktbuf = PktBuffer::default();
+    fn insert_overlay_retransmission_pkt() {
+        let mut tr = TcpReorder::default();
 
         let mut pkt = Box::new(Packet::default());
         pkt.raw = Box::new(vec![0; 24]);
@@ -646,7 +596,7 @@ mod test {
         // (0, 4)
         let intv1 = SeqInterval::from_pkt(pkt.as_ref());
 
-        pktbuf.insert_and_reorder(pkt);
+        tr.insert_and_reorder(pkt);
 
         let mut pkt = Box::new(Packet::default());
         pkt.raw = Box::new(vec![0; 24]);
@@ -657,7 +607,7 @@ mod test {
         // (5, 9)
         let intv2 = SeqInterval::from_pkt(pkt.as_ref());
 
-        pktbuf.insert_and_reorder(pkt);
+        tr.insert_and_reorder(pkt);
 
         let mut pkt = Box::new(Packet::default());
         pkt.raw = Box::new(vec![0; 28]);
@@ -668,39 +618,21 @@ mod test {
         // (3, 11)
         let intv3 = SeqInterval::from_pkt(pkt.as_ref());
 
-        pktbuf.insert_and_reorder(pkt);
+        tr.insert_and_reorder(pkt);
 
-        assert_eq!(pktbuf.seq_intervals.len(), 1);
-        assert_eq!(pktbuf.seq_intervals[0].0, intv3.union(intv2).union(intv1));
-        assert_eq!(pktbuf.seq_intervals[0].1, (0, 2));
+        assert_eq!(tr.seq_intervals.len(), 1);
+        assert_eq!(tr.seq_intervals[0].0, intv3.union(intv2).union(intv1));
+        assert_eq!(tr.seq_intervals[0].1, (0, 2));
 
-        assert_eq!(pktbuf.pkts.len(), 2);
+        assert_eq!(tr.pkts.len(), 2);
 
-        let hdr1 = TcpHdr::from_pkt(pktbuf.pkts[0].as_ref());
-        let hdr2 = TcpHdr::from_pkt(pktbuf.pkts[1].as_ref());
+        let hdr1 = TcpHdr::from_pkt(tr.pkts[0].as_ref());
+        let hdr2 = TcpHdr::from_pkt(tr.pkts[1].as_ref());
         assert!(hdr1.seq < hdr2.seq);
     }
 
     #[test]
-    fn insert_and_reorder_first_syn_without_ack() {
-        let mut tcp_order = TcpReorder::default();
-
-        let mut pkt = Box::new(Packet::default());
-        pkt.raw = Box::new(vec![0; 24]);
-        pkt.layers_mut().trans.protocol = Protocol::TCP;
-        pkt.layers_mut().app.offset = 0;
-        let hdr = TcpHdr::from_pkt_mut(pkt.as_mut());
-        hdr.flags_mut().insert(TcpFlags::SYN);
-        assert!(hdr.flags().contains(TcpFlags::SYN));
-        let dir = pkt.direction();
-
-        tcp_order.insert_and_reorder(pkt);
-
-        assert_eq!(tcp_order.snd_dir, dir);
-    }
-
-    #[test]
-    fn insert_and_reorder_first_syn_with_ack() {
+    fn insert_and_reorder_syn() {
         let mut tcp_order = TcpReorder::default();
 
         let mut pkt = Box::new(Packet::default());
@@ -714,8 +646,6 @@ mod test {
         let dir = pkt.direction();
 
         tcp_order.insert_and_reorder(pkt);
-
-        assert_eq!(tcp_order.snd_dir, dir.reverse());
     }
 
     #[test]
@@ -740,6 +670,6 @@ mod test {
 
         tcp_order.insert_and_reorder(pkt);
 
-        assert_eq!(tcp_order.snd.pkts.len(), 1);
+        assert_eq!(tcp_order.pkts.len(), 1);
     }
 }
