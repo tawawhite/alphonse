@@ -9,13 +9,15 @@ use serde::Serialize;
 use serde_json::json;
 
 use alphonse_api as api;
+use alphonse_utils as utils;
 use api::classifiers;
 use api::classifiers::{dpi, matched::Rule, RuleID};
 use api::config::Config;
-use api::packet::{Direction, Packet};
+use api::packet::{Direction, Packet, Protocol};
 use api::plugins::processor::{Processor, ProcessorID};
 use api::plugins::{Plugin, PluginType};
 use api::session::{ProtocolLayer, Session};
+use utils::tcp_reassembly::TcpReorder;
 
 mod parse;
 use parse::*;
@@ -86,12 +88,13 @@ struct HTTP {
     value: HashSet<String>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 struct HttpProcessor<'a> {
     id: ProcessorID,
     name: String,
     classified: bool,
     parsers: [llhttp::Parser<'a, Data>; 2],
+    tcp_reorder: [TcpReorder; 2],
     resp_rule_id: RuleID,
     client_direction: Direction,
 }
@@ -101,14 +104,9 @@ unsafe impl Sync for HttpProcessor<'_> {}
 
 impl<'a> HttpProcessor<'a> {
     fn new() -> Self {
-        HttpProcessor {
-            id: 0,
-            name: String::from("http"),
-            classified: false,
-            parsers: [llhttp::Parser::default(), llhttp::Parser::default()],
-            resp_rule_id: 0,
-            client_direction: Direction::Left,
-        }
+        let mut p = Self::default();
+        p.name = String::from("http");
+        p
     }
 }
 
@@ -297,6 +295,65 @@ impl<'a> Processor for HttpProcessor<'static> {
             }
         }
 
+        if pkt.layers().trans.protocol != Protocol::TCP {
+            match self.process_pkt(pkt) {
+                Ok(_) => {}
+                Err(e) => eprintln!("{}", e),
+            };
+            return Ok(());
+        }
+
+        if self.tcp_reorder[direction].full() {
+            for pkt in self.tcp_reorder[direction].get_interval_pkts() {
+                match self.process_pkt(pkt.as_ref()) {
+                    Ok(_) => {}
+                    Err(e) => eprintln!("{}", e),
+                };
+            }
+        }
+
+        self.tcp_reorder[direction].insert_and_reorder(pkt.clone_box());
+
+        Ok(())
+    }
+
+    fn mid_save(&mut self, ses: &mut api::session::Session) {
+        for pkt in self.tcp_reorder[0].get_all_pkts() {
+            match self.process_pkt(pkt.as_ref()) {
+                Ok(_) => {}
+                Err(e) => eprintln!("{}", e),
+            };
+        }
+        for pkt in self.tcp_reorder[1].get_all_pkts() {
+            match self.process_pkt(pkt.as_ref()) {
+                Ok(_) => {}
+                Err(e) => eprintln!("{}", e),
+            };
+        }
+
+        ses.add_protocol(&self.name(), ProtocolLayer::Application);
+        let state = match self.parsers[0].data() {
+            None => return,
+            Some(s) => s.borrow(),
+        };
+        ses.add_field(&"http", json!(state.http));
+    }
+
+    fn save(&mut self, ses: &mut Session) {
+        for parser in &mut self.parsers {
+            parser.finish();
+        }
+        self.mid_save(ses);
+        self.parsers[0].set_data(None);
+        self.parsers[1].set_data(None);
+    }
+}
+
+impl<'a> HttpProcessor<'a> {
+    /// Process reassembled TCP pkts or UDP/SCTP pkts
+    fn process_pkt(&mut self, pkt: &dyn Packet) -> Result<()> {
+        let direction = pkt.direction() as u8 as usize;
+
         match self.parsers[direction].data() {
             None => {}
             Some(s) => s.borrow_mut().ctx.direction = pkt.direction(),
@@ -321,26 +378,7 @@ impl<'a> Processor for HttpProcessor<'static> {
                 self.parsers[direction].set_data(data);
             }
         };
-
         Ok(())
-    }
-
-    fn mid_save(&mut self, ses: &mut api::session::Session) {
-        ses.add_protocol(&self.name(), ProtocolLayer::Application);
-        let state = match self.parsers[0].data() {
-            None => return,
-            Some(s) => s.borrow(),
-        };
-        ses.add_field(&"http", json!(state.http));
-    }
-
-    fn save(&mut self, ses: &mut Session) {
-        for parser in &mut self.parsers {
-            parser.finish();
-        }
-        self.mid_save(ses);
-        self.parsers[0].set_data(None);
-        self.parsers[1].set_data(None);
     }
 }
 
