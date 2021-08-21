@@ -19,5 +19,5 @@ once_cell = "1.6"
 serde = "1.0"
 serde_json = "1.0"
 # tls-parser = "0.10"
-tls-parser = { git = "https://github.com/JackLiar/tls-parser.git", branch = "clienthello-trait" }
+tls-parser = { git = "https://github.com/rusticata/tls-parser.git" }
 x509-parser = "0.10"
