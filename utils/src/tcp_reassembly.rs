@@ -31,12 +31,12 @@ bitflags! {
 impl TcpHdr {
     /// TCP header length
     pub fn hdr_len(&self) -> u8 {
-        (self.hdr_len_flags >> 12) as u8
+        (self.hdr_len_flags.to_be() >> 12) as u8
     }
 
     /// TCP flags
     pub fn flags(&self) -> TcpFlags {
-        TcpFlags::from_bits_truncate(self.hdr_len_flags as u8)
+        TcpFlags::from_bits_truncate(self.hdr_len_flags.to_be() as u8)
     }
 
     /// TCP options
@@ -361,7 +361,7 @@ mod test {
     // test only mutable reference
     impl TcpHdr {
         pub fn flags_mut(&mut self) -> &mut TcpFlags {
-            unsafe { &mut (*(&mut self.hdr_len_flags as *mut _ as *mut TcpFlags)) }
+            unsafe { &mut (*((self as *mut _ as *mut u8).add(13) as *mut TcpFlags)) }
         }
 
         pub fn from_pkt_mut(pkt: &mut dyn Pkt) -> &mut Self {
@@ -375,10 +375,10 @@ mod test {
     }
 
     #[test]
-    fn flags_mut() {
+    fn flags() {
         let mut hdr = TcpHdr::default();
-        hdr.hdr_len_flags = 0b00000010u16;
-        assert!(hdr.flags_mut().contains(TcpFlags::SYN));
+        hdr.hdr_len_flags = 0b00000010u16.to_be();
+        assert!(hdr.flags().contains(TcpFlags::SYN));
 
         hdr.flags_mut().insert(TcpFlags::PSH);
         assert!(hdr.flags_mut().contains(TcpFlags::PSH));
