@@ -64,7 +64,12 @@ impl TcpHdr {
         } else {
             0
         };
-        self.seq + flag_len + payload_len
+        self.seq() + flag_len + payload_len
+    }
+
+    /// Get big endianness TCP seq num
+    pub fn seq(&self) -> u32 {
+        self.seq.to_be()
     }
 }
 
@@ -84,7 +89,7 @@ impl SeqInterval {
     /// pkt is a TCP packet**
     fn from_pkt(pkt: &dyn Packet) -> Self {
         let hdr = TcpHdr::from_pkt(pkt);
-        Self((hdr.seq, hdr.seq + pkt.payload().len() as u32))
+        Self((hdr.seq(), hdr.next_seq(pkt.payload().len() as u32)))
     }
 
     /// Whether this interval overlaps another interval
@@ -162,7 +167,7 @@ impl TcpReorder {
         if self.pkts.len() == 0 {
             None
         } else {
-            Some(TcpHdr::from_pkt(self.pkts[self.pkts.len() - 1].as_ref()).seq)
+            Some(TcpHdr::from_pkt(self.pkts[self.pkts.len() - 1].as_ref()).seq())
         }
     }
 
@@ -224,7 +229,7 @@ impl TcpReorder {
         }
 
         if flags.contains(TcpFlags::SYN) {
-            self.seq_min = hdr.seq;
+            self.seq_min = hdr.seq();
             return;
         }
 
@@ -327,6 +332,10 @@ impl TcpReorder {
 
     /// Internal function to merge existing intervals
     fn merge_intervals(&mut self) {
+        if self.seq_intervals.len() <= 1 {
+            return;
+        }
+
         self.seq_intervals.make_contiguous();
 
         let len = self.seq_intervals.len();
@@ -441,7 +450,7 @@ mod test {
         pkt2.layers_mut().trans.protocol = Protocol::TCP;
         pkt2.layers_mut().app.offset = 20;
         let hdr = TcpHdr::from_pkt_mut(pkt2.as_mut());
-        hdr.seq = 4;
+        hdr.seq = 4u32.to_be();
         let intv2 = SeqInterval::from_pkt(pkt2.as_ref());
 
         assert!(intv1.overlaps(intv2));
@@ -471,7 +480,7 @@ mod test {
         pkt2.layers_mut().trans.protocol = Protocol::TCP;
         pkt2.layers_mut().app.offset = 20;
         let hdr = TcpHdr::from_pkt_mut(pkt2.as_mut());
-        hdr.seq = 5;
+        hdr.seq = 5u32.to_be();
         let intv2 = SeqInterval::from_pkt(pkt2.as_ref());
 
         assert!(!intv1.overlaps(intv2));
@@ -504,7 +513,7 @@ mod test {
         pkt.layers_mut().trans.protocol = Protocol::TCP;
         pkt.layers_mut().app.offset = 20;
         let hdr = TcpHdr::from_pkt_mut(pkt.as_mut());
-        hdr.seq = 5;
+        hdr.seq = 5u32.to_be();
         // (5, 9)
         let intv2 = SeqInterval::from_pkt(pkt.as_ref());
 
@@ -515,7 +524,7 @@ mod test {
         pkt.layers_mut().trans.protocol = Protocol::TCP;
         pkt.layers_mut().app.offset = 20;
         let hdr = TcpHdr::from_pkt_mut(pkt.as_mut());
-        hdr.seq = 4;
+        hdr.seq = 4u32.to_be();
         // (4, 8)
         let intv3 = SeqInterval::from_pkt(pkt.as_ref());
 
@@ -537,8 +546,8 @@ mod test {
         let hdr1 = TcpHdr::from_pkt(tr.pkts[0].as_ref());
         let hdr2 = TcpHdr::from_pkt(tr.pkts[1].as_ref());
         let hdr3 = TcpHdr::from_pkt(tr.pkts[2].as_ref());
-        assert!(hdr1.seq < hdr2.seq);
-        assert!(hdr2.seq < hdr3.seq);
+        assert!(hdr1.seq() < hdr2.seq());
+        assert!(hdr2.seq() < hdr3.seq());
     }
 
     #[test]
@@ -559,7 +568,7 @@ mod test {
         pkt.layers_mut().trans.protocol = Protocol::TCP;
         pkt.layers_mut().app.offset = 20;
         let hdr = TcpHdr::from_pkt_mut(pkt.as_mut());
-        hdr.seq = 5;
+        hdr.seq = 5u32.to_be();
         // (5, 9)
         let intv2 = SeqInterval::from_pkt(pkt.as_ref());
 
@@ -570,7 +579,7 @@ mod test {
         pkt.layers_mut().trans.protocol = Protocol::TCP;
         pkt.layers_mut().app.offset = 20;
         let hdr = TcpHdr::from_pkt_mut(pkt.as_mut());
-        hdr.seq = 7;
+        hdr.seq = 7u32.to_be();
         // (7, 11)
         let intv3 = SeqInterval::from_pkt(pkt.as_ref());
 
@@ -589,8 +598,8 @@ mod test {
         let hdr1 = TcpHdr::from_pkt(tr.pkts[0].as_ref());
         let hdr2 = TcpHdr::from_pkt(tr.pkts[1].as_ref());
         let hdr3 = TcpHdr::from_pkt(tr.pkts[2].as_ref());
-        assert!(hdr1.seq < hdr2.seq);
-        assert!(hdr2.seq < hdr3.seq);
+        assert!(hdr1.seq() < hdr2.seq());
+        assert!(hdr2.seq() < hdr3.seq());
     }
 
     #[test]
@@ -611,7 +620,7 @@ mod test {
         pkt.layers_mut().trans.protocol = Protocol::TCP;
         pkt.layers_mut().app.offset = 20;
         let hdr = TcpHdr::from_pkt_mut(pkt.as_mut());
-        hdr.seq = 5;
+        hdr.seq = 5u32.to_be();
         // (5, 9)
         let intv2 = SeqInterval::from_pkt(pkt.as_ref());
 
@@ -622,7 +631,7 @@ mod test {
         pkt.layers_mut().trans.protocol = Protocol::TCP;
         pkt.layers_mut().app.offset = 20;
         let hdr = TcpHdr::from_pkt_mut(pkt.as_mut());
-        hdr.seq = 3;
+        hdr.seq = 3u32.to_be();
         // (3, 11)
         let intv3 = SeqInterval::from_pkt(pkt.as_ref());
 
@@ -636,7 +645,7 @@ mod test {
 
         let hdr1 = TcpHdr::from_pkt(tr.pkts[0].as_ref());
         let hdr2 = TcpHdr::from_pkt(tr.pkts[1].as_ref());
-        assert!(hdr1.seq < hdr2.seq);
+        assert!(hdr1.seq() < hdr2.seq());
     }
 
     #[test]
@@ -701,7 +710,7 @@ mod test {
         pkt.layers_mut().trans.protocol = Protocol::TCP;
         pkt.layers_mut().app.offset = 20;
         let hdr = TcpHdr::from_pkt_mut(pkt.as_mut());
-        hdr.seq = 5;
+        hdr.seq = 5u32.to_be();
 
         tcp_order.insert_and_reorder(pkt);
 
@@ -711,7 +720,7 @@ mod test {
         pkt.layers_mut().trans.protocol = Protocol::TCP;
         pkt.layers_mut().app.offset = 20;
         let hdr = TcpHdr::from_pkt_mut(pkt.as_mut());
-        hdr.seq = 10;
+        hdr.seq = 10u32.to_be();
 
         tcp_order.insert_and_reorder(pkt);
         assert_eq!(tcp_order.pkts.len(), 3);
@@ -747,7 +756,7 @@ mod test {
         pkt.layers_mut().trans.protocol = Protocol::TCP;
         pkt.layers_mut().app.offset = 20;
         let hdr = TcpHdr::from_pkt_mut(pkt.as_mut());
-        hdr.seq = 5;
+        hdr.seq = 5u32.to_be();
 
         tcp_order.insert_and_reorder(pkt);
 
@@ -757,7 +766,7 @@ mod test {
         pkt.layers_mut().trans.protocol = Protocol::TCP;
         pkt.layers_mut().app.offset = 20;
         let hdr = TcpHdr::from_pkt_mut(pkt.as_mut());
-        hdr.seq = 10;
+        hdr.seq = 10u32.to_be();
 
         tcp_order.insert_and_reorder(pkt);
         assert_eq!(tcp_order.pkts.len(), 3);
