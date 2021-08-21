@@ -175,7 +175,7 @@ impl TcpReorder {
     pub fn get_interval_pkts(&mut self) -> Vec<Box<dyn Packet>> {
         let pkts = match self.seq_intervals.pop_front() {
             None => vec![],
-            Some((intv, indices)) => {
+            Some((_, indices)) => {
                 let num = indices.1 - indices.0;
                 let mut pkts = vec![];
                 for _ in 0..num {
@@ -651,7 +651,6 @@ mod test {
         hdr.flags_mut().insert(TcpFlags::ACK);
         assert!(hdr.flags().contains(TcpFlags::SYN));
         assert!(hdr.flags().contains(TcpFlags::ACK));
-        let dir = pkt.direction();
 
         tcp_order.insert_and_reorder(pkt);
     }
