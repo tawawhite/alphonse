@@ -175,11 +175,14 @@ impl TcpReorder {
     pub fn get_interval_pkts(&mut self) -> Vec<Box<dyn Packet>> {
         let pkts = match self.seq_intervals.pop_front() {
             None => vec![],
-            Some((_, indices)) => {
+            Some((intv, indices)) => {
                 let num = indices.1 - indices.0;
                 let mut pkts = vec![];
-                for _ in 0..num - 1 {
-                    pkts.push(self.pkts.pop_front().unwrap())
+                for _ in 0..num {
+                    let pkt = self.pkts.pop_front().unwrap();
+                    self.seq_delivered =
+                        TcpHdr::from_pkt(pkt.as_ref()).next_seq(pkt.payload().len() as u32);
+                    pkts.push(pkt);
                 }
                 pkts
             }
@@ -195,6 +198,11 @@ impl TcpReorder {
 
     /// Pop all pkts out of buffers
     pub fn get_all_pkts(&mut self) -> Vec<Box<dyn Packet>> {
+        if self.seq_intervals.is_empty() {
+            return vec![];
+        }
+
+        self.seq_delivered = self.seq_intervals[self.seq_intervals.len() - 1].0 .0 .1;
         self.seq_intervals.clear();
         let pkts = VecDeque::with_capacity(self.capacity);
         let pkts = std::mem::replace(&mut self.pkts, pkts);
@@ -671,5 +679,93 @@ mod test {
         tcp_order.insert_and_reorder(pkt);
 
         assert_eq!(tcp_order.pkts.len(), 1);
+    }
+
+    #[test]
+    fn get_interval_pkts() {
+        let mut tcp_order = TcpReorder::default();
+
+        let pkts = tcp_order.get_interval_pkts();
+        assert_eq!(pkts.len(), 0);
+
+        // (0, 4)
+        let mut pkt = Box::new(Packet::default());
+        pkt.raw = Box::new(vec![0; 24]);
+        pkt.layers_mut().trans.protocol = Protocol::TCP;
+        pkt.layers_mut().app.offset = 20;
+
+        tcp_order.insert_and_reorder(pkt);
+
+        // (5, 9)
+        let mut pkt = Box::new(Packet::default());
+        pkt.raw = Box::new(vec![0; 24]);
+        pkt.layers_mut().trans.protocol = Protocol::TCP;
+        pkt.layers_mut().app.offset = 20;
+        let hdr = TcpHdr::from_pkt_mut(pkt.as_mut());
+        hdr.seq = 5;
+
+        tcp_order.insert_and_reorder(pkt);
+
+        // (10, 14)
+        let mut pkt = Box::new(Packet::default());
+        pkt.raw = Box::new(vec![0; 24]);
+        pkt.layers_mut().trans.protocol = Protocol::TCP;
+        pkt.layers_mut().app.offset = 20;
+        let hdr = TcpHdr::from_pkt_mut(pkt.as_mut());
+        hdr.seq = 10;
+
+        tcp_order.insert_and_reorder(pkt);
+        assert_eq!(tcp_order.pkts.len(), 3);
+
+        let pkts = tcp_order.get_interval_pkts();
+        assert_eq!(pkts.len(), 1);
+        assert_eq!(tcp_order.seq_intervals.len(), 2);
+        assert_eq!(tcp_order.seq_intervals[0].0, SeqInterval((5, 9)));
+        assert_eq!(tcp_order.seq_intervals[0].1, (0, 1));
+        assert_eq!(tcp_order.seq_intervals[1].0, SeqInterval((10, 14)));
+        assert_eq!(tcp_order.seq_intervals[1].1, (1, 2));
+        assert_eq!(tcp_order.seq_delivered, 4);
+    }
+
+    #[test]
+    fn get_all_pkts() {
+        let mut tcp_order = TcpReorder::default();
+
+        let pkts = tcp_order.get_interval_pkts();
+        assert_eq!(pkts.len(), 0);
+
+        // (0, 4)
+        let mut pkt = Box::new(Packet::default());
+        pkt.raw = Box::new(vec![0; 24]);
+        pkt.layers_mut().trans.protocol = Protocol::TCP;
+        pkt.layers_mut().app.offset = 20;
+
+        tcp_order.insert_and_reorder(pkt);
+
+        // (5, 9)
+        let mut pkt = Box::new(Packet::default());
+        pkt.raw = Box::new(vec![0; 24]);
+        pkt.layers_mut().trans.protocol = Protocol::TCP;
+        pkt.layers_mut().app.offset = 20;
+        let hdr = TcpHdr::from_pkt_mut(pkt.as_mut());
+        hdr.seq = 5;
+
+        tcp_order.insert_and_reorder(pkt);
+
+        // (10, 14)
+        let mut pkt = Box::new(Packet::default());
+        pkt.raw = Box::new(vec![0; 24]);
+        pkt.layers_mut().trans.protocol = Protocol::TCP;
+        pkt.layers_mut().app.offset = 20;
+        let hdr = TcpHdr::from_pkt_mut(pkt.as_mut());
+        hdr.seq = 10;
+
+        tcp_order.insert_and_reorder(pkt);
+        assert_eq!(tcp_order.pkts.len(), 3);
+
+        let pkts = tcp_order.get_all_pkts();
+        assert_eq!(pkts.len(), 3);
+        assert_eq!(tcp_order.seq_intervals.len(), 0);
+        assert_eq!(tcp_order.seq_delivered, 14);
     }
 }
