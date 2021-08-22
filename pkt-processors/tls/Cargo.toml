@@ -9,7 +9,7 @@ crate-type = ["cdylib"]
 name = "tls"
 
 [dependencies]
-alphonse-api = { path = "../../api", optional = false }
+alphonse-api = { path = "../../api" }
 anyhow = "1.0"
 chrono = "0.4"
 hex = "0.4"

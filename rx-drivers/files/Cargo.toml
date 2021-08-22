@@ -9,7 +9,7 @@ crate-type = ["cdylib"]
 name = "rxfiles"
 
 [dependencies]
-alphonse-api = { path = "../../api", optional = false }
+alphonse-api = { path = "../../api" }
 alphonse-utils = { path = "../../utils", features = ["dissectors"] }
 anyhow = "1.0"
 crossbeam-channel = "0.5"

@@ -9,7 +9,7 @@ crate-type = ["cdylib"]
 name = "ethernet"
 
 [dependencies]
-alphonse-api = { path = "../../api", optional = false }
+alphonse-api = { path = "../../api" }
 anyhow = "1.0"
 fnv = "1.0"
 mac_address = { version = "1.1", features = ["serde"] }
