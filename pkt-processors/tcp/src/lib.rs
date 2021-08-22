@@ -1,53 +1,17 @@
 #![allow(non_camel_case_types)]
 
-#[macro_use]
-extern crate bitflags;
-
 use anyhow::Result;
 use serde::Serialize;
 use serde_json::json;
 
 use alphonse_api as api;
+use alphonse_utils as utils;
 use api::classifiers::{matched, ClassifierManager, Rule, RuleType};
 use api::packet::{Direction, Packet, Protocol};
 use api::plugins::processor::{Processor, ProcessorID};
 use api::plugins::{Plugin, PluginType};
 use api::session::{ProtocolLayer, Session};
-
-bitflags! {
-    struct TcpFlags: u8 {
-        const FIN = 0b00000001;
-        const SYN = 0b00000010;
-        const RST = 0b00000100;
-        const PSH = 0b00001000;
-        const ACK = 0b00010000;
-        const URG = 0b00100000;
-    }
-}
-
-#[repr(C)]
-struct TcpHdr {
-    pub src_port: u16,
-    pub dst_port: u16,
-    pub seq: u32,
-    pub ack: u32,
-    pub hdr_len_flags: u16,
-    pub win: u16,
-    pub sum: u16,
-    pub urp: u16,
-}
-
-impl TcpHdr {
-    /// TCP header length
-    pub fn hdr_len(&self) -> u8 {
-        (self.hdr_len_flags >> 12) as u8
-    }
-
-    /// TCP flags
-    pub fn flags(&self) -> TcpFlags {
-        TcpFlags::from_bits_truncate(self.hdr_len_flags as u8)
-    }
-}
+use utils::tcp_reassembly::{TcpFlags, TcpHdr};
 
 #[derive(Clone, Debug, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -136,8 +100,7 @@ impl Processor for ProtocolParser {
 
         let dir = pkt.direction() as usize;
 
-        let tcp_raw = &pkt.raw()[pkt.layers().trans.offset as usize..];
-        let hdr = unsafe { &*(tcp_raw.as_ptr() as *const TcpHdr) };
+        let hdr = TcpHdr::from_pkt(pkt);
         let flags = hdr.flags();
 
         if hdr.win == 0 && flags.contains(TcpFlags::RST) {
@@ -216,7 +179,7 @@ impl Processor for ProtocolParser {
 
     fn save(&mut self, ses: &mut Session) {
         ses.add_field(&"tcpflags", json!(self.flags_cnt));
-        println!("{}", serde_json::to_string_pretty(ses).unwrap());
+        // println!("{}", serde_json::to_string_pretty(ses).unwrap());
     }
 }
 
