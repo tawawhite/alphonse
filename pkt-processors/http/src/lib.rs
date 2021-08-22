@@ -106,6 +106,10 @@ impl<'a> HttpProcessor<'a> {
     fn new() -> Self {
         let mut p = Self::default();
         p.name = String::from("http");
+        p.tcp_reorder = [
+            TcpReorder::with_capacity(128),
+            TcpReorder::with_capacity(128),
+        ];
         p
     }
 }
