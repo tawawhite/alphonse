@@ -13,7 +13,9 @@ anyhow = "1.0"
 alphonse-api = { path = "../../api" }
 chrono = "0.4"
 crossbeam-channel = "0.5"
-elasticsearch = { version = "7.12.1-alpha.1", features = ["rustls-tls"], optional = true }
+elasticsearch = { version = "7.12.1-alpha.1", features = [
+    "rustls-tls",
+], default-features = false, optional = true }
 fnv = "1.0"
 futures = "0.3"
 nix = "0.22"

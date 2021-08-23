@@ -14,7 +14,9 @@ alphonse-arkime = { path = "../../arkime", optional = true }
 alphonse-utils = { path = "../../utils", features = ["dissectors"] }
 anyhow = "1.0"
 crossbeam-channel = "0.5"
-elasticsearch = { version = "7.12.1-alpha.1", features = ["rustls-tls"], optional = true }
+elasticsearch = { version = "7.12.1-alpha.1", features = [
+	"rustls-tls",
+], default-features = false, optional = true }
 fnv = "1.0"
 futures = "0.3"
 libc = "0.2"
