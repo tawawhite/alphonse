@@ -602,6 +602,62 @@ mod test {
     }
 
     #[test]
+    fn insert_and_reorder_out_of_order_pkt() {
+        let mut tr = TcpReorder::default();
+
+        let mut pkt = Box::new(Packet::default());
+        pkt.raw = Box::new(vec![0; 1472]);
+        pkt.layers_mut().trans.protocol = Protocol::TCP;
+        pkt.layers_mut().app.offset = 20;
+        let hdr = TcpHdr::from_pkt_mut(pkt.as_mut());
+        hdr.seq = 2305223065u32.to_be();
+        // (2305223065, 2305224517)
+        let intv1 = SeqInterval::from_pkt(pkt.as_ref());
+
+        tr.insert_and_reorder(pkt);
+
+        let mut pkt = Box::new(Packet::default());
+        pkt.raw = Box::new(vec![0; 1472]);
+        pkt.layers_mut().trans.protocol = Protocol::TCP;
+        pkt.layers_mut().app.offset = 20;
+        let hdr = TcpHdr::from_pkt_mut(pkt.as_mut());
+        hdr.seq = 2305224517u32.to_be();
+        // (2305224517, 2305225969)
+        let intv2 = SeqInterval::from_pkt(pkt.as_ref());
+
+        tr.insert_and_reorder(pkt);
+
+        let mut pkt = Box::new(Packet::default());
+        pkt.raw = Box::new(vec![0; 1472]);
+        pkt.layers_mut().trans.protocol = Protocol::TCP;
+        pkt.layers_mut().app.offset = 20;
+        let hdr = TcpHdr::from_pkt_mut(pkt.as_mut());
+        hdr.seq = 2305230325u32.to_be();
+        // (2305230325, 2305231777)
+        let intv3 = SeqInterval::from_pkt(pkt.as_ref());
+
+        tr.insert_and_reorder(pkt);
+
+        let mut pkt = Box::new(Packet::default());
+        pkt.raw = Box::new(vec![0; 1472]);
+        pkt.layers_mut().trans.protocol = Protocol::TCP;
+        pkt.layers_mut().app.offset = 20;
+        let hdr = TcpHdr::from_pkt_mut(pkt.as_mut());
+        hdr.seq = 2305225969u32.to_be();
+        // (2305225969, 2305227421)
+        let intv4 = SeqInterval::from_pkt(pkt.as_ref());
+
+        tr.insert_and_reorder(pkt);
+        assert_eq!(tr.seq_intervals.len(), 2);
+        assert_eq!(tr.seq_intervals[0].0, intv4.union(intv2).union(intv1));
+        assert_eq!(tr.seq_intervals[0].1, (0, 3));
+        assert_eq!(tr.seq_intervals[1].0, intv3);
+        assert_eq!(tr.seq_intervals[1].1, (3, 4));
+
+        assert_eq!(tr.pkts.len(), 4);
+    }
+
+    #[test]
     fn insert_overlay_retransmission_pkt() {
         let mut tr = TcpReorder::default();
 
