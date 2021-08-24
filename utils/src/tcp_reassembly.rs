@@ -173,7 +173,7 @@ impl TcpReorder {
 
     /// Whether this pkt buffer is full. If so, should call get_interval_pkts
     pub fn full(&self) -> bool {
-        self.pkts.len() < self.capacity
+        self.pkts.len() >= self.capacity
     }
 
     /// Get pkts in the oldest interval
@@ -326,7 +326,6 @@ impl TcpReorder {
             }
 
             // incoming pkt is an out of order pkt or a retransmit pkt, need to find proper insert position
-            return;
         }
     }
 
@@ -340,7 +339,7 @@ impl TcpReorder {
 
         let len = self.seq_intervals.len();
         let mut i = 0;
-        while i < len {
+        while i + 1 < len {
             let (intv1, indices1) = &self.seq_intervals[i];
             let (intv2, indices2) = &self.seq_intervals[i + 1];
             if !intv1.overlaps(*intv2) {
@@ -351,10 +350,10 @@ impl TcpReorder {
             let intv_new = intv1.union(*intv2);
             let indices_new = (indices1.0, indices2.1);
 
-            self.seq_intervals.pop_front();
+            self.seq_intervals.remove(i + 1);
 
-            self.seq_intervals[0].0 = intv_new;
-            self.seq_intervals[0].1 = indices_new;
+            self.seq_intervals[i].0 = intv_new;
+            self.seq_intervals[i].1 = indices_new;
 
             break;
         }
