@@ -9,12 +9,14 @@ use tls_parser::{
 };
 
 use alphonse_api as api;
+use alphonse_utils as utils;
 use api::classifiers;
 use api::classifiers::{matched, RuleID};
 use api::packet::{Direction, Packet, Protocol};
 use api::plugins::processor::{Processor, ProcessorID};
 use api::plugins::{Plugin, PluginType};
 use api::session::Session;
+use utils::tcp_reassembly::TcpReorder;
 
 mod cert;
 mod ja3;
@@ -23,28 +25,6 @@ mod udp;
 
 use cert::Cert;
 use ja3::{Ja3, Ja3s};
-
-#[repr(u8)]
-#[derive(Clone, Copy, Debug, Hash, PartialEq)]
-enum Side {
-    Client = 0,
-    Server = 1,
-}
-
-impl Default for Side {
-    fn default() -> Self {
-        Side::Client
-    }
-}
-
-#[derive(Clone, Default, Serialize)]
-struct SideInfo {
-    #[serde(skip_serializing)]
-    side: Side,
-    /// Last time unprocessed payload
-    #[serde(skip_serializing)]
-    remained: Vec<u8>,
-}
 
 #[derive(Clone, Debug, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -72,15 +52,20 @@ struct TlsProcessor {
     id: ProcessorID,
     classified: bool,
     client_direction: Direction,
+    has_change_cipher_spec: bool,
 
     tcp_rule_id: RuleID,
     udp_rule_id: RuleID,
 
-    side_data: [SideInfo; 2],
+    buffer: [Vec<u8>; 2],
+    tcp_reorder: [TcpReorder; 2],
     certs: Vec<Cert>,
     tls: TLS,
     hostnames: HashSet<String>,
 }
+
+unsafe impl Send for TlsProcessor {}
+unsafe impl Sync for TlsProcessor {}
 
 impl Plugin for TlsProcessor {
     fn plugin_type(&self) -> PluginType {
@@ -125,6 +110,10 @@ impl Processor for TlsProcessor {
         _rule: Option<&matched::Rule>,
         ses: &mut Session,
     ) -> Result<()> {
+        if self.has_change_cipher_spec {
+            return Ok(());
+        }
+
         match pkt.layers().trans.protocol {
             Protocol::TCP => self.parse_tcp_pkt(pkt, ses),
             Protocol::UDP => self.parse_udp_pkt(pkt, ses),
@@ -133,6 +122,12 @@ impl Processor for TlsProcessor {
     }
 
     fn save(&mut self, ses: &mut Session) {
+        let pkts = self.tcp_reorder[0].get_all_pkts();
+        self.reassemble_and_parse(pkts);
+
+        let pkts = self.tcp_reorder[1].get_all_pkts();
+        self.reassemble_and_parse(pkts);
+
         for cert in &self.certs {
             if cert.ca {
                 ses.add_tag(&"self-signed");
@@ -155,6 +150,12 @@ impl Processor for TlsProcessor {
 }
 
 impl TlsProcessor {
+    fn new() -> Self {
+        let mut tp = Self::default();
+        tp.tcp_reorder = [TcpReorder::with_capacity(16), TcpReorder::with_capacity(16)];
+        tp
+    }
+
     fn handle_client_hello<'a, H: ClientHello<'a>>(&mut self, dir: Direction, hello: &H) {
         self.client_direction = dir;
         match hello.session_id() {
@@ -310,7 +311,7 @@ mod test {
 
 #[no_mangle]
 pub extern "C" fn al_new_pkt_processor() -> Box<Box<dyn Processor>> {
-    Box::new(Box::new(TlsProcessor::default()))
+    Box::new(Box::new(TlsProcessor::new()))
 }
 
 #[no_mangle]

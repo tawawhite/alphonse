@@ -44,6 +44,7 @@ impl TlsProcessor {
                         }
                         _ => {}
                     },
+                    DTLSMessage::ChangeCipherSpec => self.has_change_cipher_spec = true,
                     _ => {}
                 };
             }

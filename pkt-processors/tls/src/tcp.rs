@@ -19,41 +19,48 @@ impl TlsProcessor {
         }
 
         let dir = pkt.direction() as u8 as usize;
-        let mut _buf = vec![];
-        let mut buf = if self.side_data[dir].remained.len() > 0 {
-            // If there are bytes left from last packet, prepend them to current packet's payloads
-            _buf = self.side_data[dir].remained.clone();
-            _buf.extend_from_slice(pkt.payload());
-            _buf.as_slice()
-        } else {
-            pkt.payload()
-        };
-
-        while !buf.is_empty() {
-            let (b, result) = match parse_tls_plaintext(buf) {
-                Ok(r) => r,
-                Err(e) => {
-                    match e {
-                        TlsErr::Incomplete(_) => {
-                            self.side_data[dir].remained = buf.iter().map(|x| *x).collect();
-                        }
-                        _ => {}
-                    };
-                    break;
-                }
-            };
-
-            self.handle_tls_parse_result(pkt.direction(), result);
-            buf = b;
-
-            let side = &mut self.side_data[dir];
-            if buf.len() > 0 && side.remained.len() > buf.len() {
-                let offset = side.remained.len() - buf.len();
-                side.remained = side.remained[offset..].iter().map(|x| *x).collect();
-            }
+        if self.tcp_reorder[dir].full() {
+            let pkts = self.tcp_reorder[dir].get_interval_pkts();
+            self.reassemble_and_parse(pkts);
         }
 
+        self.tcp_reorder[dir].insert_and_reorder(pkt.clone_box());
+
         Ok(())
+    }
+
+    pub fn reassemble_and_parse(&mut self, pkts: Vec<Box<dyn Packet>>) {
+        for pkt in pkts {
+            let dir = pkt.direction() as u8 as usize;
+            let mut _buf = vec![];
+            let mut buf = if self.buffer[dir].len() > 0 {
+                if self.buffer[dir].len() + pkt.payload().len() > 16_777_216 {
+                    // Tls record overflow
+                    return;
+                }
+
+                // If there are bytes left from last packet, prepend them to current packet's payloads
+                _buf = self.buffer[dir].split_off(0);
+                _buf.extend_from_slice(pkt.payload());
+                _buf.as_slice()
+            } else {
+                pkt.payload()
+            };
+
+            while !buf.is_empty() {
+                let (b, result) = match parse_tls_plaintext(buf) {
+                    Ok(r) => r,
+                    Err(TlsErr::Incomplete(_)) => {
+                        self.buffer[dir].extend_from_slice(buf);
+                        break;
+                    }
+                    _ => break,
+                };
+
+                self.handle_tls_parse_result(pkt.direction(), result);
+                buf = b;
+            }
+        }
     }
 
     fn handle_tls_parse_result(&mut self, dir: Direction, result: TlsPlaintext) {
@@ -80,6 +87,7 @@ impl TlsProcessor {
                         _ => {}
                     };
                 }
+                TlsMessage::ChangeCipherSpec => self.has_change_cipher_spec = true,
                 _ => {}
             };
         }
