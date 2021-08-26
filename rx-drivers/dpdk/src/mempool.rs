@@ -4,6 +4,8 @@ use rte::mbuf::RTE_MBUF_PRIV_ALIGN;
 use alphonse_api as api;
 use api::config::Config;
 
+use crate::device::PacketMetaData;
+
 fn is_power_of_two<T: Into<u64>>(x: T) -> bool {
     let x: u64 = x.into();
     x != 0 && ((x & (x - 1)) == 0)

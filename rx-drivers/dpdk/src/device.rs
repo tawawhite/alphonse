@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::ffi::CStr;
-use std::ops::Deref;
 
 use anyhow::{anyhow, Result};
 use rte::ethdev::EthDevice;
@@ -11,7 +10,6 @@ use api::classifiers::matched::Rule;
 use api::config::Config;
 use api::packet::{Layers, Packet as PacketTrait, Rules, Tunnel};
 use api::plugins::rx::RxStat;
-use api::utils::timeval::{precision, TimeVal};
 
 /// Minimium DPDK rx unit
 #[derive(Clone, Debug)]
@@ -199,16 +197,23 @@ pub fn init_ports(cfg: &Config, mb_pool: &mut rte::mempool::MemoryPool) -> Resul
 }
 
 pub struct PacketMetaData {
-    ts: TimeVal<precision::Millisecond>,
+    ts: libc::timeval,
     layers: Layers,
     rules: Rules,
     tunnel: Tunnel,
+    drop: bool,
 }
 
 #[derive(Clone, Debug)]
 pub struct Packet(rte::mbuf::MBuf);
 
 impl Packet {
+    fn set(&mut self, mbuf: Box<rte::mbuf::MBuf>, ts: libc::timeval) {
+        if self.metadata().drop {
+            self.0.free();
+        }
+    }
+
     pub fn new(mbuf: rte::mbuf::MBuf) -> Self {
         Self(mbuf)
     }
@@ -234,7 +239,7 @@ impl PacketTrait for Packet {
     }
 
     fn ts(&self) -> &libc::timeval {
-        self.metadata().ts.deref()
+        &self.metadata().ts
     }
 
     fn layers(&self) -> &Layers {
@@ -246,7 +251,7 @@ impl PacketTrait for Packet {
     }
 
     fn rules(&self) -> &[Rule] {
-        self.metadata().rules.as_slice()
+        self.metadata().rules.as_ref().as_slice()
     }
 
     fn rules_mut(&mut self) -> &mut Rules {
@@ -261,7 +266,7 @@ impl PacketTrait for Packet {
         &mut self.metadata_mut().tunnel
     }
 
-    fn clone_box(&self) -> Box<dyn PacketTrait + '_> {
+    fn clone_box<'a, 'b>(&'a self) -> Box<dyn PacketTrait + 'b> {
         Box::new(self.clone())
     }
 }

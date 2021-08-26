@@ -1,7 +1,6 @@
 [package]
 name = "dpdk"
 version = "0.1.0"
-authors = ["Jack Liar"]
 edition = "2018"
 
 [lib]
@@ -10,7 +9,8 @@ name = "rxlibpcap"
 
 [dependencies]
 alphonse-api = { path = "../../api" }
-anyhow = "*"
+alphonse-utils = { path = "../../utils", features = ["dissectors"] }
+anyhow = "1.0"
 crossbeam-channel = "0.5"
 libc = "0.2"
 once_cell = "1.7"

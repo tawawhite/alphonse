@@ -32,12 +32,12 @@ impl Plugin for Driver {
         "rx-libpcap"
     }
 
-    fn init(&self, cfg: &Config) -> Result<()> {
+    fn init(&mut self, cfg: &Config) -> Result<()> {
         rte::eal::init(cfg.dpdk_eal_args.as_slice())?;
         Ok(())
     }
 
-    fn cleanup(&self) -> Result<()> {
+    fn cleanup(&mut self) -> Result<()> {
         let mut handles = match self.handles.write() {
             Ok(h) => h,
             Err(e) => return Err(anyhow!("{}", e)),
@@ -59,7 +59,7 @@ impl Plugin for Driver {
 }
 
 impl RxDriver for Driver {
-    fn start(&self, cfg: Arc<Config>, sender: Sender<Box<dyn PacketTrait>>) -> Result<()> {
+    fn start(&mut self, cfg: Arc<Config>, senders: &[Sender<Box<dyn PacketTrait>>]) -> Result<()> {
         let mempool = mempool::create_pktmbuf_pool(&cfg)?;
 
         {
@@ -73,7 +73,7 @@ impl RxDriver for Driver {
             let cfg = cfg.clone();
             let mut thread = RxThread {
                 exit: cfg.exit.clone(),
-                _sender: sender.clone(),
+                senders: senders.to_vec(),
                 device: device.clone(),
             };
             let builder = std::thread::Builder::new().name(thread.name());
@@ -90,15 +90,15 @@ impl RxDriver for Driver {
         Ok(())
     }
 
-    fn stats(&self) -> RxStat {
-        self.stats
+    fn stats(&self) -> Result<RxStat> {
+        Ok(self.stats)
     }
 }
 
 struct RxThread {
     exit: Arc<AtomicBool>,
     device: Device,
-    _sender: Sender<Box<dyn PacketTrait>>,
+    senders: Vec<Sender<Box<dyn PacketTrait>>>,
 }
 
 impl RxThread {
