@@ -161,6 +161,12 @@ pub fn init_plugins(
                         .get::<rx::NewRxDriverFunc>(rx::NEW_RX_DRIVER_FUNC_NAME.as_bytes())
                         .map_err(|e| anyhow!("{}", e))?;
                     let mut driver = *func();
+                    if (!cfg.pcap_dir.is_empty() || !cfg.pcap_file.is_empty())
+                        && !driver.support_offline()
+                    {
+                        return Err(anyhow!("alphonse is trying to load rx driver '{}' to process offline pcap files, however it doesn't support offline mode", driver.name()));
+                    }
+
                     println!("Initializing {} rx driver", driver.name());
                     driver.init(cfg)?;
                     match &warehouse.rx_driver {

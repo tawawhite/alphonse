@@ -16,9 +16,9 @@ use api::config::Config;
 use arkime::stat::Stat;
 use utils::elasticsearch::handle_resp;
 
-use crate::{gather_stats, NetworkInterface};
+use crate::{gather_stats, CaptureUnit};
 
-pub(crate) fn main_loop(cfg: Arc<Config>, caps: Vec<Arc<NetworkInterface>>) -> Result<()> {
+pub(crate) fn main_loop(cfg: Arc<Config>, caps: Vec<Arc<dyn CaptureUnit>>) -> Result<()> {
     let now = SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)?
         .as_secs();
@@ -63,6 +63,7 @@ pub(crate) fn main_loop(cfg: Arc<Config>, caps: Vec<Arc<NetworkInterface>>) -> R
                 }
 
                 // ? update disk usage ?
+                let caps = caps.iter().map(|cap| cap.as_ref()).collect::<Vec<_>>();
                 let rx_stats = gather_stats(&caps)?;
 
                 // ? getrusage ?
