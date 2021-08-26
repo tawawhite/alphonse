@@ -9,14 +9,13 @@ members = [
     "pkt-processors/dns",
     "pkt-processors/ethernet",
     "pkt-processors/http",
+    "pkt-processors/ip",
     "pkt-processors/misc",
     "pkt-processors/simple-writer",
     "pkt-processors/tcp",
     "pkt-processors/tls",
-    "pkt-processors/ip",
     "pkt-processors/udp",
     "rx-drivers/libpcap",
-    "rx-drivers/files",
     "utils",
 ]
 resolver = "2"
