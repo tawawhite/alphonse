@@ -1,7 +1,6 @@
 [package]
 name = "libpcap"
 version = "0.1.0"
-authors = ["Jack Liar"]
 edition = "2018"
 
 [lib]
@@ -35,4 +34,3 @@ arkime = [
 	"elasticsearch",
 	"serde_json",
 ]
-# default = ["arkime"]
