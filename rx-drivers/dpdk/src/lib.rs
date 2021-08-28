@@ -29,11 +29,12 @@ impl Plugin for Driver {
     }
 
     fn name(&self) -> &str {
-        "rx-libpcap"
+        "rx-dpdk"
     }
 
     fn init(&mut self, cfg: &Config) -> Result<()> {
-        rte::eal::init(cfg.dpdk_eal_args.as_slice())?;
+        let args = cfg.get_str_arr("dpdk.eal.args");
+        rte::eal::init(args.as_slice())?;
         Ok(())
     }
 
@@ -127,4 +128,14 @@ impl RxThread {
     pub fn name(&self) -> String {
         format!("alphonse-{}-{:?}", self.device.port, self.device.rx_queues)
     }
+}
+
+#[no_mangle]
+pub extern "C" fn al_new_rx_driver() -> Box<Box<dyn RxDriver>> {
+    Box::new(Box::new(Driver::default()))
+}
+
+#[no_mangle]
+pub extern "C" fn al_plugin_type() -> PluginType {
+    PluginType::RxDriver
 }

@@ -5,7 +5,7 @@ edition = "2018"
 
 [lib]
 crate-type = ["cdylib"]
-name = "rxlibpcap"
+name = "rxdpdk"
 
 [dependencies]
 alphonse-api = { path = "../../api" }
