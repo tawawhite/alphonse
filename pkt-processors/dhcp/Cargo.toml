@@ -8,7 +8,7 @@ crate-type = ["cdylib"]
 name = "dhcp"
 
 [dependencies]
-alphonse-api = { path = "../../api" }
+alphonse-api = { path = "../../api", version = "0.1.0" }
 anyhow = "1.0"
 dhcp-parser2 = { git = "https://github.com/rusticata/dhcp-parser.git", branch = "master" }
 fnv = "1.0"

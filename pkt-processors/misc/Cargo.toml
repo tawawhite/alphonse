@@ -10,7 +10,7 @@ name = "misc"
 
 [dependencies]
 anyhow = "1.0"
-alphonse-api = { path = "../../api" }
+alphonse-api = { path = "../../api", version = "0.1.0" }
 fnv = "1.0"
 hyperscan = { version = "0.2", features = ["static"] }
 libc = "0.2"

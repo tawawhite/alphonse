@@ -8,7 +8,7 @@ crate-type = ["cdylib"]
 name = "tcp"
 
 [dependencies]
-alphonse-api = { path = "../../api" }
+alphonse-api = { path = "../../api", version = "0.1.0" }
 alphonse-utils = { path = "../../utils", features = ["tcp-reassembly"] }
 anyhow = "1.0"
 serde = "1.0"

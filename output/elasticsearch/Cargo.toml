@@ -9,7 +9,7 @@ crate-type = ["cdylib"]
 name = "es"
 
 [dependencies]
-alphonse-api = { path = "../../api" }
+alphonse-api = { path = "../../api", version = "0.1.0" }
 alphonse-utils = { path = "../../utils", features = ["es"] }
 anyhow = "1.0"
 chrono = "0.4"

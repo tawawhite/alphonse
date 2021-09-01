@@ -9,7 +9,7 @@ crate-type = ["cdylib"]
 name = "rxlibpcap"
 
 [dependencies]
-alphonse-api = { path = "../../api" }
+alphonse-api = { path = "../../api", version = "0.1.0" }
 anyhow = "*"
 crossbeam-channel = "0.5"
 libc = "0.2"

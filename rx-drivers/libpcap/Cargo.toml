@@ -8,7 +8,7 @@ crate-type = ["cdylib"]
 name = "rxlibpcap"
 
 [dependencies]
-alphonse-api = { path = "../../api" }
+alphonse-api = { path = "../../api", version = "0.1.0" }
 alphonse-arkime = { path = "../../arkime", optional = true }
 alphonse-utils = { path = "../../utils", features = ["dissectors"] }
 anyhow = "1.0"

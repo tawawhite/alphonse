@@ -5,7 +5,7 @@ authors = ["Jack Liar"]
 edition = "2018"
 
 [dependencies]
-alphonse-api = { path = "../api" }
+alphonse-api = { path = "../api", version = "0.1.0" }
 anyhow = "1.0"
 # arc-swap = "1.1"
 clap = "2.33"
