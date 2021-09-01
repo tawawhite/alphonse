@@ -10,7 +10,7 @@ name = "tls"
 
 [dependencies]
 alphonse-api = { path = "../../api", version = "0.1.0" }
-alphonse-utils = { path = "../../utils", features = ["tcp-reassembly"] }
+alphonse-utils = { path = "../../utils", version = "0.1.0", features = ["tcp-reassembly"] }
 anyhow = "1.0"
 chrono = "0.4"
 hex = "0.4"
