@@ -49,6 +49,11 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND BUILD_DPDK_KMODS)
     add_dependencies(alphonse dpdk-kmods)
 endif()
 
+option(BUILD_PKTGEN "build pktgen tool" OFF)
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND BUILD_PKTGEN)
+    add_dependencies(alphonse pktgen)
+endif()
+
 option(BUILD_TCMALLOC "build tcmalloc" OFF)
 if(BUILD_TCMALLOC)
     add_dependencies(alphonse gperftools)
