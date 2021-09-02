@@ -1,12 +1,12 @@
 if(OFFLINE_ENVIRONMENT)
     set(dpdk_url ${CMAKE_CURRENT_SOURCE_DIR}/third_party/dpdk-20.11.tar.xz)
 else()
-    set(dpdk_url http://fast.dpdk.org/rel/dpdk-20.11.tar.xz)
+    set(dpdk_url https://fast.dpdk.org/rel/dpdk-20.11.2.tar.xz)
 endif()
 
 ExternalProject_Add(dpdk
     URL ${dpdk_url}
-    URL_MD5 13a990dc3b300635f685e268b36918a3
+    URL_MD5 c01cf1ea8ca87c0bd43872cf32d6b1f7
     EXCLUDE_FROM_ALL ON
     PREFIX dpdk
     INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR}/install
@@ -19,10 +19,8 @@ ExternalProject_Add(dpdk
     BUILD_COMMAND ${CMAKE_COMMAND} -E env
         LIBRARY_PATH=${CMAKE_CURRENT_BINARY_DIR}/install/lib:${CMAKE_CURRENT_BINARY_DIR}/install/lib64
         C_INCLUDE_PATH=${CMAKE_CURRENT_BINARY_DIR}/install/include
-        ninja
-        # echo
-    INSTALL_COMMAND ninja install
-    # INSTALL_COMMAND echo
+        meson compile
+    INSTALL_COMMAND meson install
 )
 
 execute_process(COMMAND uname -r
