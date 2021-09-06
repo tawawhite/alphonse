@@ -1,0 +1,37 @@
+FROM rust:1.54.0-centos7-devenv AS Base
+
+RUN curl -OL https://github.com/Kitware/CMake/releases/download/v3.21.2/cmake-3.21.2-linux-x86_64.sh; \
+    chmod +x cmake-3.21.2-linux-x86_64.sh; \
+    ./cmake-3.21.2-linux-x86_64.sh --prefix=/usr/local --skip-license; \
+    rm cmake-3.21.2-linux-x86_64.sh
+RUN yum install -y flex byacc make gcc-c++
+RUN curl -OL https://releases.llvm.org/3.9.1/clang+llvm-3.9.1-x86_64-linux-gnu-ubuntu-14.04.tar.xz; \
+    mv clang+llvm-3.9.1-x86_64-linux-gnu-ubuntu-14.04.tar.xz /usr/local; \
+    cd /usr/local; \
+    tar xf clang+llvm-3.9.1-x86_64-linux-gnu-ubuntu-14.04.tar.xz --strip-components=1;\
+    rm -f clang+llvm-3.9.1-x86_64-linux-gnu-ubuntu-14.04.tar.xz
+RUN curl -OL https://gist.githubusercontent.com/nhatminhle/5181506/raw/541482dbc61862bba8a156edaae57faa2995d791/stdatomic.h; \
+    mv stdatomic.h /usr/include
+
+ENV PKG_CONFIG_PATH=/alphonse/build/install/lib/pkgconfig:/alphonse/build/install/lib64/pkgconfig \
+    LD_LIBRARY_PATH=/alphonse/build/install/lib:/alphonse/build/install/lib64 \
+    BUILD_FLAGS="--release" \
+    CMAKE_OPTIONS="-DOFFLINE_ENVIRONMENT=ON" \
+    CC=/usr/local/bin/clang \
+    CXX=/usr/local/bin/clang++
+COPY . /alphonse
+RUN cd /alphonse; \
+    /alphonse/build.sh
+
+CMD [ "/bin/bash" ]
+
+FROM centos:7.3.1611
+
+COPY --from=Base /alphonse/target/release/alphonse /usr/local/bin/
+COPY --from=Base /alphonse/target/release/*.so /usr/local/lib/
+COPY --from=Base /alphonse/build/install/lib64/libpcap*.so /usr/local/lib/
+COPY --from=Base /alphonse/alphonse.example.yml /usr/local/etc/
+COPY --from=Base /alphonse/etc/*.mmdb /usr/local/etc/
+COPY --from=Base /alphonse/etc/*.csv /usr/local/etc/
+
+CMD [ "/bin/bash" ]
