@@ -377,7 +377,8 @@ pub trait Packet: Send {
     /// It's the caller's duty to guarantee datalink layer is Ethernet
     #[inline]
     unsafe fn src_mac(&self) -> &[u8; 6] {
-        <&[u8; 6]>::try_from(&self.raw()[6..12]).unwrap()
+        let offset = (self.layers().data_link.offset) as usize;
+        <&[u8; 6]>::try_from(&self.raw()[offset + 6..offset + 12]).unwrap()
     }
 
     /// Get dst mac address
@@ -385,7 +386,8 @@ pub trait Packet: Send {
     /// It's the caller's duty to guarantee datalink layer is Ethernet
     #[inline]
     unsafe fn dst_mac(&self) -> &[u8; 6] {
-        <&[u8; 6]>::try_from(&self.raw()[0..6]).unwrap()
+        let offset = (self.layers().data_link.offset) as usize;
+        <&[u8; 6]>::try_from(&self.raw()[offset..offset + 6]).unwrap()
     }
 
     #[inline]
