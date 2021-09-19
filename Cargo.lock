@@ -30,8 +30,6 @@ dependencies = [
  "dynamic_reload",
  "fnv",
  "hostname",
- "hyperscan",
- "libc",
  "once_cell",
  "rayon",
  "serde",
