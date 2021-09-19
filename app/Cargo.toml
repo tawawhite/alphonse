@@ -1,7 +1,6 @@
 [package]
 name = "alphonse"
 version = "0.1.0"
-authors = ["Jack Liar"]
 edition = "2018"
 
 [dependencies]
@@ -13,7 +12,6 @@ crossbeam-channel = "0.5"
 chrono = "0.4"
 dashmap = { version = "4.0", features = ["raw-api"] }
 dynamic_reload = "0.4"
-elasticsearch = { version = "7.12.1-alpha.1", features = ["rustls-tls"], default-features = false }
 fnv = "1.0"
 hostname = "0.3"
 hyperscan = { version = "0.2", features = ["static"] }

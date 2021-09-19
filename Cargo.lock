@@ -28,7 +28,6 @@ dependencies = [
  "crossbeam-channel",
  "dashmap",
  "dynamic_reload",
- "elasticsearch",
  "fnv",
  "hostname",
  "hyperscan",
@@ -568,9 +567,9 @@ checksum = "e78d4f1cc4ae33bbfc157ed5d5a5ef3bc29227303d595861deb238fcec4e9457"
 
 [[package]]
 name = "elasticsearch"
-version = "7.12.1-alpha.1"
+version = "7.14.0-alpha.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a52671e9e0ded9e8374dc688f179e817ac15a7eaf25a1691a9e92c9e468978b5"
+checksum = "d853e1c104dbad916425c88e72ac5b73db65bbc22d3b8ab945174e68df91e6f0"
 dependencies = [
  "base64 0.11.0",
  "bytes",

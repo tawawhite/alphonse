@@ -1,7 +1,6 @@
 [package]
 name = "simple-writer"
 version = "0.1.0"
-authors = ["Jack Liar"]
 edition = "2018"
 
 [lib]
@@ -13,7 +12,7 @@ anyhow = "1.0"
 alphonse-api = { path = "../../api", version = "0.1.0" }
 chrono = "0.4"
 crossbeam-channel = "0.5"
-elasticsearch = { version = "7.12.1-alpha.1", features = [
+elasticsearch = { version = "7.14.0-alpha.1", features = [
     "rustls-tls",
 ], default-features = false, optional = true }
 fnv = "1.0"
