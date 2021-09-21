@@ -2484,8 +2484,9 @@ dependencies = [
 
 [[package]]
 name = "tls-parser"
-version = "0.10.0"
-source = "git+https://github.com/rusticata/tls-parser.git#f6adc7c466ce54f6c019cd8ccb831ceaf3ecc33d"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "409206e2de64edbf7ea99a44ac31680daf9ef1a57895fb3c5bd738a903691be0"
 dependencies = [
  "enum_primitive",
  "nom 7.0.0",
