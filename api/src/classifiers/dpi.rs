@@ -1,7 +1,6 @@
 use std::{borrow::Borrow, iter::FromIterator};
 
 use anyhow::{anyhow, Result};
-use fnv::FnvHashMap;
 use hyperscan::Builder;
 
 use super::{matched, packet};
@@ -142,43 +141,48 @@ impl Classifier {
         pkt: &mut dyn packet::Packet,
         scratch: &mut ClassifyScratch,
     ) -> Result<()> {
-        match (&self.hs_db, &scratch.hs_scratch) {
-            (Some(db), Some(s)) => {
-                let mut id_from_tos: FnvHashMap<usize, (u64, u64)> = FnvHashMap::default();
-                db.scan(pkt.payload(), s, |id, from, to, _flags| {
-                    match id_from_tos.get_mut(&(id as usize)) {
-                        Some((last_from, last_to)) => {
-                            if from < *last_from {
-                                *last_from = from;
-                            }
-                            if to > *last_to {
-                                *last_to = to;
-                            }
-                        }
-                        None => {
-                            id_from_tos.insert(id as usize, (from, to));
-                        }
-                    };
-                    hyperscan::Matching::Continue
-                })?;
+        let (db, scratch) = match (&self.hs_db, &scratch.hs_scratch) {
+            (Some(db), Some(s)) => (db, s),
+            (None, None) => return Ok(()), // no dpi rule is registered
+            (None, _) => return Err(anyhow!("DPI classifier's hs db is None")),
+            (_, None) => return Err(anyhow!("DPI classifier's hs scratch is None")),
+        };
 
-                for (id, (from, to)) in id_from_tos.iter() {
-                    let proto = Protocol::from(pkt.layers().trans.protocol);
-                    if self.dpi_rules[*id].protocol.contains(proto) {
-                        let mut rule = self.rules[*id].clone();
-                        if self.dpi_rules[*id].need_matched_pos {
-                            rule.from_to = Some((*from as u16, *to as u16));
-                        }
-                        pkt.rules_mut().as_mut().push(rule);
+        let mut id_from_tos = vec![];
+        db.scan(pkt.payload(), scratch, |id, from, to, _flags| {
+            match id_from_tos
+                .iter_mut()
+                .position(|(_id, _)| *_id == id as usize)
+            {
+                Some(i) => {
+                    let (_, (last_from, last_to)) = &mut id_from_tos[i];
+                    if from < *last_from {
+                        *last_from = from;
+                    }
+                    if to > *last_to {
+                        *last_to = to;
                     }
                 }
+                None => {
+                    id_from_tos.push((id as usize, (from, to)));
+                }
+            };
 
-                Ok(())
+            hyperscan::Matching::Continue
+        })?;
+
+        for (id, (from, to)) in id_from_tos.iter() {
+            let proto = Protocol::from(pkt.layers().trans.protocol);
+            if self.dpi_rules[*id].protocol.contains(proto) {
+                let mut rule = self.rules[*id].clone();
+                if self.dpi_rules[*id].need_matched_pos {
+                    rule.from_to = Some((*from as u16, *to as u16));
+                }
+                pkt.rules_mut().as_mut().push(rule);
             }
-            (None, None) => Ok(()), // no dpi rule is registered
-            (None, _) => Err(anyhow!("DPI classifier's hs db is None")),
-            (_, None) => Err(anyhow!("DPI classifier's hs scratch is None")),
         }
+
+        Ok(())
     }
 
     /// Allocate a protocol classifier scratch
@@ -260,8 +264,9 @@ mod test {
         // matched
         let mut pkt = Box::new(Packet::default());
         let buf = b"a sentence contains word regex";
-        pkt.raw = Box::new(buf.iter().cloned().collect());
+        pkt.raw = Box::new(buf.to_vec());
         let mut pkt: Box<dyn PacketTrait> = pkt;
+        pkt.layers_mut().app.protocol = crate::packet::Protocol::APPLICATION;
         classifier.classify(pkt.as_mut(), &mut scratch).unwrap();
         assert_eq!(pkt.rules().len(), 1);
         assert_eq!(pkt.rules()[0].id(), 10);
