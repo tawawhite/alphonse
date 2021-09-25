@@ -10,6 +10,7 @@ members = [
     "pkt-processors/ethernet",
     "pkt-processors/http",
     "pkt-processors/ip",
+    "pkt-processors/krb5",
     "pkt-processors/misc",
     "pkt-processors/simple-writer",
     "pkt-processors/tcp",

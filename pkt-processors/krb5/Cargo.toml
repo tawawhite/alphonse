@@ -1,0 +1,18 @@
+[package]
+name = "krb5"
+version = "0.1.0"
+edition = "2018"
+
+[lib]
+crate-type = ["cdylib"]
+name = "krb5"
+
+[dependencies]
+alphonse-api = { path = "../../api", version = "0.1.0" }
+alphonse-utils = { path = "../../utils", version = "0.1.0", features = ["tcp-reassembly"] }
+anyhow = "1.0"
+der-parser = "6"
+kerberos-parser = "0.7"
+nom = "7"
+serde = { version = "1.0", features = ["rc"] }
+serde_json = "1.0"
