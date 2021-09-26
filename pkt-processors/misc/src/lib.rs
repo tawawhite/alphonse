@@ -181,7 +181,9 @@ impl Processor for Misc {
                 MatchCallBack::ProtocolName(protocol) => {
                     ses.add_protocol(protocol, ProtocolLayer::Application);
                 }
-                MatchCallBack::Func(func) => func(ses, pkt)?,
+                MatchCallBack::Func(func) => {
+                    let _ = func(ses, pkt);
+                }
                 MatchCallBack::None => {}
             },
             None => {

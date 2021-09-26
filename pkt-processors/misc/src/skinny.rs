@@ -4,6 +4,7 @@
 //! So to distinguish between these two protocols, we call this skinny.
 
 use anyhow::Result;
+use nom::number::streaming::le_u32;
 
 use alphonse_api as api;
 use api::classifiers::ClassifierManager;
@@ -17,20 +18,23 @@ pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManage
 }
 
 fn classify(ses: &mut Session, pkt: &dyn Packet) -> Result<()> {
-    let len = (pkt.payload()[0] as u32)
-        | (pkt.payload()[1] as u32) << 8
-        | (pkt.payload()[2] as u32) << 16
-        | (pkt.payload()[3] as u32) << 24;
-    if pkt.payload().len() < len as usize || pkt.payload().len() < 9 {
-        return Ok(());
+    let _ = _classify(ses, pkt);
+    Ok(())
+}
+
+fn _classify<'a>(ses: &mut Session, pkt: &'a dyn Packet) -> nom::IResult<&'a [u8], ()> {
+    let (data, len) = le_u32(pkt.payload())?;
+    if data.len() < len as usize || data.len() < 9 {
+        println!("shit {} {}", data.len(), len);
+        return Ok((&[], ()));
     }
 
-    if pkt.payload()[4..8] != [0; 4] {
-        return Ok(());
+    if data[..4] != [0; 4] {
+        return Ok((&[], ()));
     }
 
     add_protocol(ses, "skinny");
-    Ok(())
+    Ok((&[], ()))
 }
 
 #[cfg(test)]
@@ -40,7 +44,6 @@ mod test {
     use api::plugins::processor::Processor;
     use api::session::Session;
 
-    
     use crate::test::{assert_has_protocol, Packet};
 
     #[test]
