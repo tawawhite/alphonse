@@ -6,7 +6,7 @@ use std::ops::DerefMut;
 use anyhow::Result;
 use combine::parser::byte::{byte, bytes, space, spaces, take_until_byte, take_until_byte2};
 use combine::parser::choice::optional;
-use combine::parser::range::{range, take_while1};
+use combine::parser::range::{range, take_while, take_while1};
 use combine::parser::repeat::skip_until;
 use combine::parser::Parser;
 use combine::{many1, skip_many};
@@ -97,7 +97,7 @@ fn parse_cookie(state: &mut State) -> Result<()> {
     };
 
     let key = take_until_byte(b'=');
-    let value = take_while1(|b| b != b';');
+    let value = take_while(|b| b != b';');
     let kv_parser = key
         .skip(byte(b'='))
         .and(value)
