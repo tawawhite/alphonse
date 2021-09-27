@@ -13,18 +13,31 @@ use api::plugins::{Plugin, PluginType};
 use api::session::{ProtocolLayer, Session};
 use utils::tcp_reassembly::{TcpFlags, TcpHdr};
 
+fn is_zero(x: &usize) -> bool {
+    *x == 0
+}
+
 #[derive(Clone, Debug, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct TcpFlagsCnt {
+    #[serde(skip_serializing_if = "is_zero")]
     ack: usize,
+    #[serde(skip_serializing_if = "is_zero")]
     dst_zero: usize,
+    #[serde(skip_serializing_if = "is_zero")]
     fin: usize,
+    #[serde(skip_serializing_if = "is_zero")]
     psh: usize,
+    #[serde(skip_serializing_if = "is_zero")]
     rst: usize,
+    #[serde(skip_serializing_if = "is_zero")]
     src_zero: usize,
+    #[serde(skip_serializing_if = "is_zero")]
     syn: usize,
     #[serde(rename = "syn-ack")]
+    #[serde(skip_serializing_if = "is_zero")]
     syn_ack: usize,
+    #[serde(skip_serializing_if = "is_zero")]
     urg: usize,
 }
 
