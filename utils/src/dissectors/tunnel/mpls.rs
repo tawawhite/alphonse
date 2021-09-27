@@ -22,8 +22,6 @@ impl super::Dissector for Dissector {
     #[inline]
     fn dissect(&self, buf: &[u8], offset: u16) -> Result<Option<Layer>, Error> {
         if buf.len() < 4 {
-            // 如果报文内容长度小于IP报文最短长度(IP协议头长度)
-            // 数据包有错误
             return Err(Error::CorruptPacket(format!(
                 "Corrupted MPLS packet, packet too short ({} bytes)",
                 buf.len()
@@ -33,113 +31,114 @@ impl super::Dissector for Dissector {
         let mut pos: usize = 0;
 
         let mut mpls_stack_bottom = buf[2] & 0x1;
-        while mpls_stack_bottom == 1 {
-            pos += 4;
-            if pos > buf.len() {
+        while mpls_stack_bottom != 1 {
+            if pos + 4 > buf.len() {
                 break;
             }
-
+            pos += 4;
             mpls_stack_bottom = buf[pos + 2] & 0x1;
+        }
+        pos += 4;
 
-            #[cfg(feature = "heuristic-mpls")]
-            {
-                // Try to decode it as an Ethernet protocol first
-                // If failed, then try to decode it other ways
-                let layer = match self.ethernet.dissect(&buf[pos..], offset + pos as u16) {
-                    Err(_) => None, // If can't detect next layer
-                    Ok(l) => l,
-                };
+        #[cfg(feature = "heuristic-mpls")]
+        {
+            // Try to decode it as an Ethernet protocol first
+            // If failed, then try to decode it other ways
+            let layer = match self.ethernet.dissect(&buf[pos..], offset + pos as u16) {
+                Err(_) => None, // If can't detect next layer
+                Ok(l) => l,
+            };
 
-                match layer {
-                    None => {}
-                    Some(l) => {
-                        match l.protocol {
-                            Protocol::IPV4 => {
-                                match self.ipv4.dissect(&buf[l.offset as usize..], l.offset) {
-                                    Ok(_) => {
-                                        let layer = Layer {
-                                            protocol: Protocol::ETHERNET,
-                                            offset: offset + pos as u16,
-                                        };
-                                        return Ok(Some(layer));
-                                    }
-                                    Err(_) => {}
+            match layer {
+                None => {}
+                Some(l) => {
+                    match l.protocol {
+                        Protocol::IPV4 => {
+                            match self.ipv4.dissect(&buf[l.offset as usize..], l.offset) {
+                                Ok(_) => {
+                                    let layer = Layer {
+                                        protocol: Protocol::ETHERNET,
+                                        offset: offset + pos as u16,
+                                    };
+                                    return Ok(Some(layer));
                                 }
+                                Err(_) => {}
                             }
-                            Protocol::IPV6 => {
-                                match self.ipv6.dissect(&buf[l.offset as usize..], l.offset) {
-                                    Ok(_) => {
-                                        let layer = Layer {
-                                            protocol: Protocol::ETHERNET,
-                                            offset: offset + pos as u16,
-                                        };
-                                        return Ok(Some(layer));
-                                    }
-                                    Err(_) => {}
+                        }
+                        Protocol::IPV6 => {
+                            match self.ipv6.dissect(&buf[l.offset as usize..], l.offset) {
+                                Ok(_) => {
+                                    let layer = Layer {
+                                        protocol: Protocol::ETHERNET,
+                                        offset: offset + pos as u16,
+                                    };
+                                    return Ok(Some(layer));
                                 }
+                                Err(_) => {}
                             }
-                            Protocol::PPP => {
-                                match self.ppp.dissect(&buf[l.offset as usize..], l.offset) {
-                                    Ok(_) => {
-                                        let layer = Layer {
-                                            protocol: Protocol::ETHERNET,
-                                            offset: offset + pos as u16,
-                                        };
-                                        return Ok(Some(layer));
-                                    }
-                                    Err(_) => {}
+                        }
+                        Protocol::PPP => {
+                            match self.ppp.dissect(&buf[l.offset as usize..], l.offset) {
+                                Ok(_) => {
+                                    let layer = Layer {
+                                        protocol: Protocol::ETHERNET,
+                                        offset: offset + pos as u16,
+                                    };
+                                    return Ok(Some(layer));
                                 }
+                                Err(_) => {}
                             }
-                            Protocol::MPLS => {
-                                todo! {"too much tunnel layers to handle"}
-                            }
-                            Protocol::PPPOE => {
-                                match self.pppoe.dissect(&buf[l.offset as usize..], l.offset) {
-                                    Ok(_) => {
-                                        let layer = Layer {
-                                            protocol: Protocol::ETHERNET,
-                                            offset: offset + pos as u16,
-                                        };
-                                        return Ok(Some(layer));
-                                    }
-                                    Err(_) => {}
+                        }
+                        Protocol::MPLS => {
+                            todo! {"too much tunnel layers to handle"}
+                        }
+                        Protocol::PPPOE => {
+                            match self.pppoe.dissect(&buf[l.offset as usize..], l.offset) {
+                                Ok(_) => {
+                                    let layer = Layer {
+                                        protocol: Protocol::ETHERNET,
+                                        offset: offset + pos as u16,
+                                    };
+                                    return Ok(Some(layer));
                                 }
+                                Err(_) => {}
                             }
-                            Protocol::VLAN => {
-                                todo! {"too much tunnel layers to handle"}
-                            }
-                            _ => {} // do nothing, unsupported protocol
-                        };
-                    }
-                };
-            }
-
-            match buf[offset as usize + pos] >> 4 {
-                0b0000 => {
-                    // PW Ethernet Control Word
-                    let layer = Layer {
-                        protocol: Protocol::ETHERNET,
-                        offset: offset + 4 + pos as u16,
+                        }
+                        Protocol::VLAN => {
+                            todo! {"too much tunnel layers to handle"}
+                        }
+                        _ => {} // do nothing, unsupported protocol
                     };
-                    return Ok(Some(layer));
                 }
-                0b0100 => {
-                    let layer = Layer {
-                        protocol: Protocol::IPV4,
-                        offset: offset + pos as u16,
-                    };
-                    return Ok(Some(layer));
-                }
-                0b0110 => {
-                    let layer = Layer {
-                        protocol: Protocol::IPV6,
-                        offset: offset + pos as u16,
-                    };
-                    return Ok(Some(layer));
-                }
-                _ => {}
             };
         }
+
+        println!("buf: {:x?}, pos: {}", buf, pos);
+        match buf[pos] >> 4 {
+            0b0000 => {
+                // PW Ethernet Control Word
+                let layer = Layer {
+                    protocol: Protocol::ETHERNET,
+                    offset: offset + 4 + pos as u16,
+                };
+                return Ok(Some(layer));
+            }
+            0b0100 => {
+                let layer = Layer {
+                    protocol: Protocol::IPV4,
+                    offset: offset + pos as u16,
+                };
+                return Ok(Some(layer));
+            }
+            0b0110 => {
+                let layer = Layer {
+                    protocol: Protocol::IPV6,
+                    offset: offset + pos as u16,
+                };
+                return Ok(Some(layer));
+            }
+            _ => {}
+        };
 
         return Err(Error::CorruptPacket(format!(
             "Corrupted MPLS packet, at mpls stack bottom but no valid network layer found",
@@ -168,13 +167,11 @@ mod tests {
         ];
 
         let dissector = Dissector::default();
-        match dissector.dissect(&buffer, 0) {
-            Ok(l) => {
-                assert_eq!(l.unwrap().protocol, Protocol::IPV4);
-                assert_eq!(l.unwrap().offset, 4);
-            }
-            Err(_) => {}
-        }
+        let result = dissector.dissect(&buffer, 0);
+        assert!(result.is_ok());
+        let l = result.unwrap();
+        assert_eq!(l.unwrap().protocol, Protocol::IPV4);
+        assert_eq!(l.unwrap().offset, 4);
     }
 
     #[test]
@@ -191,16 +188,15 @@ mod tests {
         ];
 
         let dissector = Dissector::default();
-        match dissector.dissect(&buffer, 0) {
-            Ok(l) => {
-                assert_eq!(l.unwrap().protocol, Protocol::IPV6);
-                assert_eq!(l.unwrap().offset, 4);
-            }
-            Err(_) => {}
-        }
+        let result = dissector.dissect(&buffer, 0);
+        assert!(result.is_ok());
+        let l = result.unwrap();
+        assert_eq!(l.unwrap().protocol, Protocol::IPV6);
+        assert_eq!(l.unwrap().offset, 4);
     }
 
     #[test]
+    #[cfg(feature = "heuristic-mpls")]
     fn double_layer_mpls_with_ethernet() {
         let buffer = [
             0x00, 0x01, 0x20, 0xfe, // mpls
@@ -216,16 +212,15 @@ mod tests {
         ];
 
         let dissector = Dissector::default();
-        match dissector.dissect(&buffer, 0) {
-            Ok(l) => {
-                assert_eq!(l.unwrap().protocol, Protocol::ETHERNET);
-                assert_eq!(l.unwrap().offset, 8);
-            }
-            Err(_) => {}
-        }
+        let result = dissector.dissect(&buffer, 0);
+        assert!(result.is_ok());
+        let l = result.unwrap();
+        assert_eq!(l.unwrap().protocol, Protocol::ETHERNET);
+        assert_eq!(l.unwrap().offset, 12);
     }
 
     #[test]
+    #[cfg(feature = "heuristic-mpls")]
     fn ethernet_over_mpls_with_pw_control_word() {
         let buffer = [
             0x00, 0x01, 0x20, 0xfe, // mpls
@@ -241,13 +236,11 @@ mod tests {
         ];
 
         let dissector = Dissector::default();
-        match dissector.dissect(&buffer, 0) {
-            Ok(l) => {
-                assert_eq!(l.unwrap().protocol, Protocol::ETHERNET);
-                assert_eq!(l.unwrap().offset, 8);
-            }
-            Err(_) => {}
-        }
+        let result = dissector.dissect(&buffer, 0);
+        assert!(result.is_ok());
+        let l = result.unwrap();
+        assert_eq!(l.unwrap().protocol, Protocol::ETHERNET);
+        assert_eq!(l.unwrap().offset, 12);
     }
 
     #[test]
@@ -268,12 +261,10 @@ mod tests {
         ];
 
         let dissector = Dissector::default();
-        match dissector.dissect(&buffer, 0) {
-            Ok(l) => {
-                assert_eq!(l.unwrap().protocol, Protocol::ETHERNET);
-                assert_eq!(l.unwrap().offset, 4);
-            }
-            Err(_) => {}
-        }
+        let result = dissector.dissect(&buffer, 0);
+        assert!(result.is_ok());
+        let l = result.unwrap();
+        assert_eq!(l.unwrap().protocol, Protocol::ETHERNET);
+        assert_eq!(l.unwrap().offset, 4);
     }
 }
