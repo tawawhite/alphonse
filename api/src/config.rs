@@ -40,6 +40,10 @@ impl Config {
         get_integer(&self.doc.as_ref(), key, default, min, max)
     }
 
+    pub fn get_float(&self, key: &str, default: f64, min: f64, max: f64) -> f64 {
+        get_float(&self.doc.as_ref(), key, default, min, max)
+    }
+
     pub fn get_str(&self, key: &str, default: &str) -> String {
         get_str(&self.doc.as_ref(), key, default)
     }
@@ -183,4 +187,41 @@ fn get_str_arr(doc: &yaml_rust::Yaml, key: &str) -> Vec<String> {
         ),
     }
     result
+}
+
+fn get_float(doc: &yaml_rust::Yaml, key: &str, default: f64, min: f64, max: f64) -> f64 {
+    match &doc[key] {
+        yaml_rust::Yaml::Real(f) => {
+            let f = match &f.parse::<f64>() {
+                Ok(f) => *f,
+                Err(e) => {
+                    eprintln!("{}", e);
+                    0.0
+                }
+            };
+            if f < min || f > max {
+                println!(
+                    "Option {} is less/greater than min/max value {}/{}, set {} to {}",
+                    key, min, max, key, default
+                );
+                default
+            } else {
+                f
+            }
+        }
+        yaml_rust::Yaml::BadValue => {
+            println!(
+                "Option {} not found or bad integer value, set {} to {}",
+                key, key, default
+            );
+            default
+        }
+        _ => {
+            println!(
+                "Wrong value type for {}, expecting string, set {} to {}",
+                key, key, default
+            );
+            default
+        }
+    }
 }

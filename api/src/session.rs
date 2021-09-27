@@ -279,6 +279,10 @@ impl Session {
         contains && self.protocol.contains(protocol.as_ref())
     }
 
+    pub fn has_app_protocol(&self) -> bool {
+        !self.protocols.app.is_empty()
+    }
+
     /// Whether this session needs to do a middle save operation
     #[inline]
     pub fn need_mid_save(&self, max_packets: u32, tv_sec: u64) -> bool {
