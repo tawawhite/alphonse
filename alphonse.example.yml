@@ -30,9 +30,10 @@ timeout.sctp: 60
 timeout.ses.save: 180
 ses.max.packets: 10000
 threads.pkt: 1
-plugins.processors:
-  [
+plugins.processors: [
+    "dhcp",
     "dns",
+    "entropy",
     "ethernet",
     "http",
     "ip",
@@ -43,7 +44,7 @@ plugins.processors:
     "es",
     "simplewriter",
   ]
-plugins.rx-driver: rxfiles
+plugins.rx-driver: rxlibpcap
 plugins.dirs: ["target/debug"]
 
 # Configuration for simple writer
