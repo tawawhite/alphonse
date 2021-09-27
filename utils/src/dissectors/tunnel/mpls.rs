@@ -113,7 +113,6 @@ impl super::Dissector for Dissector {
             };
         }
 
-        println!("buf: {:x?}, pos: {}", buf, pos);
         match buf[pos] >> 4 {
             0b0000 => {
                 // PW Ethernet Control Word
