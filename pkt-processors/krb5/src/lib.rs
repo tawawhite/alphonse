@@ -18,7 +18,7 @@ use api::plugins::{Plugin, PluginType};
 use api::session::{ProtocolLayer, Session};
 
 #[derive(Clone, Debug, Default, Serialize)]
-#[cfg_attr(feature = "arkime", serde(rename_all = "camelCase"))]
+#[serde(rename_all = "camelCase")]
 struct Kerberos {
     #[serde(skip_serializing_if = "HashSet::is_empty")]
     realm: HashSet<String>,
@@ -71,11 +71,7 @@ impl Pcr for Processor {
     }
 
     fn register_classify_rules(&mut self, manager: &mut ClassifierManager) -> Result<()> {
-        manager.add_udp_dpi_rule(self.id(), r"^.{7}\x03\x02\x01\x05")?;
-        manager.add_udp_dpi_rule(self.id(), r"^.{9}\x03\x02\x01\x05")?;
-
-        manager.add_tcp_dpi_rule(self.id(), r"^.*\x03\x02\x01\x05")?;
-        // manager.add_tcp_dpi_rule(self.id(), r"^.{13}\x03\x02\x01\x05")?;
+        manager.add_tcp_udp_dpi_rule(self.id(), r"^.*\x03\x02\x01\x05")?;
 
         Ok(())
     }
@@ -92,20 +88,19 @@ impl Pcr for Processor {
             self.fields = Some(Box::new(Kerberos::default()));
         }
 
-        let tag: &[u8] = b"\x03\x02\x01\x05";
-        let r = take_until1::<&[u8], &[u8], nom::error::Error<&[u8]>>(tag)(pkt.payload());
-        let data = if let Ok((_, data)) = r {
-            &pkt.payload()[data.len() - 9..]
-        } else {
-            return Ok(());
-        };
-
         match pkt.layers().trans.protocol {
             Protocol::TCP => {
+                let tag: &[u8] = b"\x03\x02\x01\x05";
+                let r = take_until1::<&[u8], &[u8], nom::error::Error<&[u8]>>(tag)(pkt.payload());
+                let data = if let Ok((_, data)) = r {
+                    &pkt.payload()[data.len() - 9..]
+                } else {
+                    return Ok(());
+                };
                 let _ = self.parse_udp_pkt(data);
             }
             Protocol::UDP => {
-                let _ = self.parse_udp_pkt(data);
+                let _ = self.parse_udp_pkt(pkt.payload());
             }
             _ => {}
         };
@@ -126,17 +121,17 @@ impl Pcr for Processor {
 impl Processor {
     fn parse_udp_pkt(&mut self, data: &[u8]) -> Result<()> {
         let krb = match &mut self.fields {
-            Some(dns) => dns,
+            Some(krb) => krb,
             None => return Ok(()),
         };
 
-        let (data, hdr) = der_parser::der::der_read_element_header(data).unwrap();
+        let (_, hdr) = der_parser::der::der_read_element_header(data).unwrap();
         if !hdr.is_application() {
             return Ok(());
         }
 
         match hdr.tag {
-            BerTag::Sequence => {
+            BerTag::Sequence | BerTag::Enumerated => {
                 let res = parse_as_req(data);
                 if let Ok((_, kdc_req)) = res {
                     if let Some(cnames) = kdc_req.req_body.cname {
@@ -154,7 +149,7 @@ impl Processor {
                     }
                 };
             }
-            BerTag::Set => {
+            BerTag::Set | BerTag::EmbeddedPdv => {
                 let res = parse_as_rep(data);
                 if let Ok((_, kdc_rep)) = res {
                     for cname in kdc_rep.cname.name_string {
@@ -169,7 +164,7 @@ impl Processor {
                     krb.ticket_realm.insert(kdc_rep.ticket.realm.0);
                 }
             }
-            BerTag::NumericString => {
+            BerTag::NumericString | BerTag::Utf8String => {
                 let res = parse_tgs_req(data);
                 if let Ok((_, kdc_req)) = res {
                     if let Some(cnames) = kdc_req.req_body.cname {
@@ -201,7 +196,7 @@ impl Processor {
                     }
                 }
             }
-            BerTag::PrintableString => {
+            BerTag::PrintableString | BerTag::RelativeOid => {
                 let res = parse_tgs_rep(data);
                 if let Ok((_, kdc_rep)) = res {
                     for cname in kdc_rep.cname.name_string {
