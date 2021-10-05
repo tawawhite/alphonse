@@ -5,10 +5,11 @@ use api::classifiers::ClassifierManager;
 use api::packet::Packet;
 use api::session::Session;
 
-use crate::{add_protocol, Misc};
+use crate::{add_protocol, ClassifyFunc, Misc};
 
 pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManager) -> Result<()> {
-    parser.add_udp_port_rule_with_func(8211, classify, manager)
+    let c = Box::new(classify as ClassifyFunc);
+    parser.add_udp_port_rule_with_func(8211, c.as_ref(), manager)
 }
 
 fn classify(ses: &mut Session, pkt: &dyn Packet) -> Result<()> {

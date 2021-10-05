@@ -6,10 +6,11 @@ use api::classifiers::ClassifierManager;
 use api::packet::Packet;
 use api::session::Session;
 
-use super::{add_protocol, Misc};
+use super::{add_protocol, ClassifyFunc, Misc};
 
 pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManager) -> Result<()> {
-    parser.add_tcp_dpi_rule_with_func(r"^\x03\x00", classify, manager)
+    let c = Box::new(classify as ClassifyFunc);
+    parser.add_tcp_dpi_rule_with_func(r"^\x03\x00", c.as_ref(), manager)
 }
 
 fn classify(ses: &mut Session, pkt: &dyn Packet) -> Result<()> {

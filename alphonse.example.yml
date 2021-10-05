@@ -71,3 +71,161 @@ http.response.headers:
   - location
   - server
   - content-type
+
+misc.rules:
+  - protocol: areospike
+    regex: ^\x02\x01\x00\x00\x00\x00\x00[\x4e\x23]\x6e\x6f\x64\x65
+    transport_protocol: TCP
+  - protocol: bitcoin
+    regex: ^\xf9\xbe\xb4[\xd9\xfe]
+    transport_protocol: TCP
+  - protocol: bittorrent
+    regex: ^\x13BitTorrent protocol
+    transport_protocol: TCP
+  - protocol: bittorrent
+    regex: ^Bsync\x00
+    transport_protocol: TCP
+  - protocol: bittorrent
+    regex: ^d1:[arq]
+    transport_protocol: UDP
+  - protocol: bjnp
+    regex: ^BJNP
+    transport_protocol: UDP
+  - protocol: cassandra
+    regex: ^\x00\x00\x00\x25\x80\x01\x00\x01\x00\x00\x00\x0c\x73\x65\x74\x5f
+    transport_protocol: TCP
+  - protocol: cassandra
+    regex: ^\x00\x00\x00\x1d\x80\x01\x00\x01\x00\x00\x00\x10\x64\x65\x73\x63
+    transport_protocol: TCP
+  - protocol: dcerpc
+    regex: ^\x05\x00\x0b
+    transport_protocol: TCP
+  - protocol: elasticsearch
+    regex: ^ES\x00\x00
+    transport_protocol: TCP
+  - protocol: flash-policy
+    regex: ^<policy-file-request/>
+    transport_protocol: TCP
+  - protocol: hadoop
+    regex: ^hrpc\x09
+    transport_protocol: TCP
+  - protocol: hbase
+    regex: ^HBas\x00
+    transport_protocol: TCP
+  - protocol: jabber
+    regex: ^<\?xml.*jabber
+    transport_protocol: TCP
+  - protocol: memcached
+    regex: ^flush_all
+    transport_protocol: TCP
+  - protocol: memcached
+    regex: ^STORED\r\n
+    transport_protocol: TCP
+  - protocol: memcached
+    regex: ^END\r\n
+    transport_protocol: TCP
+  - protocol: memcached
+    regex: ^VALUE
+    transport_protocol: TCP
+  - protocol: memcached
+    regex: ^.{6}\x00\x00stats
+    transport_protocol: UDP
+  - protocol: memcached
+    regex: ^.{6}\x00\x00gets
+    transport_protocol: UDP
+  - protocol: mongo
+    regex: ^.{8}[\x00\xff]{4}\xd4\x07\x00\x00
+    transport_protocol: TCP
+  - protocol: mqtt
+    regex: ^\x10.{3}MQ
+    transport_protocol: TCP
+  - protocol: mqtt
+    regex: ^\x10.{3}MQ
+    transport_protocol: TCP
+  - protocol: nsclient
+    regex: ^(NSCLIENT)|(None&)
+    transport_protocol: TCP
+  - protocol: nzsql
+    regex: ^\x00\x00\x00\x08\x00\x01\x00\x03
+    transport_protocol: TCP
+  - protocol: pjl
+    regex: ^\x1b\x25\x2d\x31\x32\x33\x34\x35
+    transport_protocol: TCP
+  - protocol: pjl
+    regex: ^\x40\x50\x4a\x4c\x20
+    transport_protocol: TCP
+  - protocol: pop3
+    regex: ^\+OK\s
+    transport_protocol: TCP
+  - protocol: redis
+    regex: ^\+PONG
+    transport_protocol: TCP
+  - protocol: redis
+    regex: ^\x2a[\x31-\x35]\x0d\x0a\x24
+    transport_protocol: TCP
+  - protocol: redis
+    regex: ^-NOAUTH
+    transport_protocol: UDP
+  - protocol: rmi
+    regex: ^\x4a\x52\x4d\x49\x00\x02\x4b
+    transport_protocol: TCP
+  - protocol: sip
+    regex: ^SIP/2.0
+    transport_protocol: UDP
+  - protocol: sip
+    regex: "^REGISTER sip:"
+    transport_protocol: UDP
+  - protocol: sip
+    regex: "^NOTIFY sip:"
+    transport_protocol: UDP
+  - protocol: splunk
+    regex: ^--splunk-cooked-mode
+    transport_protocol: TCP
+  - protocol: splunk-replication
+    regex: ^.{6}\x00\x06\x00\x00\x00\x05_raw
+    transport_protocol: TCP
+  - protocol: ssdp
+    regex: ^(M-SEARCH)|(NOTIFY\s*)\s
+    transport_protocol: UDP
+  - protocol: steam-friends
+    regex: ^(M-SEARCH)|(NOTIFY\s*)\s
+    transport_protocol: UDP
+  - protocol: valve-a2s
+    regex: ^\xff\xff\xff\xff\x54\x53\x6f\x75
+    transport_protocol: UDP
+  - protocol: syslog
+    regex: ^<[1-9]\d*>
+    transport_protocol: UDP
+  - protocol: syslog
+    regex: ^<[1-9]\d*>
+    transport_protocol: TCP
+  - protocol: thrift
+    regex: ^\x80\x01\x00\x01\x00\x00\x00
+    transport_protocol: TCP
+  - protocol: thrift
+    regex: ^\x00\x00..\x80\x01\x00.{14}
+    transport_protocol: TCP
+  - protocol: vnc
+    regex: ^RFB\s0..\....\x0a
+    transport_protocol: TCP
+  - protocol: whois
+    port: 43
+    transport_protocol: TCP
+  - protocol: x11
+    regex: ^\x6c\x00\x0b\x00
+    transport_protocol: TCP
+  - protocol: zabbix
+    regex: ^ZBXD\x01
+    transport_protocol: TCP
+  - protocol: zookeeper
+    regex: ^zk_version
+    transport_protocol: TCP
+  - protocol: zookeeper
+    regex: ^mntr\n
+    transport_protocol: TCP
+  - protocol: zookeeper
+    regex: ^\x00\x00\x00[\x2c\x2d]\x00\x00\x00\x00
+    transport_protocol: TCP
+  - tag: pdf
+    regex: "%!PDF"
+    transport_protocol: TCP

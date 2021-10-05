@@ -5,12 +5,13 @@ use api::classifiers::ClassifierManager;
 use api::packet::Packet;
 use api::session::Session;
 
-use super::{add_protocol, Misc};
+use super::{add_protocol, ClassifyFunc, Misc};
 
 pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManager) -> Result<()> {
+    let c = Box::new(classify as ClassifyFunc);
     parser.add_udp_dpi_rule_with_func(
         r"^[\x13\x19\x1a\x1b\x1cx21\x23\x24\xd9\xdb\xe3]",
-        classify,
+        c.as_ref(),
         manager,
     )
 }
@@ -37,7 +38,6 @@ mod test {
     use api::plugins::processor::Processor;
     use api::session::Session;
 
-    
     use crate::test::{assert_has_protocol, Packet};
 
     #[test]

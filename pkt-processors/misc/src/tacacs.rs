@@ -5,12 +5,13 @@ use api::classifiers::ClassifierManager;
 use api::packet::Packet;
 use api::session::Session;
 
-use super::{add_protocol, Misc};
+use super::{add_protocol, ClassifyFunc, Misc};
 
 pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManager) -> Result<()> {
+    let c = Box::new(classify as ClassifyFunc);
     parser.add_tcp_udp_dpi_rule_with_func(
         r"^(\xc0\x01[\x01\x02])|(\xc0\x02\x01)|(\xc0\x03[\x01\x02])|(\xc1\x01[\x01\x02])",
-        classify,
+        c.as_ref(),
         manager,
     )
 }
@@ -32,7 +33,6 @@ mod test {
     use api::plugins::processor::Processor;
     use api::session::Session;
 
-    
     use crate::test::{assert_has_protocol, Packet};
 
     #[test]

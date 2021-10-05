@@ -5,10 +5,11 @@ use api::classifiers::ClassifierManager;
 use api::packet::Packet;
 use api::session::Session;
 
-use crate::{add_protocol, Misc};
+use crate::{add_protocol, ClassifyFunc, Misc};
 
 pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManager) -> Result<()> {
-    parser.add_tcp_port_rule_with_func(23, classify, manager)
+    let c = Box::new(classify as ClassifyFunc);
+    parser.add_tcp_port_rule_with_func(23, c.as_ref(), manager)
 }
 
 fn classify(ses: &mut Session, pkt: &dyn Packet) -> Result<()> {
@@ -26,7 +27,6 @@ mod test {
     use api::packet::Protocol;
     use api::plugins::processor::Processor;
 
-    
     use crate::test::{assert_has_protocol, Packet};
 
     #[test]

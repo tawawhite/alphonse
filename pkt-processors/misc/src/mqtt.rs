@@ -9,10 +9,11 @@ use api::classifiers::ClassifierManager;
 use api::packet::Packet;
 use api::session::Session;
 
-use super::{add_protocol, Misc};
+use super::{add_protocol, ClassifyFunc, Misc};
 
 pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManager) -> Result<()> {
-    parser.add_tcp_dpi_rule_with_func(r"^\x10.{3}MQ", classify_wrapper, manager)
+    let c = Box::new(classify_wrapper as ClassifyFunc);
+    parser.add_tcp_dpi_rule_with_func(r"^\x10.{3}MQ", c.as_ref(), manager)
 }
 
 #[inline]

@@ -1,7 +1,6 @@
 [package]
 name = "misc"
 version = "0.1.0"
-authors = ["Jack Liar"]
 edition = "2018"
 
 [lib]
@@ -17,4 +16,5 @@ libc = "0.2"
 nom = "7"
 serde = "1.0"
 serde_json = "1.0"
+serde_yaml = ">=0.8.4"
 yaml-rust = ">=0.4.1"

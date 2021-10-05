@@ -55,6 +55,10 @@ impl Config {
     pub fn get_boolean(&self, key: &str, default: bool) -> bool {
         get_boolean(&self.doc.as_ref(), key, default)
     }
+
+    pub fn get_object(&self, key: &str) -> &yaml_rust::Yaml {
+        get_object(&self.doc.as_ref(), key)
+    }
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -223,5 +227,15 @@ fn get_float(doc: &yaml_rust::Yaml, key: &str, default: f64, min: f64, max: f64)
             );
             default
         }
+    }
+}
+
+fn get_object<'a>(doc: &'a yaml_rust::Yaml, key: &str) -> &'a yaml_rust::Yaml {
+    match &doc[key] {
+        yaml_rust::Yaml::BadValue => {
+            eprintln!("{} not found, set {} to Null", key, key);
+            &yaml_rust::Yaml::Null
+        }
+        obj => obj as &yaml_rust::Yaml,
     }
 }
