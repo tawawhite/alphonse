@@ -196,8 +196,8 @@ impl Processor for IPProcessor {
         &mut self,
         manager: &mut classifiers::ClassifierManager,
     ) -> Result<()> {
-        manager.add_etype_rule(self.id(), 0x0800)?;
-        manager.add_etype_rule(self.id(), 0x86dd)?;
+        manager.add_protocol_rule(self.id(), Protocol::IPV4)?;
+        manager.add_protocol_rule(self.id(), Protocol::IPV6)?;
         Ok(())
     }
 
