@@ -148,7 +148,7 @@ pub fn parse_dns_packet(s: &[u8]) -> IResult<&[u8], DnsMessage> {
 pub fn parse_dns_query(mut s: &[u8]) -> IResult<&[u8], Query> {
     let mut query = Query::default();
     query.name = s;
-    let mut end = 0;
+    let mut end = 0usize;
     loop {
         let (tmp, len) = be_u8(s)?;
         end += 1;
@@ -165,12 +165,12 @@ pub fn parse_dns_query(mut s: &[u8]) -> IResult<&[u8], Query> {
             _ => {
                 let (tmp, _) = take(len)(tmp)?;
                 s = tmp;
-                end += len;
+                end += len as usize;
             }
         }
     }
 
-    query.name = &query.name[..end as usize];
+    query.name = &query.name[..end];
 
     let (tmp, qry_type) = be_u16(s)?;
     let (tmp, qry_class) = be_u16(tmp)?;
