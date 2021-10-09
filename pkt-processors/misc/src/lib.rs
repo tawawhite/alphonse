@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::str::FromStr;
 use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
@@ -7,6 +8,7 @@ use serde::Deserialize;
 
 use alphonse_api as api;
 use api::classifiers::{dpi, ClassifierManager, RuleID};
+use api::hyperscan;
 use api::packet::Packet;
 use api::plugins::processor::{Processor, ProcessorID};
 use api::plugins::{Plugin, PluginType};
@@ -129,10 +131,9 @@ impl Processor for Misc {
     fn register_classify_rules(&mut self, manager: &mut ClassifierManager) -> Result<()> {
         let rules = self.rules.as_ref().clone();
         for rule in &rules {
-            // println!("rule: {:?}", rule);
             match rule {
                 MiscRule::Port(r) => self.add_simple_port_rule(r, manager)?,
-                MiscRule::Regex(r) => self.add_simple_dpi_rule(r, manager)?,
+                MiscRule::Regex(r) => self.add_dpi_rule(r, manager)?,
             }
         }
 
@@ -210,16 +211,21 @@ impl Misc {
         }
     }
 
-    fn add_simple_dpi_rule(
+    fn add_dpi_rule(
         &mut self,
         rule: &general::Regex,
         manager: &mut ClassifierManager,
     ) -> Result<()> {
-        let rule_id = manager.add_simple_dpi_rule(
-            self.id,
-            &rule.regex,
-            rule.basic.transport_protocol.into(),
-        )?;
+        let flags = match &rule.regex_flags {
+            Some(flags) => api::hyperscan::CompileFlags::from_str(flags)?,
+            None => api::hyperscan::CompileFlags::default(),
+        };
+
+        let mut pattern = hyperscan::Pattern::new(&rule.regex)?;
+        pattern.flags = flags;
+        let rule_id =
+            manager.add_dpi_rule(self.id, &pattern, rule.basic.transport_protocol.into())?;
+
         if let Some(protocol) = &rule.basic.protocol {
             self.insert_cb(rule_id, MatchCallBack::ProtocolName(protocol.clone()));
         }

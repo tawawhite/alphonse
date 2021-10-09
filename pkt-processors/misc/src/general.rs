@@ -34,6 +34,7 @@ impl Into<packet::Protocol> for TransportProtocol {
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Deserialize)]
 pub struct Regex {
     pub regex: String,
+    pub regex_flags: Option<String>,
     pub save_matched: Option<bool>,
     #[serde(flatten)]
     pub basic: BasicRule,
@@ -80,6 +81,7 @@ desc: regex
             MiscRule::Port(_) => panic!("Expecting regex misc rule, get port misc rule"),
             MiscRule::Regex(rule) => {
                 assert_eq!(rule.regex, "regex");
+                assert_eq!(rule.regex_flags, None);
                 assert_eq!(rule.basic.transport_protocol, TransportProtocol::TCP);
                 assert!(matches!(rule.basic.protocol, Some(r) if r == "regex"));
                 assert!(matches!(rule.basic.tag, Some(r) if r == "regex"));
