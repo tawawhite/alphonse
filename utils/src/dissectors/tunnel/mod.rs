@@ -1,4 +1,4 @@
-use super::{Dissector, Error, Layer, Protocol};
+use super::{Error, Protocol};
 
 pub mod gre;
 pub mod l2tp;

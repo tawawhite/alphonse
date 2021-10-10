@@ -1,78 +1,55 @@
-use super::{ip_proto, Error, Layer, Protocol};
+use nom::bytes::complete::take;
+use nom::combinator::peek;
+use nom::number::complete::be_u16;
+use nom::IResult;
 
-#[derive(Default)]
-pub struct Dissector {}
+use super::ip_proto;
+use crate::dissectors::{Error, Protocol};
 
-impl super::Dissector for Dissector {
-    #[inline]
-    fn dissect(&self, buf: &[u8], offset: u16) -> Result<Option<Layer>, Error> {
-        if buf.len() < 4 * 5 {
-            // 如果报文内容长度小于IP报文最短长度(IP协议头长度)
-            // 数据包有错误
-            return Err(Error::CorruptPacket(format!(
-                "Corrupted IPV4 packet, packet too short ({} bytes)",
-                buf.len()
-            )));
-        }
+pub fn dissect(data: &[u8]) -> IResult<Option<Protocol>, &[u8], Error<&[u8]>> {
+    let ip_vhl = data[0];
+    let ip_version = ip_vhl >> 4;
 
-        let ip_vhl = buf[0];
-        let ip_version = ip_vhl >> 4;
-
-        if ip_version != 4 {
-            // 如果报文中实际的 IP 版本号不是 IPv4，数据包有错误
-            return Err(Error::CorruptPacket(format!(
-                "Corrupted IPV4 packet, expecting ip vesrion is 4, actual version is: {}",
-                ip_version
-            )));
-        }
-
-        let ip_hdr_len = ((ip_vhl & 0x0f) * 4) as u16;
-
-        if ip_hdr_len < 4 * 5 || buf.len() < ip_hdr_len as usize {
-            // 如果报文中的IP头长度小于20字节或报文长度小于报文中声明的IP头长度, 数据包有错误
-            return Err(Error::CorruptPacket(format!("The packet is a corrupt packet, ip header too short nor payload length is less then claimed length")));
-        }
-
-        let ip_len = (buf[2] as u16) << 8 | (buf[3] as u16);
-
-        if buf.len() < ip_len as usize {
-            // 如果报文的长度小于 IP 报文中声明的数据报长度，数据包有错误
-            return Err(Error::CorruptPacket(format!(
-                "The packet is a corrupt packet, payload length is less then claimed length"
-            )));
-        }
-
-        let mut layer = Layer {
-            protocol: Protocol::default(),
-            offset: offset + ip_hdr_len,
-        };
-        let ip_proto = buf[9];
-
-        match ip_proto {
-            ip_proto::ICMP => layer.protocol = Protocol::ICMP,
-            ip_proto::IGMP => layer.protocol = Protocol::IGMP,
-            ip_proto::IPV4 => layer.protocol = Protocol::IPV4,
-            ip_proto::TCP => layer.protocol = Protocol::TCP,
-            ip_proto::UDP => layer.protocol = Protocol::UDP,
-            ip_proto::ESP => layer.protocol = Protocol::ESP,
-            ip_proto::IPV6 => layer.protocol = Protocol::IPV6,
-            ip_proto::GRE => layer.protocol = Protocol::GRE,
-            ip_proto::SCTP => layer.protocol = Protocol::SCTP,
-            _ => {
-                return Err(Error::UnsupportProtocol(format!(
-                    "Unsupport ipv4 protocol, ipv4 protocol: {}",
-                    ip_proto
-                )))
-            }
-        };
-
-        Ok(Some(layer))
+    if ip_version != 4 {
+        return Err(nom::Err::Error(Error::CorruptPacket(
+            "Corrupted IPV4 packet, ip vesrion not match",
+        )));
     }
+
+    let ip_hdr_len = ((ip_vhl & 0x0f) * 4) as u16;
+    if ip_hdr_len < 4 * 5 {
+        // 如果报文中的IP头长度小于20字节或报文长度小于报文中声明的IP头长度, 数据包有错误
+        return Err(nom::Err::Error(Error::CorruptPacket(
+            "Corrupt IPV4 packet, ip header too short ",
+        )));
+    }
+
+    let (data, _) = peek(take(2usize))(data)?;
+    let (_, total_len) = peek(be_u16)(&data[2..])?;
+    let (_, data) = take(total_len as usize)(data)?;
+    let (remain, data) = take(ip_hdr_len as usize)(data)?;
+
+    let ip_proto = data[9];
+
+    let protocol = match ip_proto {
+        ip_proto::ICMP => Protocol::ICMP,
+        ip_proto::IGMP => Protocol::IGMP,
+        ip_proto::IPV4 => Protocol::IPV4,
+        ip_proto::TCP => Protocol::TCP,
+        ip_proto::UDP => Protocol::UDP,
+        ip_proto::ESP => Protocol::ESP,
+        ip_proto::IPV6 => Protocol::IPV6,
+        ip_proto::GRE => Protocol::GRE,
+        ip_proto::SCTP => Protocol::SCTP,
+        _ => return Err(nom::Err::Error(Error::UnsupportIPProtocol(ip_proto))),
+    };
+
+    Ok((Some(protocol), remain))
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::dissectors::Dissector as D;
+    use nom::Needed;
 
     use super::*;
 
@@ -88,17 +65,18 @@ mod tests {
             0xab, 0xcd, 0xab, 0xcd, 0xab, 0xcd, 0xab, 0xcd, 0xab, 0xcd, 0xab, 0xcd, 0xab, 0xcd,
             0xab, 0xcd, 0xab, 0xcd, 0xab, 0xcd, 0xab, 0xcd, 0xab, 0xcd, //icmp
         ];
-        let dissector = Dissector::default();
-        let result = dissector.dissect(&buf, 0);
+        let result = dissect(&buf);
         assert!(matches!(result, Ok(_)));
     }
 
     #[test]
     fn test_err_pkt_too_short() {
         let buf = [0x45];
-        let dissector = Dissector::default();
-        let result = dissector.dissect(&buf, 0);
-        assert!(matches!(result.unwrap_err(), Error::CorruptPacket(_)));
+        let result = dissect(&buf);
+        assert!(matches!(
+            result.unwrap_err(),
+            nom::Err::Incomplete(Needed::Size(_))
+        ));
     }
 
     #[test]
@@ -107,9 +85,11 @@ mod tests {
             0x65, 0x00, 0x00, 0x64, 0x00, 0x0a, 0x00, 0x00, 0xff, 0x01, 0xa5, 0x6a, 0x0a, 0x01,
             0x02, 0x01, 0x0a, 0x22, 0x00, 0x01,
         ];
-        let dissector = Dissector::default();
-        let result = dissector.dissect(&buf, 0);
-        assert!(matches!(result.unwrap_err(), Error::CorruptPacket(_)));
+        let result = dissect(&buf);
+        assert!(matches!(
+            result.unwrap_err(),
+            nom::Err::Error(Error::CorruptPacket(_))
+        ));
     }
 
     #[test]
@@ -118,9 +98,11 @@ mod tests {
             0x44, 0x00, 0x00, 0x64, 0x00, 0x0a, 0x00, 0x00, 0xff, 0x01, 0xa5, 0x6a, 0x0a, 0x01,
             0x02, 0x01, 0x0a, 0x22, 0x00, 0x01,
         ];
-        let dissector = Dissector::default();
-        let result = dissector.dissect(&buf, 0);
-        assert!(matches!(result.unwrap_err(), Error::CorruptPacket(_)));
+        let result = dissect(&buf);
+        assert!(matches!(
+            result.unwrap_err(),
+            nom::Err::Error(Error::CorruptPacket(_))
+        ));
     }
 
     #[test]
@@ -129,9 +111,11 @@ mod tests {
             0x46, 0x00, 0x00, 0x64, 0x00, 0x0a, 0x00, 0x00, 0xff, 0x01, 0xa5, 0x6a, 0x0a, 0x01,
             0x02, 0x01, 0x0a, 0x22, 0x00, 0x01,
         ];
-        let dissector = Dissector::default();
-        let result = dissector.dissect(&buf, 0);
-        assert!(matches!(result.unwrap_err(), Error::CorruptPacket(_)));
+        let result = dissect(&buf);
+        assert!(matches!(
+            result.unwrap_err(),
+            nom::Err::Error(Error::CorruptPacket(_))
+        ));
     }
 
     #[test]
@@ -140,10 +124,11 @@ mod tests {
             0x45, 0x00, 0x00, 0x64, 0x00, 0x0a, 0x00, 0x00, 0xff, 0x01, 0xa5, 0x6a, 0x0a, 0x01,
             0x02, 0x01, 0x0a, 0x22, 0x00, 0x01,
         ];
-        let dissector = Dissector::default();
-        let result = dissector.dissect(&buf, 0);
-        assert!(matches!(result, Err(_)));
-        assert!(matches!(result.unwrap_err(), Error::CorruptPacket(_)));
+        let result = dissect(&buf);
+        assert!(matches!(
+            result.unwrap_err(),
+            nom::Err::Incomplete(Needed::Size(_))
+        ));
     }
 
     #[test]
@@ -158,9 +143,10 @@ mod tests {
             0xab, 0xcd, 0xab, 0xcd, 0xab, 0xcd, 0xab, 0xcd, 0xab, 0xcd, 0xab, 0xcd, 0xab, 0xcd,
             0xab, 0xcd, 0xab, 0xcd, 0xab, 0xcd, 0xab, 0xcd, 0xab, 0xcd, // icmp
         ];
-        let dissector = Dissector::default();
-        let result = dissector.dissect(&buf, 0);
-        assert!(matches!(result, Err(_)));
-        assert!(matches!(result.unwrap_err(), Error::UnsupportProtocol(_)));
+        let result = dissect(&buf);
+        assert!(matches!(
+            result.unwrap_err(),
+            nom::Err::Error(Error::UnsupportIPProtocol(_))
+        ));
     }
 }

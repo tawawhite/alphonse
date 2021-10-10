@@ -1,28 +1,14 @@
-use super::{Error, Layer, Protocol};
+use nom::bytes::complete::take;
+use nom::IResult;
 
-#[derive(Default)]
-pub struct Dissector {}
+use super::{Error, Protocol};
 
-impl super::Dissector for Dissector {
-    #[inline]
-    fn dissect(&self, buf: &[u8], offset: u16) -> Result<Option<Layer>, Error> {
-        if buf.len() < 8 {
-            return Err(Error::CorruptPacket(format!(
-                "Corrupt ERSPAN packet, packet too short: {}",
-                buf.len(),
-            )));
-        }
+pub fn dissect(data: &[u8]) -> IResult<Option<Protocol>, &[u8], Error<&[u8]>> {
+    let (remain, data) = take(8usize)(data)?;
 
-        if buf[0] >> 4 != 1 {
-            return Ok(Some(Layer {
-                protocol: Protocol::UNKNOWN,
-                offset: offset + 8,
-            }));
-        }
-
-        return Ok(Some(Layer {
-            protocol: Protocol::ETHERNET,
-            offset: offset + 8,
-        }));
+    if data[0] >> 4 != 1 {
+        return Ok((Some(Protocol::UNKNOWN), &[]));
     }
+
+    return Ok((Some(Protocol::ETHERNET), remain));
 }

@@ -1,50 +1,63 @@
 use std::fmt::{Display, Formatter};
 
 use anyhow::Result;
+use nom::error::{ErrorKind, ParseError};
+use nom::IResult;
 
 use alphonse_api as api;
-use api::packet::{Layer, Packet, Protocol};
+use api::packet::{Layer, Layers, Packet, Protocol};
 
+mod etype;
 pub mod link;
 pub mod network;
 pub mod transport;
 pub mod tunnel;
 
+pub use etype::EtherType;
 use link::LinkType;
 
-/// A dissector only validate protocol format and returns layer start offset
-pub trait Dissector {
-    /// Parse current layer's protocol, return next layer's protocol and offset
-    ///
-    /// # Arguments
-    ///
-    /// * `buf` - Buffer of this layer and its payload
-    ///
-    /// * `offset` - Position to the start of the packet
-    fn dissect(&self, _buf: &[u8], _offset: u16) -> Result<Option<Layer>, Error> {
-        Ok(None)
-    }
-}
-
-pub type Callback = fn(buf: &[u8], offset: u16) -> Result<Option<Layer>, Error>;
+/// Parse current layer's protocol, return next layer's protocol and remaining data
+///
+/// # Arguments
+///
+/// * `data` - Data of this layer and its payload
+pub type Callback = fn(data: &[u8]) -> IResult<Option<Protocol>, &[u8], Error<&[u8]>>;
 
 #[derive(Debug)]
-pub enum Error {
-    UnsupportProtocol(String),
-    CorruptPacket(String),
+pub enum Error<I> {
+    UnsupportProtocol(&'static str),
+    UnsupportIPProtocol(u8),
+    CorruptPacket(&'static str),
     UnknownProtocol,
+    UnknownEtype(u16),
+    Nom(I, ErrorKind),
 }
 
-impl Display for Error {
+impl<I> Display for Error<I> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match &self {
+        match self {
             Error::UnknownProtocol => write!(f, "Unknown Protocol"),
+            Error::UnknownEtype(etype) => write!(f, "Unknown etype({})", etype),
             Error::UnsupportProtocol(s) | Error::CorruptPacket(s) => write!(f, "{}", s),
+            Error::UnsupportIPProtocol(ip_proto) => {
+                write!(f, "Unsupport IP Protocol({})", ip_proto)
+            }
+            Error::Nom(e, ek) => write!(f, "",),
         }
     }
 }
 
-impl std::error::Error for Error {}
+impl<I> ParseError<I> for Error<I> {
+    fn from_error_kind(input: I, kind: ErrorKind) -> Self {
+        Error::Nom(input, kind)
+    }
+
+    fn append(_: I, _: ErrorKind, other: Self) -> Self {
+        other
+    }
+}
+
+impl<I: std::fmt::Debug> std::error::Error for Error<I> {}
 
 pub struct ProtocolDessector {
     /// SnapLen, Snap Length, or snapshot length is the amount of data for each frame
@@ -52,7 +65,7 @@ pub struct ProtocolDessector {
     /// https://wiki.wireshark.org/SnapLen
     _snap_len: u32,
     link_type: LinkType,
-    callbacks: Vec<Option<Box<dyn Dissector>>>,
+    callbacks: Vec<Option<Callback>>,
 }
 
 impl ProtocolDessector {
@@ -69,148 +82,93 @@ impl ProtocolDessector {
         };
         // register protocol callbacks
         // link layer protocol parsers
-        parser.callbacks[Protocol::ETHERNET as u8 as usize] =
-            Some(Box::new(link::ethernet::Dissector::default()));
-        parser.callbacks[Protocol::NULL as u8 as usize] =
-            Some(Box::new(link::null::Dissector::default()));
-        parser.callbacks[Protocol::FRAME_RELAY as u8 as usize] =
-            Some(Box::new(link::frame_relay::Dissector::default()));
-        parser.callbacks[Protocol::ARP as u8 as usize] =
-            Some(Box::new(link::arp::Dissector::default()));
+        parser.callbacks[Protocol::ETHERNET as u8 as usize] = Some(link::ethernet::dissect);
+        parser.callbacks[Protocol::NULL as u8 as usize] = Some(link::null::dissect);
+        parser.callbacks[Protocol::FRAME_RELAY as u8 as usize] = Some(link::frame_relay::dissect);
+        parser.callbacks[Protocol::ARP as u8 as usize] = Some(link::arp::dissect);
 
         // tunnel protocol parsers
-        parser.callbacks[Protocol::MPLS as u8 as usize] =
-            Some(Box::new(tunnel::mpls::Dissector::default()));
-        parser.callbacks[Protocol::L2TP as u8 as usize] =
-            Some(Box::new(tunnel::l2tp::Dissector::default()));
-        parser.callbacks[Protocol::PPP as u8 as usize] =
-            Some(Box::new(tunnel::ppp::Dissector::default()));
-        parser.callbacks[Protocol::PPPOE as u8 as usize] =
-            Some(Box::new(tunnel::pppoe::Dissector::default()));
-        parser.callbacks[Protocol::GRE as u8 as usize] =
-            Some(Box::new(tunnel::gre::Dissector::default()));
+        parser.callbacks[Protocol::MPLS as u8 as usize] = Some(tunnel::mpls::dissect);
+        parser.callbacks[Protocol::L2TP as u8 as usize] = Some(tunnel::l2tp::dissect);
+        parser.callbacks[Protocol::PPP as u8 as usize] = Some(tunnel::ppp::dissect);
+        parser.callbacks[Protocol::PPPOE as u8 as usize] = Some(tunnel::pppoe::dissect);
+        parser.callbacks[Protocol::GRE as u8 as usize] = Some(tunnel::gre::dissect);
 
         // network layer protocl parsers
-        parser.callbacks[Protocol::IPV4 as u8 as usize] =
-            Some(Box::new(network::ipv4::Dissector::default()));
-        parser.callbacks[Protocol::IPV6 as u8 as usize] =
-            Some(Box::new(network::ipv6::Dissector::default()));
-        parser.callbacks[Protocol::VLAN as u8 as usize] =
-            Some(Box::new(network::vlan::Dissector::default()));
-        parser.callbacks[Protocol::ICMP as u8 as usize] =
-            Some(Box::new(network::icmp::Dissector::default()));
-        parser.callbacks[Protocol::ERSPAN as u8 as usize] =
-            Some(Box::new(network::erspan::Dissector::default()));
-        parser.callbacks[Protocol::ESP as u8 as usize] =
-            Some(Box::new(network::esp::Dissector::default()));
-        parser.callbacks[Protocol::IGMP as u8 as usize] =
-            Some(Box::new(network::igmp::Dissector::default()));
+        parser.callbacks[Protocol::IPV4 as u8 as usize] = Some(network::ipv4::dissect);
+        parser.callbacks[Protocol::IPV6 as u8 as usize] = Some(network::ipv6::dissect);
+        parser.callbacks[Protocol::VLAN as u8 as usize] = Some(network::vlan::dissect);
+        parser.callbacks[Protocol::ICMP as u8 as usize] = Some(network::icmp::dissect);
+        parser.callbacks[Protocol::ERSPAN as u8 as usize] = Some(network::erspan::dissect);
+        // parser.callbacks[Protocol::ESP as u8 as usize] = Some(Box::new(network::esp::dissect));
+        // parser.callbacks[Protocol::IGMP as u8 as usize] = Some(Box::new(network::igmp::dissect));
 
         // transport layer protocl parsers
-        parser.callbacks[Protocol::TCP as u8 as usize] =
-            Some(Box::new(transport::tcp::Dissector::default()));
-        parser.callbacks[Protocol::UDP as u8 as usize] =
-            Some(Box::new(transport::udp::Dissector::default()));
-        parser.callbacks[Protocol::SCTP as u8 as usize] =
-            Some(Box::new(transport::sctp::Dissector::default()));
+        parser.callbacks[Protocol::TCP as u8 as usize] = Some(transport::tcp::dissect);
+        parser.callbacks[Protocol::UDP as u8 as usize] = Some(transport::udp::dissect);
+        parser.callbacks[Protocol::SCTP as u8 as usize] = Some(transport::sctp::dissect);
 
         parser
     }
 
     /// parse a single packet
     #[inline]
-    pub fn parse_pkt(&self, pkt: &mut dyn Packet) -> Result<(), Error> {
+    pub fn parse_pkt(&self, pkt: &mut dyn Packet) -> Result<(), Error<&[u8]>> {
+        let mut layers = Layers::default();
         // 根据 link type 解析数据链路层协议, 获取下一层协议的协议类型和起始位置
         let mut result = match self.link_type {
             LinkType::NULL => {
                 pkt.layers_mut().data_link.protocol = Protocol::NULL;
                 let index = pkt.layers_mut().data_link.protocol as u8 as usize;
-                self.callbacks[index]
-                    .as_ref()
-                    .unwrap()
-                    .dissect(pkt.raw(), 0)
+                self.callbacks[index].unwrap()(pkt.raw())
             }
             LinkType::ETHERNET => {
                 pkt.layers_mut().data_link.protocol = Protocol::ETHERNET;
                 let index = pkt.layers_mut().data_link.protocol as u8 as usize;
-                self.callbacks[index]
-                    .as_ref()
-                    .unwrap()
-                    .dissect(pkt.raw(), 0)
+                self.callbacks[index].unwrap()(pkt.raw())
             }
             LinkType::FRAME_RELAY => {
                 pkt.layers_mut().data_link.protocol = Protocol::FRAME_RELAY;
                 let index = pkt.layers_mut().data_link.protocol as u8 as usize;
-                self.callbacks[index]
-                    .as_ref()
-                    .unwrap()
-                    .dissect(pkt.raw(), 0)
+                self.callbacks[index].unwrap()(pkt.raw())
             }
-            LinkType::RAW | LinkType::IPV4 => {
-                let layer = Layer {
-                    protocol: Protocol::IPV4,
-                    offset: 0,
-                };
-                Ok(Some(layer))
-            }
-            LinkType::IPV6 => {
-                let layer = Layer {
-                    protocol: Protocol::IPV6,
-                    offset: 0,
-                };
-                Ok(Some(layer))
-            }
-        };
-
-        let mut layer = match result {
-            Ok(l) => match l {
-                Some(l) => l,
-                None => return Ok(()),
-            },
-            Err(e) => return Err(e),
+            LinkType::RAW | LinkType::IPV4 => Ok((Some(Protocol::IPV4), pkt.raw())),
+            LinkType::IPV6 => Ok((Some(Protocol::IPV6), pkt.raw())),
         };
 
         loop {
-            let index = layer.protocol as u8 as usize;
-            result = match &self.callbacks[index] {
-                Some(p) => {
-                    match &layer.protocol {
-                        Protocol::ETHERNET => pkt.layers_mut().data_link = layer,
-                        Protocol::IPV4 | Protocol::IPV6 => pkt.layers_mut().network = layer,
-                        Protocol::TCP | Protocol::UDP | Protocol::SCTP => {
-                            pkt.layers_mut().trans = layer
-                        }
+            let (protocol, data) = match result {
+                Ok((p, data)) => match p {
+                    Some(p) => (p, data),
+                    None => return Ok(()),
+                },
+                Err(e) => todo!("properly handle parse error"),
+            };
+
+            let offset = (pkt.raw().len() - data.len()) as u16;
+            result = match &self.callbacks[protocol as usize] {
+                Some(dissect) => {
+                    let layer = Layer { offset, protocol };
+                    match protocol {
+                        Protocol::ETHERNET => layers.data_link = layer,
+                        Protocol::IPV4 | Protocol::IPV6 => layers.network = layer,
+                        Protocol::TCP | Protocol::UDP | Protocol::SCTP => layers.trans = layer,
                         _ => {}
                     };
-                    let buf = &pkt.raw()[layer.offset as usize..];
-                    let offset = layer.offset;
-                    p.dissect(buf, offset)
+                    dissect(data)
                 }
                 None => {
-                    match layer.protocol {
+                    let layer = Layer { offset, protocol };
+                    match protocol {
                         Protocol::APPLICATION => {
-                            pkt.layers_mut().app = layer;
+                            layers.app = layer;
                             return Ok(());
                         }
                         _ => {
-                            return Err(Error::UnsupportProtocol(format!(
-                                "Unsupport protocol {:?}",
-                                layer.protocol
-                            )))
+                            return Err(Error::UnsupportProtocol(""));
                         }
                     };
                 }
-            };
-
-            match result {
-                Ok(l) => {
-                    layer = match l {
-                        None => return Ok(()),
-                        Some(l) => l,
-                    };
-                    // layer = l;
-                }
-                Err(e) => return Err(e),
             };
         }
     }
