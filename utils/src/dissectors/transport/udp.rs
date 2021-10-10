@@ -41,7 +41,7 @@ mod test {
     fn test_pkt_too_short() {
         let buf = [0xf4];
         let result = dissect(&buf);
-        assert!(matches!(result, Err(nom::Err::Incomplete(Needed::Size(_)))));
+        assert!(matches!(result, Err(nom::Err::Error(Error::Nom(_, _)))));
     }
 
     #[test]

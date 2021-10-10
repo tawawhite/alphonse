@@ -49,8 +49,6 @@ pub fn dissect(data: &[u8]) -> IResult<Option<Protocol>, &[u8], Error<&[u8]>> {
 
 #[cfg(test)]
 mod tests {
-    use nom::Needed;
-
     use super::*;
 
     #[test]
@@ -73,10 +71,7 @@ mod tests {
     fn test_err_pkt_too_short() {
         let buf = [0x45];
         let result = dissect(&buf);
-        assert!(matches!(
-            result.unwrap_err(),
-            nom::Err::Incomplete(Needed::Size(_))
-        ));
+        assert!(matches!(result, Err(nom::Err::Error(Error::Nom(_, _)))));
     }
 
     #[test]
@@ -112,10 +107,7 @@ mod tests {
             0x02, 0x01, 0x0a, 0x22, 0x00, 0x01,
         ];
         let result = dissect(&buf);
-        assert!(matches!(
-            result.unwrap_err(),
-            nom::Err::Error(Error::CorruptPacket(_))
-        ));
+        assert!(matches!(result, Err(nom::Err::Error(Error::Nom(_, _)))));
     }
 
     #[test]
@@ -125,10 +117,7 @@ mod tests {
             0x02, 0x01, 0x0a, 0x22, 0x00, 0x01,
         ];
         let result = dissect(&buf);
-        assert!(matches!(
-            result.unwrap_err(),
-            nom::Err::Incomplete(Needed::Size(_))
-        ));
+        assert!(matches!(result, Err(nom::Err::Error(Error::Nom(_, _)))));
     }
 
     #[test]

@@ -31,8 +31,6 @@ pub fn dissect(data: &[u8]) -> IResult<Option<Protocol>, &[u8], Error<&[u8]>> {
 mod tests {
     use super::*;
 
-    use nom::Needed;
-
     #[test]
     fn test_ok_ipv4() {
         let buf = [
@@ -61,11 +59,7 @@ mod tests {
     fn test_err_pkt_too_short() {
         let buf = [0x01];
         let result = dissect(&buf);
-        assert!(matches!(result, Err(_)));
-        assert!(matches!(
-            result.unwrap_err(),
-            nom::Err::Incomplete(Needed::Size(_))
-        ));
+        assert!(matches!(result, Err(nom::Err::Error(Error::Nom(_, _)))));
     }
 
     #[test]

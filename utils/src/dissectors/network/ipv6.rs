@@ -33,14 +33,13 @@ pub fn dissect(data: &[u8]) -> IResult<Option<Protocol>, &[u8], Error<&[u8]>> {
         _ => return Err(nom::Err::Error(Error::UnsupportIPProtocol(ip_proto))),
     };
 
-    let (remain, payload) = take(ip_len as usize)(remain)?;
+    let (_, payload) = take(ip_len as usize)(remain)?;
 
     Ok((Some(protocol), payload))
 }
 
 #[cfg(test)]
 mod tests {
-    use nom::Needed;
 
     use super::*;
 
@@ -84,17 +83,15 @@ mod tests {
     fn test_err_pkt_too_short() {
         let buf = [0x60];
         let result = dissect(&buf);
-        assert!(matches!(
-            result.unwrap_err(),
-            nom::Err::Incomplete(Needed::Size(_))
-        ));
+        assert!(matches!(result, Err(nom::Err::Error(Error::Nom(_, _)))));
     }
 
     #[test]
     fn test_err_not_ipv6() {
         let buf = [
-            0x45, 0x00, 0x00, 0x64, 0x00, 0x0a, 0x00, 0x00, 0xff, 0x01, 0xa5, 0x6a, 0x0a, 0x01,
-            0x02, 0x01, 0x0a, 0x22, 0x00, 0x01,
+            0x40, 0x02, 0xd9, 0x95, 0x01, 0x54, 0x11, 0xf2, 0x11, 0x11, 0x22, 0x22, 0x33, 0x33,
+            0x44, 0x44, 0x55, 0x55, 0x77, 0x77, 0x00, 0x00, 0x00, 0x00, 0x11, 0x11, 0x22, 0x22,
+            0x33, 0x33, 0x44, 0x44, 0x55, 0x55, 0x88, 0x88, 0xa8, 0xac, 0x7b, 0xc0,
         ];
         let result = dissect(&buf);
         assert!(matches!(
@@ -106,15 +103,12 @@ mod tests {
     #[test]
     fn test_err_buf_len_shorter_than_ip_hdr_len() {
         let buf = [
-            0x60, 0x00, 0x00, 0x00, 0x00, 0x3c, 0x3a, 0x40, 0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00,
+            0x60, 0x00, 0x00, 0x00, 0x00, 0x3c, 0x06, 0x40, 0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00,
             0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x20, 0x01, 0x0d, 0xb8,
             0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02,
         ];
         let result = dissect(&buf);
-        assert!(matches!(
-            result.unwrap_err(),
-            nom::Err::Error(Error::CorruptPacket(_))
-        ));
+        assert!(matches!(result, Err(nom::Err::Error(Error::Nom(_, _)))));
     }
 
     #[test]
@@ -132,8 +126,8 @@ mod tests {
         ];
         let result = dissect(&buf);
         assert!(matches!(
-            result.unwrap_err(),
-            nom::Err::Error(Error::CorruptPacket(_))
+            result,
+            Err(nom::Err::Error(Error::UnsupportIPProtocol(_)))
         ));
     }
 }

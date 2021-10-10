@@ -8,14 +8,12 @@ pub fn dissect(data: &[u8]) -> IResult<Option<Protocol>, &[u8], Error<&[u8]>> {
     let (remain, data) = peek(take(13usize))(data)?;
     let tcp_hdr_len = ((data[12] >> 4) * 4) as usize;
 
-    let (remain, data) = take(tcp_hdr_len)(remain)?;
+    let (remain, _) = take(tcp_hdr_len)(remain)?;
     return Ok((Some(Protocol::APPLICATION), remain));
 }
 
 #[cfg(test)]
 mod tests {
-    use nom::Needed;
-
     use super::*;
 
     #[test]
@@ -34,7 +32,7 @@ mod tests {
         let buf = [0x04];
         let result = dissect(&buf);
         assert!(matches!(result, Err(_)));
-        assert!(matches!(result, Err(nom::Err::Incomplete(Needed::Size(_)))));
+        assert!(matches!(result, Err(nom::Err::Error(Error::Nom(_, _)))));
     }
 
     #[test]
@@ -46,10 +44,6 @@ mod tests {
             0x04, 0x02,
         ];
         let result = dissect(&buf);
-        assert!(matches!(result, Err(_)));
-        assert!(matches!(
-            result.unwrap_err(),
-            nom::Err::Incomplete(Needed::Size(_))
-        ));
+        assert!(matches!(result, Err(nom::Err::Error(Error::Nom(_, _)))));
     }
 }
