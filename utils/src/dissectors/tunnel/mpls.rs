@@ -11,11 +11,10 @@ use crate::dissectors::network::{ipv4, ipv6};
 
 pub fn dissect(data: &[u8]) -> IResult<Option<Protocol>, &[u8], Error<&[u8]>> {
     let (mut remain, data) = take(4usize)(data)?;
-    let mut pos: usize = 0;
 
     let mut mpls_stack_bottom = data[2] & 0x1;
     while mpls_stack_bottom != 1 {
-        if pos + 4 > remain.len() {
+        if 4 > remain.len() {
             break;
         }
         let (r, data) = take(4usize)(remain)?;
@@ -26,28 +25,29 @@ pub fn dissect(data: &[u8]) -> IResult<Option<Protocol>, &[u8], Error<&[u8]>> {
     #[cfg(feature = "heuristic-mpls")]
     {
         match ethernet::dissect(remain) {
-            Err(_) => {}
+            Err(e) => eprintln!("{:?}", e),
             Ok((protocol, data)) => {
                 match protocol {
                     Some(Protocol::IPV4) => match ipv4::dissect(data) {
-                        Ok(_) => return Ok((Some(Protocol::ETHERNET), data)),
+                        Ok(_) => return Ok((Some(Protocol::ETHERNET), remain)),
                         Err(_) => {}
                     },
                     Some(Protocol::IPV6) => match ipv6::dissect(data) {
-                        Ok(_) => return Ok((Some(Protocol::ETHERNET), data)),
+                        Ok(_) => return Ok((Some(Protocol::ETHERNET), remain)),
                         Err(_) => {}
                     },
                     Some(Protocol::PPP) => match ppp::dissect(data) {
-                        Ok(_) => return Ok((Some(Protocol::ETHERNET), data)),
+                        Ok(_) => return Ok((Some(Protocol::ETHERNET), remain)),
                         Err(_) => {}
                     },
                     Some(Protocol::MPLS) => {
                         todo! {"too much tunnel layers to handle"}
                     }
                     Some(Protocol::PPPOE) => match pppoe::dissect(data) {
-                        Ok(_) => return Ok((Some(Protocol::ETHERNET), data)),
+                        Ok(_) => return Ok((Some(Protocol::ETHERNET), remain)),
                         Err(_) => {}
                     },
+                    Some(Protocol::ARP) => return Ok((Some(Protocol::ETHERNET), remain)),
                     Some(Protocol::VLAN) => {
                         todo! {"too much tunnel layers to handle"}
                     }
@@ -59,7 +59,10 @@ pub fn dissect(data: &[u8]) -> IResult<Option<Protocol>, &[u8], Error<&[u8]>> {
 
     match remain[0] >> 4 {
         // PW Ethernet Control Word
-        0b0000 => Ok((Some(Protocol::ETHERNET), remain)),
+        0b0000 => {
+            let (data, _) = take(4usize)(remain)?;
+            Ok((Some(Protocol::ETHERNET), data))
+        }
         0b0100 => Ok((Some(Protocol::IPV4), remain)),
         0b0110 => Ok((Some(Protocol::IPV6), remain)),
         _ => Err(nom::Err::Error(Error::CorruptPacket(
@@ -119,21 +122,18 @@ mod tests {
         let buffer = [
             0x00, 0x01, 0x20, 0xfe, // mpls
             0x00, 0x01, 0x01, 0xff, // mpls
-            0x00, 0x00, 0x00, 0x00, // PW Ethernet Control Word
-            0x01, 0x80, 0xc2, 0x00, 0x00, 0x00, 0xcc, 0x04, 0x0d, 0x5c, 0xf0, 0x00, 0x00,
-            0x26, // Ethernet
-            0x42, 0x42, 0x03, // Logical-Link Control
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0x00, 0xcc, 0x04, 0x0d, 0x5c, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x80, 0x00, 0xcc, 0x04, 0x0d, 0x5c, 0x00, 0x00, 0x80, 0x01, 0x00,
-            0x00, 0x14, 0x00, 0x02, 0x00, 0x0f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, // Spanning Tree Protocol
+            0x01, 0x80, 0xc2, 0x00, 0x00, 0x00, 0xcc, 0x04, 0x0d, 0x5c, 0xf0, 0x00, 0x08,
+            0x06, // Ethernet
+            0x00, 0x01, 0x08, 0x00, 0x06, 0x04, 0x00, 0x01, 0x00, 0x50, 0x79, 0x66, 0x68, 0x00,
+            0xc0, 0xa8, 0x00, 0x0a, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xc0, 0xa8, 0x00,
+            0x14, // ARP
         ];
 
         let result = dissect(&buffer);
         assert!(result.is_ok());
         let (protocol, data) = result.unwrap();
         assert_eq!(protocol, Some(Protocol::ETHERNET));
-        assert_eq!(data.len(), buffer.len() - 12);
+        assert_eq!(data.len(), buffer.len() - 8);
     }
 
     #[test]
