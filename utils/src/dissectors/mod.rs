@@ -42,7 +42,7 @@ impl<I> Display for Error<I> {
             Error::UnsupportIPProtocol(ip_proto) => {
                 write!(f, "Unsupport IP Protocol({})", ip_proto)
             }
-            Error::Nom(e, ek) => write!(f, "",),
+            Error::Nom(_, _) => write!(f, "Nom parse error",),
         }
     }
 }
@@ -115,21 +115,20 @@ impl ProtocolDessector {
     #[inline]
     pub fn parse_pkt(&self, pkt: &mut dyn Packet) -> Result<(), Error<&[u8]>> {
         let mut layers = Layers::default();
-        // 根据 link type 解析数据链路层协议, 获取下一层协议的协议类型和起始位置
         let mut result = match self.link_type {
             LinkType::NULL => {
-                pkt.layers_mut().data_link.protocol = Protocol::NULL;
-                let index = pkt.layers_mut().data_link.protocol as u8 as usize;
+                layers.data_link.protocol = Protocol::NULL;
+                let index = Protocol::NULL as usize;
                 self.callbacks[index].unwrap()(pkt.raw())
             }
             LinkType::ETHERNET => {
-                pkt.layers_mut().data_link.protocol = Protocol::ETHERNET;
-                let index = pkt.layers_mut().data_link.protocol as u8 as usize;
+                layers.data_link.protocol = Protocol::ETHERNET;
+                let index = Protocol::ETHERNET as usize;
                 self.callbacks[index].unwrap()(pkt.raw())
             }
             LinkType::FRAME_RELAY => {
-                pkt.layers_mut().data_link.protocol = Protocol::FRAME_RELAY;
-                let index = pkt.layers_mut().data_link.protocol as u8 as usize;
+                layers.data_link.protocol = Protocol::FRAME_RELAY;
+                let index = Protocol::FRAME_RELAY as usize;
                 self.callbacks[index].unwrap()(pkt.raw())
             }
             LinkType::RAW | LinkType::IPV4 => Ok((Some(Protocol::IPV4), pkt.raw())),
@@ -142,7 +141,7 @@ impl ProtocolDessector {
                     Some(p) => (p, data),
                     None => return Ok(()),
                 },
-                Err(e) => todo!("properly handle parse error"),
+                Err(_) => todo!("properly handle parse error"),
             };
 
             let offset = (pkt.raw().len() - data.len()) as u16;
@@ -160,14 +159,13 @@ impl ProtocolDessector {
                 None => {
                     let layer = Layer { offset, protocol };
                     match protocol {
-                        Protocol::APPLICATION => {
-                            layers.app = layer;
-                            return Ok(());
-                        }
+                        Protocol::APPLICATION => layers.app = layer,
                         _ => {
                             return Err(Error::UnsupportProtocol(""));
                         }
                     };
+                    *pkt.layers_mut() = layers;
+                    return Ok(());
                 }
             };
         }
