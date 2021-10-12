@@ -2,12 +2,12 @@ use std::hash::Hash;
 
 use anyhow::{anyhow, Result};
 
-use crate::packet;
+use crate::packet::{Packet, Protocol};
 
 use super::matched;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct Rule(pub packet::Protocol);
+pub struct Rule(pub Protocol);
 
 pub struct Classifier {
     /// Port rules
@@ -47,19 +47,17 @@ impl super::Classifier for Classifier {
 }
 
 impl Classifier {
-    pub fn classify(&self, pkt: &mut dyn packet::Packet) {
-        macro_rules! classify_layer {
-            ($layer:ident) => {
-                let i = pkt.layers().$layer.protocol as usize;
-                if self.rules[i].processors.len() > 0 {
-                    pkt.rules_mut().as_mut().push(self.rules[i].clone());
-                }
-            };
+    pub fn classify(&self, pkt: &mut dyn Packet) {
+        let mut protocols = vec![];
+        for layer in pkt.layers().as_ref() {
+            let protocol = layer.protocol as usize;
+            if self.rules[protocol].processors.len() > 0 {
+                protocols.push(protocol);
+            }
         }
-
-        classify_layer!(data_link);
-        classify_layer!(network);
-        classify_layer!(trans);
+        for protocol in protocols {
+            pkt.rules_mut().as_mut().push(self.rules[protocol].clone());
+        }
     }
 }
 
@@ -74,7 +72,7 @@ mod test {
     #[test]
     fn add_same_protocol_rule() {
         let mut classifier = Box::new(Classifier::default());
-        let proto_rule = Rule(packet::Protocol::TCP);
+        let proto_rule = Rule(Protocol::TCP);
         let mut rule = crate::classifiers::Rule::new(1);
         rule.rule_type = crate::classifiers::RuleType::Protocol(proto_rule);
         assert!(matches!(classifier.add_rule(&mut rule), Ok(_)));
@@ -84,7 +82,7 @@ mod test {
         assert_eq!(rule.processors[0], 1);
 
         // Add a same rule only ID is different, we expected the same
-        let proto_rule = Rule(packet::Protocol::TCP);
+        let proto_rule = Rule(Protocol::TCP);
         let mut rule = crate::classifiers::Rule::new(2);
         rule.rule_type = crate::classifiers::RuleType::Protocol(proto_rule);
         assert!(matches!(classifier.add_rule(&mut rule), Ok(rule) if rule.id == 0));
@@ -106,24 +104,15 @@ mod test {
     #[test]
     fn classify() {
         let mut classifier = Box::new(Classifier::default());
-        let proto_rule = Rule(packet::Protocol::TCP);
+        let proto_rule = Rule(Protocol::TCP);
         let mut rule = crate::classifiers::Rule::new(1);
         rule.rule_type = crate::classifiers::RuleType::Protocol(proto_rule);
         classifier.add_rule(&mut rule).unwrap();
 
         let mut pkt = Box::new(Packet::default());
-        pkt.layers_mut().data_link = packet::Layer {
-            offset: 0,
-            protocol: packet::Protocol::ETHERNET,
-        };
-        pkt.layers_mut().network = packet::Layer {
-            offset: 14,
-            protocol: packet::Protocol::IPV4,
-        };
-        pkt.layers_mut().trans = packet::Layer {
-            offset: 34,
-            protocol: packet::Protocol::TCP,
-        };
+        pkt.layers_mut().datalink_mut().protocol = Protocol::ETHERNET;
+        pkt.layers_mut().network_mut().protocol = Protocol::IPV4;
+        pkt.layers_mut().transport_mut().protocol = Protocol::TCP;
         let mut pkt: Box<dyn PacketTrait> = pkt;
         classifier.classify(pkt.as_mut());
         assert_eq!(pkt.rules().len(), 1);
