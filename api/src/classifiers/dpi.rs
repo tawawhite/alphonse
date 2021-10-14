@@ -152,11 +152,14 @@ impl Classifier {
             return Ok(());
         }
 
-        let trans_protocol = match pkt.layers().transport().protocol {
-            packet::Protocol::TCP | packet::Protocol::UDP | packet::Protocol::SCTP => {
-                pkt.layers().transport().protocol
-            }
-            _ => unreachable!("this should never happens"),
+        let trans_protocol = match pkt.layers().transport() {
+            None => return Ok(()),
+            Some(l) => match l.protocol {
+                packet::Protocol::TCP | packet::Protocol::UDP | packet::Protocol::SCTP => {
+                    l.protocol
+                }
+                _ => unreachable!("this should never happens"),
+            },
         };
 
         let mut id_from_tos = vec![];
@@ -232,6 +235,7 @@ mod test {
     use super::*;
     use crate::classifiers::Classifier as ClassifierTrait;
     use crate::packet::test::Packet;
+    use crate::packet::Layers;
     use crate::packet::Packet as PacketTrait;
 
     #[test]
@@ -279,11 +283,12 @@ mod test {
         let buf = b"a sentence contains word regex";
         pkt.raw = Box::new(buf.to_vec());
         let mut pkt: Box<dyn PacketTrait> = pkt;
-        pkt.layers_mut().transport = 0;
-        pkt.layers_mut().transport_mut().protocol = crate::packet::Protocol::TCP;
-        pkt.layers_mut().application = 1;
-        pkt.layers_mut().application_mut().protocol = crate::packet::Protocol::APPLICATION;
-        pkt.layers_mut().application_mut().range = Range {
+        *pkt.layers_mut() = Layers::new_with_default_max_layers();
+        pkt.layers_mut().transport = Some(0);
+        pkt.layers_mut().transport_mut().unwrap().protocol = crate::packet::Protocol::TCP;
+        pkt.layers_mut().application = Some(1);
+        pkt.layers_mut().application_mut().unwrap().protocol = crate::packet::Protocol::APPLICATION;
+        pkt.layers_mut().application_mut().unwrap().range = Range {
             start: 0,
             end: buf.len(),
         };
@@ -299,6 +304,15 @@ mod test {
         let buf = b"a sentence does not contains the word";
         pkt.raw = Box::new(buf.iter().cloned().collect());
         let mut pkt: Box<dyn PacketTrait> = pkt;
+        *pkt.layers_mut() = Layers::new_with_default_max_layers();
+        pkt.layers_mut().transport = Some(0);
+        pkt.layers_mut().transport_mut().unwrap().protocol = crate::packet::Protocol::TCP;
+        pkt.layers_mut().application = Some(1);
+        pkt.layers_mut().application_mut().unwrap().protocol = crate::packet::Protocol::APPLICATION;
+        pkt.layers_mut().application_mut().unwrap().range = Range {
+            start: 0,
+            end: buf.len(),
+        };
         classifier.classify(pkt.as_mut(), &mut scratch).unwrap();
         assert_eq!(pkt.rules().len(), 0);
     }
@@ -325,11 +339,12 @@ mod test {
         let mut pkt = Box::new(Packet::default());
         let buf = b"a sentence contains word regex";
         pkt.raw = Box::new(buf.iter().cloned().collect());
-        pkt.layers_mut().transport = 0;
-        pkt.layers_mut().transport_mut().protocol = crate::packet::Protocol::TCP;
-        pkt.layers_mut().application = 1;
-        pkt.layers_mut().application_mut().protocol = crate::packet::Protocol::APPLICATION;
-        pkt.layers_mut().application_mut().range = Range {
+        *pkt.layers_mut() = Layers::new_with_default_max_layers();
+        pkt.layers_mut().transport = Some(0);
+        pkt.layers_mut().transport_mut().unwrap().protocol = crate::packet::Protocol::TCP;
+        pkt.layers_mut().application = Some(1);
+        pkt.layers_mut().application_mut().unwrap().protocol = crate::packet::Protocol::APPLICATION;
+        pkt.layers_mut().application_mut().unwrap().range = Range {
             start: 0,
             end: buf.len(),
         };

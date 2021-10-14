@@ -9,15 +9,19 @@ use crate::dissectors::link::ethernet;
 #[cfg(feature = "heuristic-mpls")]
 use crate::dissectors::network::{ipv4, ipv6};
 
-pub fn dissect(data: &[u8]) -> IResult<Option<Protocol>, &[u8], Error<&[u8]>> {
+pub fn dissect(data: &[u8]) -> IResult<(usize, Option<Protocol>), &[u8], Error<&[u8]>> {
+    let mut len = 0;
     let (mut remain, data) = take(4usize)(data)?;
+    len += 4;
 
     let mut mpls_stack_bottom = data[2] & 0x1;
     while mpls_stack_bottom != 1 {
         if 4 > remain.len() {
             break;
         }
+
         let (r, data) = take(4usize)(remain)?;
+        len += 4;
         remain = r;
         mpls_stack_bottom = data[2] & 0x1;
     }
@@ -26,28 +30,28 @@ pub fn dissect(data: &[u8]) -> IResult<Option<Protocol>, &[u8], Error<&[u8]>> {
     {
         match ethernet::dissect(remain) {
             Err(e) => eprintln!("{:?}", e),
-            Ok((protocol, data)) => {
+            Ok(((_, protocol), data)) => {
                 match protocol {
                     Some(Protocol::IPV4) => match ipv4::dissect(data) {
-                        Ok(_) => return Ok((Some(Protocol::ETHERNET), remain)),
+                        Ok(_) => return Ok(((len, Some(Protocol::ETHERNET)), remain)),
                         Err(_) => {}
                     },
                     Some(Protocol::IPV6) => match ipv6::dissect(data) {
-                        Ok(_) => return Ok((Some(Protocol::ETHERNET), remain)),
+                        Ok(_) => return Ok(((len, Some(Protocol::ETHERNET)), remain)),
                         Err(_) => {}
                     },
                     Some(Protocol::PPP) => match ppp::dissect(data) {
-                        Ok(_) => return Ok((Some(Protocol::ETHERNET), remain)),
+                        Ok(_) => return Ok(((len, Some(Protocol::ETHERNET)), remain)),
                         Err(_) => {}
                     },
                     Some(Protocol::MPLS) => {
                         todo! {"too much tunnel layers to handle"}
                     }
                     Some(Protocol::PPPOE) => match pppoe::dissect(data) {
-                        Ok(_) => return Ok((Some(Protocol::ETHERNET), remain)),
+                        Ok(_) => return Ok(((len, Some(Protocol::ETHERNET)), remain)),
                         Err(_) => {}
                     },
-                    Some(Protocol::ARP) => return Ok((Some(Protocol::ETHERNET), remain)),
+                    Some(Protocol::ARP) => return Ok(((len, Some(Protocol::ETHERNET)), remain)),
                     Some(Protocol::VLAN) => {
                         todo! {"too much tunnel layers to handle"}
                     }
@@ -61,10 +65,11 @@ pub fn dissect(data: &[u8]) -> IResult<Option<Protocol>, &[u8], Error<&[u8]>> {
         // PW Ethernet Control Word
         0b0000 => {
             let (data, _) = take(4usize)(remain)?;
-            Ok((Some(Protocol::ETHERNET), data))
+            len += 4;
+            Ok(((len, Some(Protocol::ETHERNET)), data))
         }
-        0b0100 => Ok((Some(Protocol::IPV4), remain)),
-        0b0110 => Ok((Some(Protocol::IPV6), remain)),
+        0b0100 => Ok(((len, Some(Protocol::IPV4)), remain)),
+        0b0110 => Ok(((len, Some(Protocol::IPV6)), remain)),
         _ => Err(nom::Err::Error(Error::CorruptPacket(
             "Corrupted MPLS packet, at mpls stack bottom but no valid network layer found",
         ))),
@@ -91,7 +96,8 @@ mod tests {
 
         let result = dissect(&buffer);
         assert!(result.is_ok());
-        let (protocol, data) = result.unwrap();
+        let ((len, protocol), data) = result.unwrap();
+        assert_eq!(len, 4);
         assert_eq!(protocol, Some(Protocol::IPV4));
         assert_eq!(data.len(), buffer.len() - 4);
     }
@@ -112,7 +118,8 @@ mod tests {
         let result = dissect(&buffer);
         assert!(result.is_ok());
         let (protocol, data) = result.unwrap();
-        assert_eq!(protocol, Some(Protocol::IPV6));
+        let ((len, protocol), data) = result.unwrap();
+        assert_eq!(len, 4);
         assert_eq!(data.len(), buffer.len() - 4);
     }
 
@@ -131,7 +138,8 @@ mod tests {
 
         let result = dissect(&buffer);
         assert!(result.is_ok());
-        let (protocol, data) = result.unwrap();
+        let ((len, protocol), data) = result.unwrap();
+        assert_eq!(len, 8);
         assert_eq!(protocol, Some(Protocol::ETHERNET));
         assert_eq!(data.len(), buffer.len() - 8);
     }
@@ -154,7 +162,8 @@ mod tests {
 
         let result = dissect(&buffer);
         assert!(result.is_ok());
-        let (protocol, data) = result.unwrap();
+        let ((len, protocol), data) = result.unwrap();
+        assert_eq!(len, 12);
         assert_eq!(protocol, Some(Protocol::ETHERNET));
         assert_eq!(data.len(), buffer.len() - 12);
     }
@@ -178,7 +187,8 @@ mod tests {
 
         let result = dissect(&buffer);
         assert!(result.is_ok());
-        let (protocol, data) = result.unwrap();
+        let ((len, protocol), data) = result.unwrap();
+        assert_eq!(len, 4);
         assert_eq!(protocol, Some(Protocol::ETHERNET));
         assert_eq!(data.len(), buffer.len() - 4);
     }

@@ -5,7 +5,7 @@ use num_traits::FromPrimitive;
 
 use crate::dissectors::{Error, EtherType, Protocol};
 
-pub fn dissect(data: &[u8]) -> IResult<Option<Protocol>, &[u8], Error<&[u8]>> {
+pub fn dissect(data: &[u8]) -> IResult<(usize, Option<Protocol>), &[u8], Error<&[u8]>> {
     let (remain, data) = take(14usize)(data)?;
     let (_, etype) = be_u16(&data[12..])?;
     let protocol = match EtherType::from_u16(etype) {
@@ -13,7 +13,7 @@ pub fn dissect(data: &[u8]) -> IResult<Option<Protocol>, &[u8], Error<&[u8]>> {
         Some(proto) => proto.into(),
     };
 
-    Ok((Some(protocol), remain))
+    Ok(((14, Some(protocol)), remain))
 }
 
 #[cfg(test)]

@@ -64,12 +64,14 @@ impl super::Classifier for Classifier {
 impl Classifier {
     /// Classify packet by transport protocol and port
     pub fn classify(&self, pkt: &mut dyn packet::Packet) {
-        let layer = pkt.layers().transport();
-        let base_index = match layer.protocol {
-            packet::Protocol::TCP => std::u16::MAX as usize * 0,
-            packet::Protocol::UDP => std::u16::MAX as usize * 1,
-            packet::Protocol::SCTP => std::u16::MAX as usize * 2,
-            _ => return,
+        let base_index = match pkt.layers().transport() {
+            None => return,
+            Some(l) => match l.protocol {
+                packet::Protocol::TCP => std::u16::MAX as usize * 0,
+                packet::Protocol::UDP => std::u16::MAX as usize * 1,
+                packet::Protocol::SCTP => std::u16::MAX as usize * 2,
+                _ => return,
+            },
         };
 
         let src_port = match pkt.src_port() {
@@ -97,6 +99,7 @@ mod test {
     use super::*;
     use crate::classifiers::Classifier as ClassifierTrait;
     use crate::packet::test::Packet;
+    use crate::packet::Layers;
     use crate::packet::Packet as PacketTrait;
 
     #[test]
@@ -187,9 +190,14 @@ mod test {
             0x6e, 0x74, 0x3a, 0x20, 0x63, 0x6f, 0x6d, 0x2e, 0x61, 0x70, 0x70, 0x6c, 0x65, 0x2e,
             0x74, 0x72, 0x75, 0x73, 0x74, 0x64, 0x2f, 0x32, 0x2e, 0x30, 0x0d, 0x0a, 0x0d, 0x0a,
         ]);
-        pkt.layers_mut().transport_mut().protocol = packet::Protocol::TCP;
-        pkt.layers_mut().transport_mut().range.start = 34;
-        pkt.layers_mut().transport_mut().range.end = pkt.raw().len();
+        pkt.layers = Layers::new_with_default_max_layers();
+        pkt.layers.transport = Some(0);
+        let end = pkt.raw().len();
+        let transport = pkt.layers_mut().transport_mut().unwrap();
+
+        transport.protocol = packet::Protocol::TCP;
+        transport.range.start = 34;
+        transport.range.end = end;
         let mut pkt: Box<dyn PacketTrait> = pkt;
         classifier.classify(pkt.as_mut());
         assert_eq!(pkt.rules().len(), 1);
@@ -216,9 +224,14 @@ mod test {
             0x6f, 0x67, 0x6c, 0x65, 0x61, 0x70, 0x69, 0x73, 0x03, 0x63, 0x6f, 0x6d, 0x00, 0x00,
             0x01, 0x00, 0x01,
         ]);
-        pkt.layers_mut().transport_mut().protocol = packet::Protocol::UDP;
-        pkt.layers_mut().transport_mut().range.start = 34;
-        pkt.layers_mut().transport_mut().range.end = pkt.raw().len();
+        *pkt.layers_mut() = Layers::new_with_default_max_layers();
+        pkt.layers.transport = Some(0);
+        let end = pkt.raw().len();
+        let transport = pkt.layers_mut().transport_mut().unwrap();
+
+        transport.protocol = packet::Protocol::UDP;
+        transport.range.start = 34;
+        transport.range.end = end;
         let mut pkt: Box<dyn PacketTrait> = pkt;
         classifier.classify(pkt.as_mut());
         assert_eq!(pkt.rules().len(), 1);
@@ -272,9 +285,14 @@ mod test {
             0x6e, 0x3a, 0x20, 0x6b, 0x65, 0x65, 0x70, 0x2d, 0x61, 0x6c, 0x69, 0x76, 0x65, 0x0d,
             0x0a, 0x0d, 0x0a, 0x00,
         ]);
-        pkt.layers_mut().transport_mut().protocol = packet::Protocol::SCTP;
-        pkt.layers_mut().transport_mut().range.start = 34;
-        pkt.layers_mut().transport_mut().range.end = pkt.raw().len();
+        *pkt.layers_mut() = Layers::new_with_default_max_layers();
+        pkt.layers.transport = Some(0);
+        let end = pkt.raw().len();
+        let transport = pkt.layers_mut().transport_mut().unwrap();
+
+        transport.protocol = packet::Protocol::SCTP;
+        transport.range.start = 34;
+        transport.range.end = end;
         let mut pkt: Box<dyn PacketTrait> = pkt;
         classifier.classify(pkt.as_mut());
         assert_eq!(pkt.rules().len(), 1);

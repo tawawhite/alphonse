@@ -84,23 +84,33 @@ impl Processor for EthernetProcessor {
         if !self.classified {
             self.classified = true;
             self.src_direction = pkt.direction();
-            match pkt.layers().data_link.protocol {
+
+            let protocol = match pkt.layers().datalink() {
+                None => unreachable!("ethernet received a pkt with no datalink layer"),
+                Some(layer) => layer.protocol,
+            };
+            match protocol {
                 Protocol::ETHERNET => {
                     ses.add_protocol(&"ethernet", ProtocolLayer::Datalink);
                 }
                 _ => unreachable!(),
             }
         }
+        let src_mac = match pkt.src_mac() {
+            None => unreachable!("ethernet received a pkt with no datalink layer"),
+            Some(mac) => MacAddress::new(mac.clone()),
+        };
+        let dst_mac = match pkt.src_mac() {
+            None => unreachable!("ethernet received a pkt with no datalink layer"),
+            Some(mac) => MacAddress::new(mac.clone()),
+        };
 
         let (src_mac, dst_mac) = if self.src_direction == pkt.direction() {
-            let src_mac = unsafe { MacAddress::new(pkt.src_mac().clone()) };
-            let dst_mac = unsafe { MacAddress::new(pkt.dst_mac().clone()) };
             (src_mac, dst_mac)
         } else {
-            let src_mac = unsafe { MacAddress::new(pkt.dst_mac().clone()) };
-            let dst_mac = unsafe { MacAddress::new(pkt.src_mac().clone()) };
-            (src_mac, dst_mac)
+            (dst_mac, src_mac)
         };
+
         let info = MacInfo { addr: src_mac };
         self.src_macs.insert(info);
 

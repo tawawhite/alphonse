@@ -18,7 +18,7 @@ pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManage
 
 fn classify(ses: &mut Session, pkt: &dyn Packet) -> Result<()> {
     unsafe {
-        if pkt.src_port() == 49 || pkt.dst_port() == 49 {
+        if pkt.src_port() == Some(49) || pkt.dst_port() == Some(49) {
             add_protocol(ses, "tacacs");
         }
     }

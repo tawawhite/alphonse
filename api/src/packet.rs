@@ -3,7 +3,6 @@ use std::hash::{Hash, Hasher};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::ops::Range;
 
-use dyn_clone::DynClone;
 use tinyvec::TinyVec;
 
 use serde::ser::SerializeSeq;
@@ -60,68 +59,82 @@ impl Hash for Layer {
 
 const MAX_LAYERS: usize = 8;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct Layers {
-    pub datalink: u8,
-    pub network: u8,
-    pub transport: u8,
-    pub application: u8,
+    pub datalink: Option<u8>,
+    pub network: Option<u8>,
+    pub transport: Option<u8>,
+    pub application: Option<u8>,
     layers: TinyVec<[Layer; MAX_LAYERS]>,
 }
 
-impl Default for Layers {
-    fn default() -> Self {
+impl Layers {
+    pub fn new_with_default_max_layers() -> Self {
         let mut layers = tinyvec::tiny_vec!([Layer; MAX_LAYERS]);
         for _ in 0..MAX_LAYERS {
             layers.push(Layer::default());
         }
         Self {
-            datalink: 0,
-            network: 0,
-            transport: 0,
-            application: 0,
+            datalink: None,
+            network: None,
+            transport: None,
+            application: None,
             layers,
         }
     }
 }
 
 impl Layers {
-    pub fn datalink(&self) -> &Layer {
-        &self.layers[self.datalink as usize]
+    pub fn datalink(&self) -> Option<&Layer> {
+        self.datalink.map_or(None, |i| self.layers.get(i as usize))
     }
 
-    pub fn datalink_mut(&mut self) -> &mut Layer {
-        &mut self.layers[self.datalink as usize]
+    pub(crate) fn datalink_mut(&mut self) -> Option<&mut Layer> {
+        self.datalink
+            .map_or(None, move |i| self.layers.get_mut(i as usize))
     }
 
-    pub fn network(&self) -> &Layer {
-        &self.layers[self.network as usize]
+    pub fn network(&self) -> Option<&Layer> {
+        self.network.map_or(None, |i| self.layers.get(i as usize))
     }
 
-    pub fn network_mut(&mut self) -> &mut Layer {
-        &mut self.layers[self.network as usize]
+    pub(crate) fn network_mut(&mut self) -> Option<&mut Layer> {
+        self.network
+            .map_or(None, move |i| self.layers.get_mut(i as usize))
     }
 
-    pub fn transport(&self) -> &Layer {
-        &self.layers[self.transport as usize]
+    pub fn transport(&self) -> Option<&Layer> {
+        self.transport.map_or(None, |i| self.layers.get(i as usize))
     }
 
-    pub fn transport_mut(&mut self) -> &mut Layer {
-        &mut self.layers[self.transport as usize]
+    pub(crate) fn transport_mut(&mut self) -> Option<&mut Layer> {
+        self.transport
+            .map_or(None, move |i| self.layers.get_mut(i as usize))
     }
 
-    pub fn application(&self) -> &Layer {
-        &self.layers[self.application as usize]
+    pub fn application(&self) -> Option<&Layer> {
+        self.application
+            .map_or(None, |i| self.layers.get(i as usize))
     }
 
-    pub fn application_mut(&mut self) -> &mut Layer {
-        &mut self.layers[self.application as usize]
+    pub(crate) fn application_mut(&mut self) -> Option<&mut Layer> {
+        self.application
+            .map_or(None, move |i| self.layers.get_mut(i as usize))
+    }
+
+    pub fn len(&self) -> usize {
+        self.layers.len()
     }
 }
 
 impl AsRef<TinyVec<[Layer; MAX_LAYERS]>> for Layers {
     fn as_ref(&self) -> &TinyVec<[Layer; MAX_LAYERS]> {
         &self.layers
+    }
+}
+impl AsMut<TinyVec<[Layer; MAX_LAYERS]>> for Layers {
+    fn as_mut(&mut self) -> &mut TinyVec<[Layer; MAX_LAYERS]> {
+        &mut self.layers
     }
 }
 
@@ -178,8 +191,14 @@ impl Default for PacketHashKey {
 impl From<&dyn Packet> for PacketHashKey {
     fn from(pkt: &dyn Packet) -> Self {
         let mut key = Self::default();
-        key.network_proto = pkt.layers().network().protocol;
-        key.trans_proto = pkt.layers().transport().protocol;
+        key.network_proto = pkt
+            .layers()
+            .network()
+            .map_or(Protocol::UNKNOWN, |l| l.protocol);
+        key.trans_proto = pkt
+            .layers()
+            .transport()
+            .map_or(Protocol::UNKNOWN, |l| l.protocol);
 
         if pkt.src_port() > pkt.dst_port() {
             key.src_port = pkt.src_port().unwrap_or(0);
@@ -333,9 +352,7 @@ impl AsMut<TinyVec<[Rule; DEFAULT_MAX_MATCHED_RULES]>> for Rules {
     }
 }
 
-dyn_clone::clone_trait_object!(Packet);
-
-pub trait Packet: Send + DynClone {
+pub trait Packet: Send {
     /// Get raw packet data
     fn raw(&self) -> &[u8];
 
@@ -354,105 +371,135 @@ pub trait Packet: Send + DynClone {
     fn tunnel(&self) -> Tunnel;
     fn tunnel_mut(&mut self) -> &mut Tunnel;
 
+    fn clone_box<'a, 'b>(&'a self) -> Box<dyn Packet + 'b>;
+
     /// Get src port if this layer is TCP|UDP|SCTP
-    #[inline]
     fn src_port(&self) -> Option<u16> {
-        let l = self.layers().transport();
-        match l.protocol {
-            Protocol::TCP | Protocol::UDP | Protocol::SCTP => {
-                let data = &self.raw()[l.range.clone()];
-                Some(((data[0] as u16) << 8) + data[1] as u16)
-            }
-            _ => None,
+        match self.layers().transport() {
+            None => None,
+            Some(l) => match l.protocol {
+                Protocol::TCP | Protocol::UDP | Protocol::SCTP => {
+                    let data = &self.raw()[l.range.clone()];
+                    Some(((data[0] as u16) << 8) + data[1] as u16)
+                }
+                _ => None,
+            },
         }
     }
 
     /// Get dst port if this layer is TCP|UDP|SCTP
-    #[inline]
     fn dst_port(&self) -> Option<u16> {
-        let l = self.layers().transport();
-        match l.protocol {
-            Protocol::TCP | Protocol::UDP | Protocol::SCTP => {
-                let data = &self.raw()[l.range.clone()];
-                Some(((data[2] as u16) << 8) + data[3] as u16)
-            }
-            _ => None,
+        match self.layers().transport() {
+            None => None,
+            Some(l) => match l.protocol {
+                Protocol::TCP | Protocol::UDP | Protocol::SCTP => {
+                    let data = &self.raw()[l.range.clone()];
+                    Some(((data[2] as u16) << 8) + data[3] as u16)
+                }
+                _ => None,
+            },
         }
     }
 
     fn src_ipv4(&self) -> Option<u32> {
-        let l = self.layers().network();
-        match l.protocol {
-            Protocol::IPV4 => {}
-            _ => return None,
-        };
-        let mut ip = 0;
-        for i in &self.raw()[l.range.clone()][12..16] {
-            ip = (ip << 8) + *i as u32;
+        match self.layers().network() {
+            None => None,
+            Some(l) => {
+                match l.protocol {
+                    Protocol::IPV4 => {}
+                    _ => return None,
+                };
+                let mut ip = 0;
+                for i in &self.raw()[l.range.clone()][12..16] {
+                    ip = (ip << 8) + *i as u32;
+                }
+                Some(ip)
+            }
         }
-        Some(ip)
     }
 
     fn dst_ipv4(&self) -> Option<u32> {
-        let l = self.layers().network();
-        match l.protocol {
-            Protocol::IPV4 => {}
-            _ => return None,
-        };
-        let mut ip = 0;
-        for i in &self.raw()[l.range.clone()][16..20] {
-            ip = (ip << 8) + *i as u32;
+        match self.layers().network() {
+            None => None,
+            Some(l) => {
+                match l.protocol {
+                    Protocol::IPV4 => {}
+                    _ => return None,
+                };
+                let mut ip = 0;
+                for i in &self.raw()[l.range.clone()][16..20] {
+                    ip = (ip << 8) + *i as u32;
+                }
+                Some(ip)
+            }
         }
-        Some(ip)
     }
 
     fn src_ipv6(&self) -> Option<&[u8; 16]> {
-        let l = self.layers().network();
-        match l.protocol {
-            Protocol::IPV6 => {}
-            _ => return None,
-        };
-        <&[u8; 16]>::try_from(&self.raw()[l.range.clone()][8..24])
-            .map_or_else(|_| None, |ip| Some(ip))
+        match self.layers().network() {
+            None => None,
+            Some(l) => {
+                match l.protocol {
+                    Protocol::IPV6 => {}
+                    _ => return None,
+                };
+                <&[u8; 16]>::try_from(&self.raw()[l.range.clone()][8..24])
+                    .map_or_else(|_| None, |ip| Some(ip))
+            }
+        }
     }
 
     fn dst_ipv6(&self) -> Option<&[u8; 16]> {
-        let l = self.layers().network();
-        match l.protocol {
-            Protocol::IPV6 => {}
-            _ => return None,
-        };
-        <&[u8; 16]>::try_from(&self.raw()[l.range.clone()][24..40])
-            .map_or_else(|_| None, |ip| Some(ip))
+        match self.layers().network() {
+            None => None,
+            Some(l) => {
+                match l.protocol {
+                    Protocol::IPV6 => {}
+                    _ => return None,
+                };
+                <&[u8; 16]>::try_from(&self.raw()[l.range.clone()][24..40])
+                    .map_or_else(|_| None, |ip| Some(ip))
+            }
+        }
     }
 
     fn src_mac(&self) -> Option<&[u8; 6]> {
-        let l = self.layers().datalink();
-        match l.protocol {
-            Protocol::ETHERNET => {}
-            _ => return None,
-        };
-        <&[u8; 6]>::try_from(&self.raw()[l.range.clone()][6..12])
-            .map_or_else(|_| None, |mac| Some(mac))
+        match self.layers().datalink() {
+            None => None,
+            Some(l) => {
+                match l.protocol {
+                    Protocol::ETHERNET => {}
+                    _ => return None,
+                };
+                <&[u8; 6]>::try_from(&self.raw()[l.range.clone()][6..12])
+                    .map_or_else(|_| None, |mac| Some(mac))
+            }
+        }
     }
 
     fn dst_mac(&self) -> Option<&[u8; 6]> {
-        let l = self.layers().datalink();
-        match l.protocol {
-            Protocol::ETHERNET => {}
-            _ => return None,
-        };
-        <&[u8; 6]>::try_from(&self.raw()[l.range.clone()][0..6])
-            .map_or_else(|_| None, |mac| Some(mac))
+        match self.layers().datalink() {
+            None => None,
+            Some(l) => {
+                match l.protocol {
+                    Protocol::ETHERNET => {}
+                    _ => return None,
+                };
+                <&[u8; 6]>::try_from(&self.raw()[l.range.clone()][0..6])
+                    .map_or_else(|_| None, |mac| Some(mac))
+            }
+        }
     }
 
     #[inline]
     /// Get packet's application layer payload
     fn payload(&self) -> &[u8] {
-        let l = self.layers().application();
-        match l.protocol {
-            Protocol::APPLICATION => &self.raw()[l.range.clone()],
-            _ => &[],
+        match self.layers().application() {
+            None => &[],
+            Some(l) => match l.protocol {
+                Protocol::APPLICATION => &self.raw()[l.range.clone()],
+                _ => &[],
+            },
         }
     }
 
@@ -481,6 +528,12 @@ pub trait Packet: Send + DynClone {
         }
 
         Direction::Right
+    }
+}
+
+impl Clone for Box<dyn Packet> {
+    fn clone(&self) -> Self {
+        self.clone_box()
     }
 }
 
@@ -687,6 +740,10 @@ pub mod test {
         fn tunnel_mut(&mut self) -> &mut Tunnel {
             &mut self.tunnel
         }
+
+        fn clone_box<'a, 'b>(&'a self) -> Box<dyn PacketTrait + 'b> {
+            Box::new(self.clone())
+        }
     }
 
     #[test]
@@ -697,16 +754,22 @@ pub mod test {
         let mut pkt = Packet::default();
         pkt.raw = Box::new(vec![0x14, 0xe9]);
         println!("len: {}", pkt.layers().layers.len());
-        pkt.layers_mut().transport_mut().range = Range { start: 0, end: 2 };
-        pkt.layers_mut().transport_mut().protocol = Protocol::TCP;
+        pkt.layers = Layers::new_with_default_max_layers();
+        pkt.layers.transport = Some(0);
+        let trans_layer = pkt.layers.transport_mut().unwrap();
+
+        trans_layer.range = Range { start: 0, end: 2 };
+        trans_layer.protocol = Protocol::TCP;
         assert_eq!(pkt.src_port(), Some(5353));
 
-        pkt.layers_mut().transport_mut().range = Range { start: 0, end: 2 };
-        pkt.layers_mut().transport_mut().protocol = Protocol::UDP;
+        let trans_layer = pkt.layers.transport_mut().unwrap();
+        trans_layer.range = Range { start: 0, end: 2 };
+        trans_layer.protocol = Protocol::UDP;
         assert_eq!(pkt.src_port(), Some(5353));
 
-        pkt.layers_mut().transport_mut().range = Range { start: 0, end: 2 };
-        pkt.layers_mut().transport_mut().protocol = Protocol::SCTP;
+        let trans_layer = pkt.layers.transport_mut().unwrap();
+        trans_layer.range = Range { start: 0, end: 2 };
+        trans_layer.protocol = Protocol::SCTP;
         assert_eq!(pkt.src_port(), Some(5353));
     }
 
@@ -714,16 +777,22 @@ pub mod test {
     fn test_dst_port() {
         let mut pkt = Packet::default();
         pkt.raw = Box::new(vec![0, 0, 0x14, 0xe9]);
-        pkt.layers_mut().transport_mut().range = Range { start: 0, end: 4 };
-        pkt.layers_mut().transport_mut().protocol = Protocol::TCP;
+        pkt.layers = Layers::new_with_default_max_layers();
+        pkt.layers.transport = Some(0);
+        let trans_layer = pkt.layers_mut().transport_mut().unwrap();
+
+        trans_layer.range = Range { start: 0, end: 4 };
+        trans_layer.protocol = Protocol::TCP;
         assert_eq!(pkt.dst_port(), Some(5353));
 
-        pkt.layers_mut().transport_mut().range = Range { start: 0, end: 4 };
-        pkt.layers_mut().transport_mut().protocol = Protocol::UDP;
+        let trans_layer = pkt.layers_mut().transport_mut().unwrap();
+        trans_layer.range = Range { start: 0, end: 4 };
+        trans_layer.protocol = Protocol::UDP;
         assert_eq!(pkt.dst_port(), Some(5353));
 
-        pkt.layers_mut().transport_mut().range = Range { start: 0, end: 4 };
-        pkt.layers_mut().transport_mut().protocol = Protocol::SCTP;
+        let trans_layer = pkt.layers_mut().transport_mut().unwrap();
+        trans_layer.range = Range { start: 0, end: 4 };
+        trans_layer.protocol = Protocol::SCTP;
         assert_eq!(pkt.dst_port(), Some(5353));
     }
 
@@ -735,9 +804,14 @@ pub mod test {
             0x02, 0xde, 0xda, 0x62, 0x21, 0xc5, 0xe2, 0xb2, 0x01, 0xbb, 0x2b, 0xd5, 0x16, 0xf7,
             0x66, 0x96, 0xcf, 0xb8, 0x50, 0x18, 0x10, 0x00, 0x8a, 0xcf, 0x00, 0x00,
         ]);
-        pkt.layers_mut().network_mut().range.start = 0;
-        pkt.layers_mut().network_mut().range.end = pkt.raw().len() as usize;
-        pkt.layers_mut().network_mut().protocol = Protocol::IPV4;
+        pkt.layers = Layers::new_with_default_max_layers();
+        pkt.layers.network = Some(0);
+        let end = pkt.raw().len() as usize;
+        let network = pkt.layers_mut().network_mut().unwrap();
+
+        network.range.start = 0;
+        network.range.end = end;
+        network.protocol = Protocol::IPV4;
         assert_eq!(pkt.src_ipv4(), Some(0xc0a802de));
     }
 
@@ -749,9 +823,14 @@ pub mod test {
             0x02, 0xde, 0xda, 0x62, 0x21, 0xc5, 0xe2, 0xb2, 0x01, 0xbb, 0x2b, 0xd5, 0x16, 0xf7,
             0x66, 0x96, 0xcf, 0xb8, 0x50, 0x18, 0x10, 0x00, 0x8a, 0xcf, 0x00, 0x00,
         ]);
-        pkt.layers_mut().network_mut().range.start = 0;
-        pkt.layers_mut().network_mut().range.end = pkt.raw().len() as usize;
-        pkt.layers_mut().network_mut().protocol = Protocol::IPV4;
+        pkt.layers = Layers::new_with_default_max_layers();
+        pkt.layers.network = Some(0);
+        let end = pkt.raw().len() as usize;
+        let network = pkt.layers_mut().network_mut().unwrap();
+
+        network.range.start = 0;
+        network.range.end = end;
+        network.protocol = Protocol::IPV4;
         assert_eq!(pkt.dst_ipv4(), Some(0xda6221c5));
     }
 
@@ -763,9 +842,14 @@ pub mod test {
             0x00, 0x00, 0x10, 0x08, 0xfa, 0x70, 0x46, 0xe8, 0x42, 0x04, 0xff, 0x02, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xfb,
         ]);
-        pkt.layers_mut().network_mut().range.start = 0;
-        pkt.layers_mut().network_mut().range.end = pkt.raw().len() as usize;
-        pkt.layers_mut().network_mut().protocol = Protocol::IPV6;
+        pkt.layers = Layers::new_with_default_max_layers();
+        pkt.layers.network = Some(0);
+        let end = pkt.raw().len();
+        let network = pkt.layers_mut().network_mut().unwrap();
+
+        network.range.start = 0;
+        network.range.end = end;
+        network.protocol = Protocol::IPV6;
 
         assert_eq!(
             pkt.src_ipv6(),
@@ -784,9 +868,14 @@ pub mod test {
             0x00, 0x00, 0x10, 0x08, 0xfa, 0x70, 0x46, 0xe8, 0x42, 0x04, 0xff, 0x02, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xfb,
         ]);
-        pkt.layers_mut().network_mut().range.start = 0;
-        pkt.layers_mut().network_mut().range.end = pkt.raw().len() as usize;
-        pkt.layers_mut().network_mut().protocol = Protocol::IPV6;
+        pkt.layers = Layers::new_with_default_max_layers();
+        pkt.layers.network = Some(0);
+        let end = pkt.raw().len();
+        let network = pkt.layers_mut().network_mut().unwrap();
+
+        network.range.start = 0;
+        network.range.end = end;
+        network.protocol = Protocol::IPV6;
         assert_eq!(
             pkt.dst_ipv6(),
             Some(&[

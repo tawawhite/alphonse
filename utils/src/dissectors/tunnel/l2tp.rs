@@ -43,7 +43,8 @@ fn l2tp_version(control: u16) -> u16 {
     control & 0x000f
 }
 
-pub fn dissect(data: &[u8]) -> IResult<Option<Protocol>, &[u8], Error<&[u8]>> {
+pub fn dissect(data: &[u8]) -> IResult<(usize, Option<Protocol>), &[u8], Error<&[u8]>> {
+    let org_len = data.len();
     let (data, control) = be_u16(data)?;
 
     match l2tp_version(control) {
@@ -65,18 +66,21 @@ pub fn dissect(data: &[u8]) -> IResult<Option<Protocol>, &[u8], Error<&[u8]>> {
             data = remain
         }
         if control & OFFSET == OFFSET {
+            println!("offset flag on");
             let (remain, _) = take(2usize)(data)?;
+            println!("remain len: {}", remain.len());
             data = remain
         }
         if control & PRIORITY == PRIORITY {
             let (remain, _) = take(2usize)(data)?;
             data = remain
         }
-        let (data, _) = take(4usize)(data)?;
         data
     };
+    println!("data len: {}", data.len());
+    let (data, _) = take(4usize)(data)?;
 
-    return Ok((Some(Protocol::PPP), data));
+    return Ok(((org_len - data.len(), Some(Protocol::PPP)), data));
 }
 
 #[cfg(test)]
@@ -91,7 +95,7 @@ mod test {
         let result = dissect(&buf);
         assert!(matches!(result, Ok(_)));
 
-        let (protocol, data) = result.unwrap();
+        let ((len, protocol), data) = result.unwrap();
         assert!(matches!(protocol, Some(Protocol::PPP)));
         assert_eq!(data.len(), 8);
     }
@@ -105,9 +109,9 @@ mod test {
         let result = dissect(&buf);
         assert!(matches!(result, Ok(_)));
 
-        let (protocol, data) = result.unwrap();
+        let ((len, protocol), data) = result.unwrap();
         assert!(matches!(protocol, Some(Protocol::PPP)));
-        assert_eq!(data.len(), 0);
+        assert_eq!(data.len(), 12);
     }
 
     #[test]
@@ -116,7 +120,7 @@ mod test {
         let result = dissect(&buf);
         assert!(matches!(result, Ok(_)));
 
-        let (protocol, data) = result.unwrap();
+        let ((len, protocol), data) = result.unwrap();
         assert!(matches!(protocol, Some(Protocol::PPP)));
         assert_eq!(data.len(), 0);
     }

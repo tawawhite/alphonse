@@ -4,12 +4,12 @@ use nom::IResult;
 
 use super::{Error, Protocol};
 
-pub fn dissect(data: &[u8]) -> IResult<Option<Protocol>, &[u8], Error<&[u8]>> {
+pub fn dissect(data: &[u8]) -> IResult<(usize, Option<Protocol>), &[u8], Error<&[u8]>> {
     let (remain, data) = peek(take(13usize))(data)?;
     let tcp_hdr_len = ((data[12] >> 4) * 4) as usize;
 
     let (remain, _) = take(tcp_hdr_len)(remain)?;
-    return Ok((Some(Protocol::APPLICATION), remain));
+    return Ok(((tcp_hdr_len, Some(Protocol::APPLICATION)), remain));
 }
 
 #[cfg(test)]

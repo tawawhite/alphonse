@@ -1,4 +1,5 @@
 use std::fmt::{Display, Formatter};
+use std::ops::Range;
 
 use anyhow::Result;
 use nom::error::{ErrorKind, ParseError};
@@ -16,12 +17,12 @@ pub mod tunnel;
 pub use etype::EtherType;
 use link::LinkType;
 
-/// Parse current layer's protocol, return next layer's protocol and remaining data
+/// Parse current layer's protocol, return current layer's length, next layer's protocol and remaining data
 ///
 /// # Arguments
 ///
 /// * `data` - Data of this layer and its payload
-pub type Callback = fn(data: &[u8]) -> IResult<Option<Protocol>, &[u8], Error<&[u8]>>;
+pub type Callback = fn(data: &[u8]) -> IResult<(usize, Option<Protocol>), &[u8], Error<&[u8]>>;
 
 #[derive(Debug)]
 pub enum Error<I> {
@@ -114,58 +115,76 @@ impl ProtocolDessector {
     /// parse a single packet
     #[inline]
     pub fn parse_pkt(&self, pkt: &mut dyn Packet) -> Result<(), Error<&[u8]>> {
+        let mut consumed = 0;
         let mut layers = Layers::default();
+        let mut cur_proto = None;
+
         let mut result = match self.link_type {
-            LinkType::NULL => {
-                layers.data_link.protocol = Protocol::NULL;
-                let index = Protocol::NULL as usize;
-                self.callbacks[index].unwrap()(pkt.raw())
-            }
-            LinkType::ETHERNET => {
-                layers.data_link.protocol = Protocol::ETHERNET;
-                let index = Protocol::ETHERNET as usize;
-                self.callbacks[index].unwrap()(pkt.raw())
-            }
-            LinkType::FRAME_RELAY => {
-                layers.data_link.protocol = Protocol::FRAME_RELAY;
-                let index = Protocol::FRAME_RELAY as usize;
-                self.callbacks[index].unwrap()(pkt.raw())
-            }
-            LinkType::RAW | LinkType::IPV4 => Ok((Some(Protocol::IPV4), pkt.raw())),
-            LinkType::IPV6 => Ok((Some(Protocol::IPV6), pkt.raw())),
+            LinkType::NULL => Ok(((0, Some(Protocol::NULL)), pkt.raw())),
+            LinkType::ETHERNET => Ok(((0, Some(Protocol::ETHERNET)), pkt.raw())),
+            LinkType::FRAME_RELAY => Ok(((0, Some(Protocol::FRAME_RELAY)), pkt.raw())),
+            LinkType::RAW | LinkType::IPV4 => Ok(((0, Some(Protocol::IPV4)), pkt.raw())),
+            LinkType::IPV6 => Ok(((0, Some(Protocol::IPV6)), pkt.raw())),
         };
 
         loop {
-            let (protocol, data) = match result {
-                Ok((p, data)) => match p {
-                    Some(p) => (p, data),
-                    None => return Ok(()),
-                },
+            let ((len, nxt_proto), data) = match result {
+                Ok(r) => r,
                 Err(_) => todo!("properly handle parse error"),
             };
 
-            let offset = (pkt.raw().len() - data.len()) as u16;
-            result = match &self.callbacks[protocol as usize] {
-                Some(dissect) => {
-                    let layer = Layer { offset, protocol };
+            match cur_proto {
+                Some(protocol) => {
+                    let layer = Layer {
+                        protocol,
+                        range: Range {
+                            start: consumed,
+                            end: consumed + len,
+                        },
+                    };
+                    consumed += len;
+                    layers.as_mut().push(layer);
                     match protocol {
-                        Protocol::ETHERNET => layers.data_link = layer,
-                        Protocol::IPV4 | Protocol::IPV6 => layers.network = layer,
-                        Protocol::TCP | Protocol::UDP | Protocol::SCTP => layers.trans = layer,
+                        Protocol::ETHERNET => layers.datalink = Some(layers.len() as u8 - 1),
+                        Protocol::IPV4 | Protocol::IPV6 => {
+                            layers.network = Some(layers.len() as u8 - 1)
+                        }
+                        Protocol::TCP | Protocol::UDP | Protocol::SCTP => {
+                            layers.transport = Some(layers.len() as u8 - 1)
+                        }
                         _ => {}
                     };
-                    dissect(data)
                 }
+                None => {}
+            };
+
+            let nxt_proto = match nxt_proto {
+                Some(p) => match p {
+                    Protocol::APPLICATION => {
+                        let layer = Layer {
+                            protocol: p,
+                            range: Range {
+                                start: consumed,
+                                end: consumed + len,
+                            },
+                        };
+                        layers.as_mut().push(layer);
+                        layers.application = Some(layers.len() as u8 - 1);
+                        *pkt.layers_mut() = layers;
+                        return Ok(());
+                    }
+                    _ => p,
+                },
                 None => {
-                    let layer = Layer { offset, protocol };
-                    match protocol {
-                        Protocol::APPLICATION => layers.app = layer,
-                        _ => {
-                            return Err(Error::UnsupportProtocol(""));
-                        }
-                    };
-                    *pkt.layers_mut() = layers;
                     return Ok(());
+                }
+            };
+            cur_proto = Some(nxt_proto);
+
+            result = match &self.callbacks[nxt_proto as usize] {
+                Some(dissect) => dissect(data),
+                None => {
+                    return Err(Error::UnsupportProtocol(""));
                 }
             };
         }

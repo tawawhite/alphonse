@@ -114,10 +114,13 @@ impl Processor for TlsProcessor {
             return Ok(());
         }
 
-        match pkt.layers().trans.protocol {
-            Protocol::TCP => self.parse_tcp_pkt(pkt, ses),
-            Protocol::UDP => self.parse_udp_pkt(pkt, ses),
-            _ => unreachable!(),
+        match pkt.layers().transport() {
+            None => unreachable!("this should never happends"),
+            Some(l) => match l.protocol {
+                Protocol::TCP => self.parse_tcp_pkt(pkt, ses),
+                Protocol::UDP => self.parse_udp_pkt(pkt, ses),
+                _ => unreachable!(),
+            },
         }
     }
 

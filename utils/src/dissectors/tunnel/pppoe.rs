@@ -5,7 +5,8 @@ use nom::IResult;
 
 use super::{Error, Protocol};
 
-pub fn dissect(data: &[u8]) -> IResult<Option<Protocol>, &[u8], Error<&[u8]>> {
+pub fn dissect(data: &[u8]) -> IResult<(usize, Option<Protocol>), &[u8], Error<&[u8]>> {
+    let org_len = data.len();
     let (remain, data) = take(8usize)(data)?;
     if data[0] != 0x11 || data[1] != 0 {
         return Err(nom::Err::Error(Error::CorruptPacket(
@@ -23,5 +24,5 @@ pub fn dissect(data: &[u8]) -> IResult<Option<Protocol>, &[u8], Error<&[u8]>> {
         _ => Protocol::UNKNOWN,
     };
 
-    Ok((Some(protocol), remain))
+    Ok(((org_len - remain.len(), Some(protocol)), remain))
 }

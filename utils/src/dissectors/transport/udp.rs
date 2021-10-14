@@ -4,22 +4,20 @@ use nom::IResult;
 
 use super::{Error, Protocol};
 
-pub fn dissect(data: &[u8]) -> IResult<Option<Protocol>, &[u8], Error<&[u8]>> {
+pub fn dissect(data: &[u8]) -> IResult<(usize, Option<Protocol>), &[u8], Error<&[u8]>> {
     let (remain, data) = take(8usize)(data)?;
 
     let (data, src_port) = be_u16(data)?;
     let (data, dst_port) = be_u16(data)?;
     if src_port == 1701 && dst_port == 1701 {
-        return Ok((Some(Protocol::L2TP), remain));
+        return Ok(((8, Some(Protocol::L2TP)), remain));
     }
 
-    return Ok((Some(Protocol::APPLICATION), remain));
+    return Ok(((8, Some(Protocol::APPLICATION)), remain));
 }
 
 #[cfg(test)]
 mod test {
-    use nom::Needed;
-
     use super::*;
 
     #[test]
@@ -32,7 +30,7 @@ mod test {
         let result = dissect(&buf);
         assert!(matches!(result, Ok(_)));
 
-        let (protocol, remain) = result.unwrap();
+        let ((_, protocol), remain) = result.unwrap();
         assert!(matches!(protocol, Some(Protocol::APPLICATION)));
         assert_eq!(remain.len(), 32);
     }
@@ -50,7 +48,7 @@ mod test {
         let result = dissect(&buf);
         assert!(matches!(result, Ok(_)));
 
-        let (protocol, remain) = result.unwrap();
+        let ((_, protocol), remain) = result.unwrap();
         assert!(matches!(protocol, Some(Protocol::L2TP)));
         assert_eq!(remain.len(), 0);
     }

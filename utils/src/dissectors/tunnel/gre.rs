@@ -5,7 +5,8 @@ use num_traits::FromPrimitive;
 
 use crate::dissectors::{Error, EtherType, Protocol};
 
-pub fn dissect(data: &[u8]) -> IResult<Option<Protocol>, &[u8], Error<&[u8]>> {
+pub fn dissect(data: &[u8]) -> IResult<(usize, Option<Protocol>), &[u8], Error<&[u8]>> {
+    let org_len = data.len();
     let (data, flags_version) = be_u16(data)?;
     let (mut data, proto_type) = be_u16(data)?;
 
@@ -41,12 +42,13 @@ pub fn dissect(data: &[u8]) -> IResult<Option<Protocol>, &[u8], Error<&[u8]>> {
         data = remain;
     };
 
+    let len = org_len - data.len();
     let protocol = match EtherType::from_u16(proto_type) {
-        None => return Ok((Some(Protocol::UNKNOWN), data)),
+        None => return Ok(((len, Some(Protocol::UNKNOWN)), data)),
         Some(etype) => etype.into(),
     };
 
-    return Ok((Some(protocol), data));
+    return Ok(((len, Some(protocol)), data));
 }
 
 #[cfg(test)]
@@ -117,7 +119,8 @@ mod test {
     #[test]
     fn ok() -> Result<()> {
         let buf = [0x10, 0x00, 0x88, 0xbe, 0x00, 0x00, 0x07, 0x07];
-        let (protocol, data) = dissect(&buf).unwrap();
+        let ((len, protocol), data) = dissect(&buf).unwrap();
+        assert_eq!(len, 8);
         assert_eq!(protocol, Some(Protocol::ERSPAN));
         assert_eq!(data.len(), 0);
 

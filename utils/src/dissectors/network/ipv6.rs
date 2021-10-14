@@ -5,7 +5,8 @@ use nom::IResult;
 use super::ip_proto;
 use crate::dissectors::{Error, Protocol};
 
-pub fn dissect(data: &[u8]) -> IResult<Option<Protocol>, &[u8], Error<&[u8]>> {
+pub fn dissect(data: &[u8]) -> IResult<(usize, Option<Protocol>), &[u8], Error<&[u8]>> {
+    let total_len = data.len();
     let (remain, data) = take(40usize)(data)?;
 
     let ip_vhl = data[0];
@@ -17,7 +18,7 @@ pub fn dissect(data: &[u8]) -> IResult<Option<Protocol>, &[u8], Error<&[u8]>> {
         )));
     }
 
-    let (_, ip_len) = be_u16(&data[4..])?;
+    let (_, pl_len) = be_u16(&data[4..])?;
     let ip_proto = data[6];
 
     let protocol = match ip_proto {
@@ -33,9 +34,9 @@ pub fn dissect(data: &[u8]) -> IResult<Option<Protocol>, &[u8], Error<&[u8]>> {
         _ => return Err(nom::Err::Error(Error::UnsupportIPProtocol(ip_proto))),
     };
 
-    let (_, payload) = take(ip_len as usize)(remain)?;
+    let (_, payload) = take(pl_len as usize)(remain)?;
 
-    Ok((Some(protocol), payload))
+    Ok(((total_len - pl_len as usize, Some(protocol)), payload))
 }
 
 #[cfg(test)]

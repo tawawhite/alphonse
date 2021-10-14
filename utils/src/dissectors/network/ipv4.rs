@@ -6,7 +6,7 @@ use nom::IResult;
 use super::ip_proto;
 use crate::dissectors::{Error, Protocol};
 
-pub fn dissect(data: &[u8]) -> IResult<Option<Protocol>, &[u8], Error<&[u8]>> {
+pub fn dissect(data: &[u8]) -> IResult<(usize, Option<Protocol>), &[u8], Error<&[u8]>> {
     let ip_vhl = data[0];
     let ip_version = ip_vhl >> 4;
 
@@ -16,7 +16,7 @@ pub fn dissect(data: &[u8]) -> IResult<Option<Protocol>, &[u8], Error<&[u8]>> {
         )));
     }
 
-    let ip_hdr_len = ((ip_vhl & 0x0f) * 4) as u16;
+    let ip_hdr_len = ((ip_vhl & 0x0f) * 4) as usize;
     if ip_hdr_len < 4 * 5 {
         // 如果报文中的IP头长度小于20字节或报文长度小于报文中声明的IP头长度, 数据包有错误
         return Err(nom::Err::Error(Error::CorruptPacket(
@@ -27,7 +27,7 @@ pub fn dissect(data: &[u8]) -> IResult<Option<Protocol>, &[u8], Error<&[u8]>> {
     let (data, _) = peek(take(2usize))(data)?;
     let (_, total_len) = peek(be_u16)(&data[2..])?;
     let (_, data) = take(total_len as usize)(data)?;
-    let (remain, data) = take(ip_hdr_len as usize)(data)?;
+    let (remain, data) = take(ip_hdr_len)(data)?;
 
     let ip_proto = data[9];
 
@@ -44,7 +44,7 @@ pub fn dissect(data: &[u8]) -> IResult<Option<Protocol>, &[u8], Error<&[u8]>> {
         _ => return Err(nom::Err::Error(Error::UnsupportIPProtocol(ip_proto))),
     };
 
-    Ok((Some(protocol), remain))
+    Ok(((ip_hdr_len, Some(protocol)), remain))
 }
 
 #[cfg(test)]

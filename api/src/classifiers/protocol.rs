@@ -67,6 +67,7 @@ mod test {
 
     use crate::classifiers::Classifier as ClassifierTrait;
     use crate::packet::test::Packet;
+    use crate::packet::Layers;
     use crate::packet::Packet as PacketTrait;
 
     #[test]
@@ -110,9 +111,13 @@ mod test {
         classifier.add_rule(&mut rule).unwrap();
 
         let mut pkt = Box::new(Packet::default());
-        pkt.layers_mut().datalink_mut().protocol = Protocol::ETHERNET;
-        pkt.layers_mut().network_mut().protocol = Protocol::IPV4;
-        pkt.layers_mut().transport_mut().protocol = Protocol::TCP;
+        *pkt.layers_mut() = Layers::new_with_default_max_layers();
+        pkt.layers_mut().datalink = Some(0);
+        pkt.layers_mut().datalink_mut().unwrap().protocol = Protocol::ETHERNET;
+        pkt.layers_mut().network = Some(0);
+        pkt.layers_mut().network_mut().unwrap().protocol = Protocol::IPV4;
+        pkt.layers_mut().transport = Some(0);
+        pkt.layers_mut().transport_mut().unwrap().protocol = Protocol::TCP;
         let mut pkt: Box<dyn PacketTrait> = pkt;
         classifier.classify(pkt.as_mut());
         assert_eq!(pkt.rules().len(), 1);

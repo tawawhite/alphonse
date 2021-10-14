@@ -12,22 +12,14 @@
 //! So what we actually doing here is parsing Cisco's HDLC protocol and its deriving protocols
 //! And in this specific case is Frame Relay protocol
 
-use std::num::NonZeroUsize;
-
 use nom::bytes::complete::take;
 use nom::number::streaming::be_u16;
-use nom::{IResult, Needed};
+use nom::IResult;
 use num_traits::FromPrimitive;
 
 use crate::dissectors::{Error, EtherType, Protocol};
 
-pub fn dissect(data: &[u8]) -> IResult<Option<Protocol>, &[u8], Error<&[u8]>> {
-    if data.len() < 4 {
-        return Err(nom::Err::Incomplete(Needed::Size(unsafe {
-            NonZeroUsize::new_unchecked(4)
-        })));
-    }
-
+pub fn dissect(data: &[u8]) -> IResult<(usize, Option<Protocol>), &[u8], Error<&[u8]>> {
     let (data, _) = take(2usize)(data)?;
     let (data, proto) = be_u16(data)?;
     let proto = match EtherType::from_u16(proto) {
@@ -35,5 +27,5 @@ pub fn dissect(data: &[u8]) -> IResult<Option<Protocol>, &[u8], Error<&[u8]>> {
         Some(proto) => proto.into(),
     };
 
-    Ok((Some(proto), data))
+    Ok(((4, Some(proto)), data))
 }

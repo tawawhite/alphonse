@@ -14,7 +14,7 @@ pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManage
 
 fn classify(ses: &mut Session, pkt: &dyn Packet) -> Result<()> {
     unsafe {
-        if pkt.src_port() == 17500 || pkt.dst_port() == 17500 {
+        if pkt.src_port() == Some(17500) || pkt.dst_port() == Some(17500) {
             add_protocol(ses, "dropbox-lan-sync");
         }
     }

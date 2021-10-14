@@ -3,7 +3,7 @@ use nom::IResult;
 
 use crate::dissectors::{Error, Protocol};
 
-pub fn dissect(data: &[u8]) -> IResult<Option<Protocol>, &[u8], Error<&[u8]>> {
+pub fn dissect(data: &[u8]) -> IResult<(usize, Option<Protocol>), &[u8], Error<&[u8]>> {
     let (remain, data) = take(4usize)(data)?;
 
     let protocol = match data[0] {
@@ -24,7 +24,7 @@ pub fn dissect(data: &[u8]) -> IResult<Option<Protocol>, &[u8], Error<&[u8]>> {
         _ => return Err(nom::Err::Error(Error::UnknownProtocol)),
     };
 
-    Ok((Some(protocol), remain))
+    Ok(((4, Some(protocol)), remain))
 }
 
 #[cfg(test)]
@@ -39,7 +39,7 @@ mod tests {
         let result = dissect(&buf);
         assert!(matches!(result, Ok(_)));
 
-        let (protocol, _) = result.unwrap();
+        let ((_, protocol), _) = result.unwrap();
         assert!(matches!(protocol, Some(Protocol::IPV4)));
     }
 
@@ -51,7 +51,7 @@ mod tests {
         let result = dissect(&buf);
         assert!(matches!(result, Ok(_)));
 
-        let (protocol, _) = result.unwrap();
+        let ((_, protocol), _) = result.unwrap();
         assert!(matches!(protocol, Some(Protocol::IPV6)));
     }
 

@@ -88,7 +88,12 @@ impl Pcr for Processor {
             self.fields = Some(Box::new(Kerberos::default()));
         }
 
-        match pkt.layers().trans.protocol {
+        let layer = match pkt.layers().transport() {
+            None => unreachable!("this should never happens"),
+            Some(l) => l,
+        };
+
+        match layer.protocol {
             Protocol::TCP => {
                 let tag: &[u8] = b"\x03\x02\x01\x05";
                 let r = take_until1::<&[u8], &[u8], nom::error::Error<&[u8]>>(tag)(pkt.payload());

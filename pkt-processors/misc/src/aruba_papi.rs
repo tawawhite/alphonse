@@ -13,7 +13,7 @@ pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManage
 }
 
 fn classify(ses: &mut Session, pkt: &dyn Packet) -> Result<()> {
-    if pkt.data_len() < 20 {
+    if pkt.payload().len() < 20 {
         return Ok(());
     }
     if pkt.payload()[0] != 0x49 || pkt.payload()[1] != 0x72 {
