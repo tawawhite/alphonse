@@ -168,7 +168,9 @@ pub fn init_plugins(
                     }
 
                     println!("Initializing {} rx driver", driver.name());
-                    driver.init(cfg)?;
+                    driver.init(cfg).map_err(|e| {
+                        anyhow!("Initializing {} rx dirver failed: {}", driver.name(), e)
+                    })?;
                     match &warehouse.rx_driver {
                         None => warehouse.rx_driver = Some(driver),
                         Some(d) => {
@@ -190,7 +192,13 @@ pub fn init_plugins(
                         .map_err(|e| anyhow!("{}", e))?;
                     let mut processor = *func();
                     println!("Initializing {} pkt processor", processor.name());
-                    processor.init(cfg)?;
+                    processor.init(cfg).map_err(|e| {
+                        anyhow!(
+                            "Initializing {} pkt processor failed: {}",
+                            processor.name(),
+                            e
+                        )
+                    })?;
                     processor.set_id(pkt_processor_cnt);
                     warehouse.pkt_processors.push(processor);
                     pkt_processor_cnt += 1;
@@ -204,7 +212,9 @@ pub fn init_plugins(
                         .map_err(|e| anyhow!("{}", e))?;
                     let mut plugin = *func();
                     println!("Initializing {} output plugin", plugin.name());
-                    plugin.init(cfg)?;
+                    plugin.init(cfg).map_err(|e| {
+                        anyhow!("Initializing {} output plugin failed: {}", plugin.name(), e)
+                    })?;
                     warehouse.output_plugins.push(plugin)
                 }
                 _ => {}
