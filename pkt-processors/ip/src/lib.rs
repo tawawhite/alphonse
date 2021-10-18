@@ -211,37 +211,37 @@ impl Processor for IPProcessor {
             return Ok(());
         };
 
-        if !self.classified {
-            self.classified = true;
-            match pkt.layers().network.protocol {
-                Protocol::IPV4 => {
-                    self.ip_protocol = pkt.layers().network.data(pkt)[9];
-                    ses.add_protocol(&"ipv4", ProtocolLayer::Network);
-                }
-                Protocol::IPV6 => {
-                    self.ip_protocol = pkt.layers().network.data(pkt)[6];
-                    ses.add_protocol(&"ipv6", ProtocolLayer::Network);
-                }
-                _ => unreachable!(),
-            }
-        }
-
-        self.src_ip.addr = unsafe {
-            match pkt.layers().network.protocol {
-                Protocol::IPV4 => IpAddr::V4(Ipv4Addr::from(pkt.src_ipv4())),
-                Protocol::IPV6 => IpAddr::V6(Ipv6Addr::from(*pkt.src_ipv6())),
-                _ => unreachable!(),
-            }
+        let layer = match pkt.layers().network() {
+            None => unreachable!("ip processor received a pkt with no network layer"),
+            Some(layer) => layer,
         };
 
-        self.dst_ip.addr = unsafe {
-            match pkt.layers().network.protocol {
-                Protocol::IPV4 => IpAddr::V4(Ipv4Addr::from(pkt.dst_ipv4())),
-                Protocol::IPV6 => IpAddr::V6(Ipv6Addr::from(*pkt.dst_ipv6())),
-                _ => {
-                    unreachable!()
+        match layer.protocol {
+            Protocol::IPV4 => {
+                self.ip_protocol = pkt.raw()[layer.range.clone()][9];
+                ses.add_protocol(&"ipv4", ProtocolLayer::Network);
+                self.src_ip.addr = match pkt.src_ipv4() {
+                    None => unreachable!("ip processor received a pkt with non ipv4 network layer"),
+                    Some(ipv4) => IpAddr::V4(Ipv4Addr::from(ipv4)),
+                };
+                self.dst_ip.addr = match pkt.dst_ipv4() {
+                    None => unreachable!("ip processor received a pkt with non ipv4 network layer"),
+                    Some(ipv4) => IpAddr::V4(Ipv4Addr::from(ipv4)),
                 }
             }
+            Protocol::IPV6 => {
+                self.ip_protocol = pkt.raw()[layer.range.clone()][6];
+                ses.add_protocol(&"ipv6", ProtocolLayer::Network);
+                self.src_ip.addr = match pkt.src_ipv6() {
+                    None => unreachable!("ip processor received a pkt with non ipv6 network layer"),
+                    Some(ipv6) => IpAddr::V6(Ipv6Addr::from(ipv6.clone())),
+                };
+                self.dst_ip.addr = match pkt.dst_ipv6() {
+                    None => unreachable!("ip processor received a pkt with non ipv6 network layer"),
+                    Some(ipv6) => IpAddr::V6(Ipv6Addr::from(ipv6.clone())),
+                }
+            }
+            _ => unreachable!("ip processor received a pkt with non ipv4/ipv6 network layer"),
         };
 
         let db = ASN_DB

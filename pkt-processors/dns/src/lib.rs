@@ -134,7 +134,12 @@ impl Processor for DNSProcessor {
             None => return Ok(()),
         };
 
-        let msg = match pkt.layers().trans.protocol {
+        let protocol = match pkt.layers().transport() {
+            None => unreachable!("dns get a pkt with no transport layer"),
+            Some(layer) => layer.protocol,
+        };
+
+        let msg = match protocol {
             Protocol::TCP => match parse_tcp_dns_packet(pkt.payload()) {
                 Err(e) => match e {
                     nom::Err::Incomplete(_) => {

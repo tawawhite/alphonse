@@ -51,10 +51,15 @@ impl TcpHdr {
         }
     }
 
+    // This method assumes pkt is a TCP packet
     pub fn from_pkt(pkt: &dyn Packet) -> &Self {
-        let layer = pkt.layers().trans;
-        let hdr = &pkt.raw()[layer.offset as usize..];
-        unsafe { &(*(hdr.as_ptr() as *const TcpHdr)) }
+        match pkt.layers().transport() {
+            None => unreachable!("Caller should gurantee this method only accpt TCP packet"),
+            Some(l) => {
+                let hdr = &pkt.raw()[l.range.clone()];
+                unsafe { &(*(hdr.as_ptr() as *const TcpHdr)) }
+            }
+        }
     }
 
     pub fn next_seq(&self, payload_len: u32) -> u32 {

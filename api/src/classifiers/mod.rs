@@ -6,7 +6,6 @@ use crate::plugins::processor::ProcessorID;
 
 pub mod all;
 pub mod dpi;
-pub mod ethertype;
 pub mod port;
 pub mod protocol;
 
@@ -21,8 +20,6 @@ pub enum RuleType {
     Port(port::Rule),
     // Get packets by protocol
     Protocol(protocol::Rule),
-    // Get packets by protocol
-    EtherType(ethertype::Rule),
     // Get all packets
     All,
 }
@@ -101,7 +98,6 @@ pub mod matched {
                 super::RuleType::Port(_) => RuleType::Port,
                 super::RuleType::DPI(_) => RuleType::DPI,
                 super::RuleType::Protocol(_) => RuleType::Protocol,
-                super::RuleType::EtherType(_) => RuleType::EtherType,
             }
         }
     }
@@ -179,8 +175,6 @@ pub struct ClassifierManager {
     dpi_classifier: dpi::Classifier,
     /// Protocol classifier
     proto_classifier: protocol::Classifier,
-    /// EtherType classifier
-    etype_classifier: ethertype::Classifier,
 }
 
 pub type ClassifyScratch = dpi::ClassifyScratch;
@@ -198,7 +192,6 @@ impl ClassifierManager {
             port_classifier: port::Classifier::default(),
             dpi_classifier: dpi::Classifier::default(),
             proto_classifier: protocol::Classifier::default(),
-            etype_classifier: ethertype::Classifier::default(),
         }
     }
 
@@ -316,13 +309,6 @@ impl ClassifierManager {
         Ok(self.add_rule(&mut rule)?)
     }
 
-    pub fn add_etype_rule(&mut self, id: ProcessorID, ethertype: u16) -> Result<RuleID> {
-        let etype_rule = ethertype::Rule { ethertype };
-        let mut rule = Rule::new(id);
-        rule.rule_type = RuleType::EtherType(etype_rule);
-        Ok(self.add_rule(&mut rule)?)
-    }
-
     /// Add a classify rule
     pub fn add_rule(&mut self, rule: &mut Rule) -> Result<RuleID> {
         // Find existing rule first, let individual classifiers handle same rule situation
@@ -334,7 +320,6 @@ impl ClassifierManager {
                     RuleType::DPI(_) => self.dpi_classifier.add_rule(rule)?,
                     RuleType::Port(_) => self.port_classifier.add_rule(rule)?,
                     RuleType::Protocol(_) => self.proto_classifier.add_rule(rule)?,
-                    RuleType::EtherType(_) => self.etype_classifier.add_rule(rule)?,
                 }
             }
             None => {
@@ -344,7 +329,6 @@ impl ClassifierManager {
                     RuleType::DPI(_) => self.dpi_classifier.add_rule(rule)?,
                     RuleType::Port(_) => self.port_classifier.add_rule(rule)?,
                     RuleType::Protocol(_) => self.proto_classifier.add_rule(rule)?,
-                    RuleType::EtherType(_) => self.etype_classifier.add_rule(rule)?,
                 };
                 self.rules.push(rule.clone());
                 match_rule
@@ -384,8 +368,6 @@ impl ClassifierManager {
         scratch: &mut dpi::ClassifyScratch,
     ) -> Result<()> {
         self.all_pkt_classifier.classify(pkt);
-
-        self.etype_classifier.classify(pkt);
 
         self.proto_classifier.classify(pkt);
 

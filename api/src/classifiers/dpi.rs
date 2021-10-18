@@ -148,6 +148,20 @@ impl Classifier {
             (_, None) => return Err(anyhow!("DPI classifier's hs scratch is None")),
         };
 
+        if pkt.payload().len() == 0 {
+            return Ok(());
+        }
+
+        let trans_protocol = match pkt.layers().transport() {
+            None => return Ok(()),
+            Some(l) => match l.protocol {
+                packet::Protocol::TCP | packet::Protocol::UDP | packet::Protocol::SCTP => {
+                    l.protocol
+                }
+                _ => unreachable!("this should never happens"),
+            },
+        };
+
         let mut id_from_tos = vec![];
         db.scan(pkt.payload(), scratch, |id, from, to, _flags| {
             match id_from_tos
@@ -172,7 +186,7 @@ impl Classifier {
         })?;
 
         for (id, (from, to)) in id_from_tos.iter() {
-            let proto = Protocol::from(pkt.layers().trans.protocol);
+            let proto = Protocol::from(trans_protocol);
             if self.dpi_rules[*id].protocol.contains(proto) {
                 let mut rule = self.rules[*id].clone();
                 if self.dpi_rules[*id].need_matched_pos {
@@ -214,11 +228,14 @@ pub struct ClassifyScratch {
 
 #[cfg(test)]
 mod test {
+    use std::ops::Range;
+
     use tinyvec::tiny_vec;
 
     use super::*;
     use crate::classifiers::Classifier as ClassifierTrait;
     use crate::packet::test::Packet;
+    use crate::packet::Layers;
     use crate::packet::Packet as PacketTrait;
 
     #[test]
@@ -266,7 +283,15 @@ mod test {
         let buf = b"a sentence contains word regex";
         pkt.raw = Box::new(buf.to_vec());
         let mut pkt: Box<dyn PacketTrait> = pkt;
-        pkt.layers_mut().app.protocol = crate::packet::Protocol::APPLICATION;
+        *pkt.layers_mut() = Layers::new_with_default_max_layers();
+        pkt.layers_mut().transport = Some(0);
+        pkt.layers_mut().transport_mut().unwrap().protocol = crate::packet::Protocol::TCP;
+        pkt.layers_mut().application = Some(1);
+        pkt.layers_mut().application_mut().unwrap().protocol = crate::packet::Protocol::APPLICATION;
+        pkt.layers_mut().application_mut().unwrap().range = Range {
+            start: 0,
+            end: buf.len(),
+        };
         classifier.classify(pkt.as_mut(), &mut scratch).unwrap();
         assert_eq!(pkt.rules().len(), 1);
         assert_eq!(pkt.rules()[0].id(), 10);
@@ -279,6 +304,15 @@ mod test {
         let buf = b"a sentence does not contains the word";
         pkt.raw = Box::new(buf.iter().cloned().collect());
         let mut pkt: Box<dyn PacketTrait> = pkt;
+        *pkt.layers_mut() = Layers::new_with_default_max_layers();
+        pkt.layers_mut().transport = Some(0);
+        pkt.layers_mut().transport_mut().unwrap().protocol = crate::packet::Protocol::TCP;
+        pkt.layers_mut().application = Some(1);
+        pkt.layers_mut().application_mut().unwrap().protocol = crate::packet::Protocol::APPLICATION;
+        pkt.layers_mut().application_mut().unwrap().range = Range {
+            start: 0,
+            end: buf.len(),
+        };
         classifier.classify(pkt.as_mut(), &mut scratch).unwrap();
         assert_eq!(pkt.rules().len(), 0);
     }
@@ -305,7 +339,15 @@ mod test {
         let mut pkt = Box::new(Packet::default());
         let buf = b"a sentence contains word regex";
         pkt.raw = Box::new(buf.iter().cloned().collect());
-        pkt.layers_mut().trans.protocol = packet::Protocol::TCP;
+        *pkt.layers_mut() = Layers::new_with_default_max_layers();
+        pkt.layers_mut().transport = Some(0);
+        pkt.layers_mut().transport_mut().unwrap().protocol = crate::packet::Protocol::TCP;
+        pkt.layers_mut().application = Some(1);
+        pkt.layers_mut().application_mut().unwrap().protocol = crate::packet::Protocol::APPLICATION;
+        pkt.layers_mut().application_mut().unwrap().range = Range {
+            start: 0,
+            end: buf.len(),
+        };
         let mut pkt: Box<dyn PacketTrait> = pkt;
         classifier.classify(pkt.as_mut(), &mut scratch).unwrap();
         assert_eq!(pkt.rules().len(), 0);

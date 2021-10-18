@@ -299,12 +299,17 @@ impl<'a> Processor for HttpProcessor<'static> {
             }
         }
 
-        if pkt.layers().trans.protocol != Protocol::TCP {
-            match self.process_pkt(pkt) {
-                Ok(_) => {}
-                Err(e) => eprintln!("{}", e),
-            };
-            return Ok(());
+        match pkt.layers().transport() {
+            None => unreachable!("http processor received a pkt with no transport layer"),
+            Some(l) => {
+                if l.protocol != Protocol::TCP {
+                    match self.process_pkt(pkt) {
+                        Ok(_) => {}
+                        Err(e) => eprintln!("{}", e),
+                    };
+                    return Ok(());
+                }
+            }
         }
 
         if self.tcp_reorder[direction].full() {

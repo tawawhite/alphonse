@@ -1,8 +1,5 @@
 #![allow(non_camel_case_types)]
 
-use super::{Dissector, Error};
-use super::{Layer, Protocol};
-
 pub mod arp;
 pub mod ethernet;
 pub mod frame_relay;

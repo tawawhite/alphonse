@@ -101,14 +101,14 @@ impl Processor for ProtocolParser {
     ) -> Result<()> {
         if !self.classified {
             self.src_dir = pkt.direction();
-            // If this session is already classified as this protocol, skip
             self.classified = true;
             ses.add_protocol(&self.name(), ProtocolLayer::Transport);
-            unsafe {
-                ses.add_field(&"srcPort", json!(pkt.src_port()));
-                ses.add_field(&"dstPort", json!(pkt.dst_port()));
-            }
-            // println!("{}", serde_json::to_string(ses).unwrap());
+            let (src_port, dst_port) = match (pkt.src_port(), pkt.dst_port()) {
+                (Some(sp), Some(dp)) => (sp, dp),
+                _ => unreachable!("tcp processor received a pkt don't have port"),
+            };
+            ses.add_field(&"srcPort", json!(src_port));
+            ses.add_field(&"dstPort", json!(dst_port));
         }
 
         let dir = pkt.direction() as usize;
@@ -135,9 +135,9 @@ impl Processor for ProtocolParser {
             } else {
                 self.flags_cnt.syn += 1;
                 if self.syn_time == 0 {
-                    self.syn_time = (pkt.ts().tv_sec - ses.start_time.tv_sec) as u64 * 1000000
-                        + (pkt.ts().tv_usec - ses.start_time.tv_usec) as u64
-                        + 1;
+                    // self.syn_time = (pkt.ts().tv_sec - ses.start_time.tv_sec) as u64 * 1000000
+                    //     + (pkt.ts().tv_usec - ses.start_time.tv_usec) as u64
+                    //     + 1;
                 }
                 self.ack_time = 0;
             }
@@ -146,14 +146,6 @@ impl Processor for ProtocolParser {
 
         if flags.contains(TcpFlags::RST) {
             self.flags_cnt.rst += 1;
-            let diff = seq_diff(hdr.seq, self.seq[dir]);
-            if diff <= 0 {
-                if diff == 0 {
-                    // TODO: inform alphonse this session should be closed
-                    return Ok(());
-                }
-            }
-            // TODO: update tcp state
         }
 
         if flags.contains(TcpFlags::FIN) {
@@ -194,18 +186,6 @@ impl Processor for ProtocolParser {
         ses.add_field(&"tcpflags", json!(self.flags_cnt));
         // println!("{}", serde_json::to_string_pretty(ses).unwrap());
     }
-}
-
-fn seq_diff(a: u32, b: u32) -> u32 {
-    // if a > 0xc0000000 && b < 0x40000000 {
-    //     return a.wrapping_add(0x100000000) - b;
-    // }
-
-    // if b > 0xc0000000 && a < 0x40000000 {
-    //     return a - b.wrapping_sub(0x100000000);
-    // }
-
-    return b - a;
 }
 
 #[no_mangle]

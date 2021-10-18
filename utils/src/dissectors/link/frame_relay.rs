@@ -12,40 +12,20 @@
 //! So what we actually doing here is parsing Cisco's HDLC protocol and its deriving protocols
 //! And in this specific case is Frame Relay protocol
 
-use super::ethernet::EtherType;
-use super::{Error, Layer, Protocol};
-
 use nom::bytes::complete::take;
 use nom::number::streaming::be_u16;
 use nom::IResult;
 use num_traits::FromPrimitive;
 
-#[derive(Default)]
-pub struct Dissector {}
+use crate::dissectors::{Error, EtherType, Protocol};
 
-impl super::Dissector for Dissector {
-    #[inline]
-    fn dissect(&self, buf: &[u8], offset: u16) -> Result<Option<Layer>, Error> {
-        if buf.len() < 4 {
-            return Err(Error::CorruptPacket(String::from(
-                "Corrupt FrameRelay packet",
-            )));
-        }
-
-        let (remain, protocol) = dissect(buf).or(Err(Error::CorruptPacket(String::from(
-            "Corrupt FrameRelay packet",
-        ))))?;
-        let offset = offset + (buf.len() - remain.len()) as u16;
-        Ok(Some(Layer { protocol, offset }))
-    }
-}
-
-fn dissect(buf: &[u8]) -> IResult<&[u8], Protocol> {
-    let (buf, _) = take(2usize)(buf)?;
-    let (buf, proto) = be_u16(buf)?;
+pub fn dissect(data: &[u8]) -> IResult<(usize, Option<Protocol>), &[u8], Error<&[u8]>> {
+    let (data, _) = take(2usize)(data)?;
+    let (data, proto) = be_u16(data)?;
     let proto = match EtherType::from_u16(proto) {
         None => Protocol::UNKNOWN,
         Some(proto) => proto.into(),
     };
-    Ok((buf, proto))
+
+    Ok(((4, Some(proto)), data))
 }

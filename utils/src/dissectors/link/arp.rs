@@ -1,26 +1,16 @@
-use super::Error;
-use super::Layer;
+use nom::bytes::complete::take;
+use nom::IResult;
 
-#[derive(Default)]
-pub struct Dissector {}
+use crate::dissectors::{Error, Protocol};
 
-impl super::Dissector for Dissector {
-    #[inline]
-    fn dissect(&self, buf: &[u8], _offset: u16) -> Result<Option<Layer>, Error> {
-        if buf.len() < 28 {
-            return Err(Error::CorruptPacket(format!(
-                "The arp packet is corrupted, packet too short ({} bytes)",
-                buf.len()
-            )));
-        }
-
-        if buf[7] > 2 {
-            // Neither a request nor a response
-            return Err(Error::CorruptPacket(format!(
-                "The arp packet is corrupted, Neither a request nor a response"
-            )));
-        }
-
-        Ok(None)
+pub fn dissect(data: &[u8]) -> IResult<(usize, Option<Protocol>), &[u8], Error<&[u8]>> {
+    let (remain, data) = take(28usize)(data)?;
+    if data[7] > 2 {
+        // Neither a request nor a response
+        return Err(nom::Err::Error(Error::CorruptPacket(
+            "The arp packet is corrupted, Neither a request nor a response",
+        )));
     }
+
+    Ok(((28, None), &[]))
 }

@@ -14,7 +14,7 @@ pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManage
 }
 
 fn classify(ses: &mut Session, pkt: &dyn Packet) -> Result<()> {
-    if pkt.data_len() < 18 {
+    if pkt.payload().len() < 18 {
         return Ok(());
     }
 

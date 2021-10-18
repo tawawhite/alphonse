@@ -1,36 +1,28 @@
-use super::{Error, Layer, Protocol};
+use nom::bytes::complete::take;
+use nom::combinator::peek;
+use nom::number::complete::be_u16;
+use nom::IResult;
 
-#[derive(Default)]
-pub struct Dissector;
+use super::{Error, Protocol};
 
-impl super::Dissector for Dissector {
-    #[inline]
-    fn dissect(&self, buf: &[u8], offset: u16) -> Result<Option<Layer>, Error> {
-        if buf.len() < 8 || buf[0] != 0x11 || buf[1] != 0 {
-            return Err(Error::CorruptPacket(format!("Corrupted PPPOE packet")));
-        }
-
-        let plen = (((buf[4] as u16) << 8) | buf[5] as u16) as usize;
-        if plen != buf.len() - 6 {
-            return Err(Error::CorruptPacket(format!("Corrupted PPPOE packet")));
-        }
-
-        let protocol = ((buf[6] as u16) << 8) | buf[7] as u16;
-        let layer = match protocol {
-            0x21 => Layer {
-                protocol: Protocol::IPV4,
-                offset: offset + 8,
-            },
-            0x57 => Layer {
-                protocol: Protocol::IPV6,
-                offset: offset + 8,
-            },
-            _ => Layer {
-                protocol: Protocol::UNKNOWN,
-                offset: offset + 8,
-            },
-        };
-
-        Ok(Some(layer))
+pub fn dissect(data: &[u8]) -> IResult<(usize, Option<Protocol>), &[u8], Error<&[u8]>> {
+    let org_len = data.len();
+    let (remain, data) = take(8usize)(data)?;
+    if data[0] != 0x11 || data[1] != 0 {
+        return Err(nom::Err::Error(Error::CorruptPacket(
+            "Corrupted PPPOE packet",
+        )));
     }
+
+    let (_, plen) = be_u16(&data[4..])?;
+    let (_, _) = peek(take(plen as usize))(remain)?;
+
+    let (_, protocol) = be_u16(&data[6..])?;
+    let protocol = match protocol {
+        0x21 => Protocol::IPV4,
+        0x57 => Protocol::IPV6,
+        _ => Protocol::UNKNOWN,
+    };
+
+    Ok(((org_len - remain.len(), Some(protocol)), remain))
 }

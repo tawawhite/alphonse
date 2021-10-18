@@ -145,9 +145,11 @@ impl Processor for DHCPProcessor {
 
 fn parse_dhcp(ses: &mut Session, pkt: &dyn Packet, dhcp: &mut DHCP) {
     let payload = pkt.payload();
-    if payload.len() < 256
-        || (payload[0] != 1 && payload[0] != 2) && pkt.layers().network.protocol == Protocol::IPV4
-    {
+    let protocol = match pkt.layers().network() {
+        None => unreachable!("dhcp processor received a pkt with no network layer"),
+        Some(layer) => layer.protocol,
+    };
+    if payload.len() < 256 || (payload[0] != 1 && payload[0] != 2) && protocol == Protocol::IPV4 {
         if payload.len() < 240 || &payload[236..240] != b"\x63\x82\x53\x63" {
             return;
         }
@@ -178,10 +180,11 @@ fn parse_dhcp(ses: &mut Session, pkt: &dyn Packet, dhcp: &mut DHCP) {
 }
 
 fn parse_dhcpv6(ses: &mut Session, pkt: &dyn Packet) {
-    if pkt.payload()[0] != 1
-        && pkt.payload()[0] != 11
-        && pkt.layers().network.protocol == Protocol::IPV6
-    {
+    let protocol = match pkt.layers().network() {
+        None => unreachable!("dhcp processor received a pkt with no network layer"),
+        Some(layer) => layer.protocol,
+    };
+    if pkt.payload()[0] != 1 && pkt.payload()[0] != 11 && protocol == Protocol::IPV6 {
         return;
     }
 

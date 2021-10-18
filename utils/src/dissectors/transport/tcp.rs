@@ -1,41 +1,19 @@
-use super::{Error, Layer, Protocol};
+use nom::bytes::complete::take;
+use nom::combinator::peek;
+use nom::IResult;
 
-#[derive(Default)]
-pub struct Dissector {}
+use super::{Error, Protocol};
 
-impl super::Dissector for Dissector {
-    #[inline]
-    fn dissect(&self, buf: &[u8], offset: u16) -> Result<Option<Layer>, Error> {
-        if buf.len() < 20 {
-            // 如果报文内容长度小于IP报文最短长度(IP协议头长度)
-            // 数据包有错误
-            return Err(Error::CorruptPacket(format!(
-                "Corrupted TCP packet, packet too short ({} bytes)",
-                buf.len()
-            )));
-        }
+pub fn dissect(data: &[u8]) -> IResult<(usize, Option<Protocol>), &[u8], Error<&[u8]>> {
+    let (remain, data) = peek(take(13usize))(data)?;
+    let tcp_hdr_len = ((data[12] >> 4) * 4) as usize;
 
-        let tcp_hdr_len = (buf[12] >> 4) * 4;
-        if tcp_hdr_len as usize > buf.len() {
-            return Err(Error::CorruptPacket(format!(
-                "Corrupted TCP packet, packet too short ({} bytes)",
-                buf.len()
-            )));
-        }
-
-        let layer = Layer {
-            protocol: Protocol::APPLICATION,
-            offset: offset + tcp_hdr_len as u16,
-        };
-
-        Ok(Some(layer))
-    }
+    let (remain, _) = take(tcp_hdr_len)(remain)?;
+    return Ok(((tcp_hdr_len, Some(Protocol::APPLICATION)), remain));
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::dissectors::Dissector as D;
-
     use super::*;
 
     #[test]
@@ -46,18 +24,15 @@ mod tests {
             0x01, 0x01, 0x08, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x01,
             0x04, 0x02,
         ];
-        let dissector = Dissector::default();
-        assert!(matches!(dissector.dissect(&buf, 0), Ok(_)));
+        assert!(matches!(dissect(&buf), Ok(_)));
     }
 
     #[test]
     fn test_err_packet_too_short() {
         let buf = [0x04];
-        let dissector = Dissector::default();
-        let result = dissector.dissect(&buf, 0);
+        let result = dissect(&buf);
         assert!(matches!(result, Err(_)));
-        let err = result.unwrap_err();
-        assert!(matches!(err, Error::CorruptPacket(_)));
+        assert!(matches!(result, Err(nom::Err::Error(Error::Nom(_, _)))));
     }
 
     #[test]
@@ -68,10 +43,7 @@ mod tests {
             0x01, 0x01, 0x08, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x01,
             0x04, 0x02,
         ];
-        let dissector = Dissector::default();
-        let result = dissector.dissect(&buf, 0);
-        assert!(matches!(result, Err(_)));
-        let err = result.unwrap_err();
-        assert!(matches!(err, Error::CorruptPacket(_)));
+        let result = dissect(&buf);
+        assert!(matches!(result, Err(nom::Err::Error(Error::Nom(_, _)))));
     }
 }

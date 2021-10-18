@@ -213,11 +213,11 @@ impl Session {
         if pkt.direction() == self.src_direction {
             self.pkt_count[0] += 1;
             self.bytes[0] += pkt.caplen() as u64;
-            self.data_bytes[0] += pkt.data_len() as u64;
+            self.data_bytes[0] += pkt.payload().len() as u64;
         } else {
             self.pkt_count[1] += 1;
             self.bytes[1] += pkt.caplen() as u64;
-            self.data_bytes[1] += pkt.data_len() as u64;
+            self.data_bytes[1] += pkt.payload().len() as u64;
         }
 
         self.end_time = TimeVal::new(*pkt.ts());

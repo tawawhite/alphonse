@@ -1,25 +1,23 @@
-use super::{Error, Layer};
+use crate::dissectors::{Error, Protocol};
 
-use nom::number::streaming::{be_u16, be_u32, be_u8};
+use nom::number::complete::{be_u16, be_u8};
 use nom::IResult;
 
-#[derive(Default)]
-pub struct Dissector {}
+// struct Type(u8);
+// impl Type {
+//     pub const EchoReplay: u8 = 0;
+//     pub const DesUnreachable: u8 = 3;
+// }
 
-impl super::Dissector for Dissector {
-    #[inline]
-    fn dissect(&self, buf: &[u8], _offset: u16) -> Result<Option<Layer>, Error> {
-        dissect(buf).or(Err(Error::CorruptPacket(String::from(
-            "Corrupt ICMP packet",
-        ))))?;
-
-        return Ok(None);
-    }
+#[repr(u8)]
+enum Type {
+    EchoReplay = 0,
+    DesUnreachable = 3,
 }
 
-fn dissect(buf: &[u8]) -> IResult<&[u8], ()> {
-    let (buf, _) = be_u8(buf)?;
-    let (buf, _) = be_u16(buf)?;
-    let (buf, _) = be_u32(buf)?;
-    Ok((buf, ()))
+pub fn dissect(data: &[u8]) -> IResult<(usize, Option<Protocol>), &[u8], Error<&[u8]>> {
+    let (data, icmp_type) = be_u8(data)?;
+    let (data, code) = be_u8(data)?;
+    let (data, checksum) = be_u16(data)?;
+    Ok(((4, None), &[]))
 }

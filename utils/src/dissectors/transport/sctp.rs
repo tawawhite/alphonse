@@ -1,25 +1,9 @@
-use super::{Error, Layer, Protocol};
+use nom::bytes::complete::take;
+use nom::IResult;
 
-#[derive(Default)]
-pub struct Dissector {}
+use super::{Error, Protocol};
 
-impl super::Dissector for Dissector {
-    #[inline]
-    fn dissect(&self, buf: &[u8], offset: u16) -> Result<Option<Layer>, Error> {
-        if buf.len() < 12 {
-            return Err(Error::CorruptPacket(format!(
-                "Corrupted SCTP packet, packet too short ({} bytes)",
-                buf.len()
-            )));
-        }
-
-        // here we asume sctp must has at least one data chunk
-        // need checking rfc document to make sure
-        let layer = Layer {
-            protocol: Protocol::APPLICATION,
-            offset: offset + 16 as u16,
-        };
-
-        Ok(Some(layer))
-    }
+pub fn dissect(data: &[u8]) -> IResult<(usize, Option<Protocol>), &[u8], Error<&[u8]>> {
+    let (remain, _) = take(12usize)(data)?;
+    return Ok(((12, Some(Protocol::APPLICATION)), remain));
 }
