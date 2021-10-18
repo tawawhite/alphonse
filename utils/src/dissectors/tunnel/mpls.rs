@@ -117,7 +117,6 @@ mod tests {
 
         let result = dissect(&buffer);
         assert!(result.is_ok());
-        let (protocol, data) = result.unwrap();
         let ((len, protocol), data) = result.unwrap();
         assert_eq!(len, 4);
         assert_eq!(data.len(), buffer.len() - 4);
