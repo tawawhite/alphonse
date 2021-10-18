@@ -3,7 +3,7 @@ extern crate clap;
 #[macro_use]
 extern crate strum;
 
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
@@ -21,7 +21,7 @@ mod threadings;
 
 use threadings::SessionTable;
 
-pub static mut LAST_PACKET: OnceCell<Vec<u64>> = OnceCell::new();
+pub static LAST_PACKET: OnceCell<Vec<Arc<AtomicU64>>> = OnceCell::new();
 
 fn main() -> Result<()> {
     let root_cmd = commands::new_root_command();
@@ -60,12 +60,10 @@ fn main() -> Result<()> {
     let mut timeout_threads = vec![];
     let mut session_tables = vec![];
 
-    let last_packet = vec![0; cfg.pkt_threads as usize];
-    unsafe {
-        LAST_PACKET
-            .set(last_packet)
-            .or(Err(anyhow!("alphonse LAST_PACKET is already setted")))?;
-    }
+    let last_packet = vec![Arc::new(AtomicU64::new(0)); cfg.pkt_threads as usize];
+    LAST_PACKET
+        .set(last_packet)
+        .or(Err(anyhow!("alphonse LAST_PACKET is already setted")))?;
 
     for i in 0..cfg.pkt_threads {
         let (sender, receiver) = bounded(cfg.pkt_channel_size as usize);
@@ -100,10 +98,9 @@ fn main() -> Result<()> {
     for thread in timeout_threads {
         let cfg = cfg.clone();
         let builder = std::thread::Builder::new().name(thread.name());
-        let last_packet =
-            unsafe { &mut LAST_PACKET.get_mut().ok_or(anyhow!(""))?[thread.id as usize] };
+        let last_packet = &LAST_PACKET.get().ok_or(anyhow!(""))?[thread.id as usize];
         let handle = builder
-            .spawn(move || thread.spawn(cfg, last_packet))
+            .spawn(move || thread.spawn(cfg, last_packet.clone()))
             .unwrap();
         handles.push(handle);
     }
@@ -119,9 +116,8 @@ fn main() -> Result<()> {
                 .collect(),
         );
         let builder = std::thread::Builder::new().name(thread.name());
-        let last_packet =
-            unsafe { &mut LAST_PACKET.get_mut().ok_or(anyhow!(""))?[thread.id as usize] };
-        let handle = builder.spawn(move || thread.spawn(cfg, parsers, last_packet))?;
+        let last_packet = &LAST_PACKET.get().ok_or(anyhow!(""))?[thread.id as usize];
+        let handle = builder.spawn(move || thread.spawn(cfg, parsers, last_packet.clone()))?;
         handles.push(handle);
     }
 

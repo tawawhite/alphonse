@@ -1,7 +1,7 @@
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use crossbeam_channel::Receiver;
 use serde_json::json;
 
@@ -96,7 +96,7 @@ impl PktThread {
         &self,
         cfg: Arc<Config>,
         mut processors: Box<Vec<Box<dyn Processor>>>,
-        last_packet: &mut u64,
+        last_packet: Arc<AtomicU64>,
     ) -> Result<()> {
         let mut classify_scratch = match self.classifier.alloc_scratch() {
             Ok(scratch) => scratch,
@@ -112,7 +112,7 @@ impl PktThread {
                 }
                 Ok(s) => s,
             };
-            *last_packet = pkt.ts().tv_sec as u64;
+            last_packet.store(pkt.ts().tv_sec as u64, Ordering::Relaxed);
 
             let key = PacketHashKey::from(pkt.as_ref());
             match self.session_table.get_mut(&key) {

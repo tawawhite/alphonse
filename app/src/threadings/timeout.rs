@@ -1,5 +1,5 @@
 use std::os::raw::c_long;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 
 use anyhow::Result;
@@ -58,12 +58,13 @@ impl TimeoutThread {
         format!("alphonse-timeout{}", self.id)
     }
 
-    pub fn spawn(&self, cfg: Arc<Config>, last_packet: &mut u64) -> Result<()> {
-        let mut next_timeout_check_time: u64 = *last_packet + cfg.timeout_interval;
+    pub fn spawn(&self, cfg: Arc<Config>, last_packet: Arc<AtomicU64>) -> Result<()> {
+        let now = last_packet.load(Ordering::Relaxed);
+        let mut next_timeout_check_time: u64 = now + cfg.timeout_interval;
         println!("{} started", self.name());
 
         while !self.exit.load(Ordering::Relaxed) {
-            let now = *last_packet;
+            let now = last_packet.load(Ordering::Relaxed);
             if now <= next_timeout_check_time {
                 continue;
             }
