@@ -165,7 +165,7 @@ impl ProtocolDessector {
                             protocol: p,
                             range: Range {
                                 start: consumed,
-                                end: consumed + len,
+                                end: consumed + data.len(),
                             },
                         };
                         layers.as_mut().push(layer);
