@@ -13,10 +13,8 @@ pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManage
 }
 
 fn classify(ses: &mut Session, pkt: &dyn Packet) -> Result<()> {
-    unsafe {
-        if pkt.src_port() == Some(520) || pkt.dst_port() == Some(520) {
-            add_protocol(ses, "rip");
-        }
+    if pkt.src_port() == Some(520) || pkt.dst_port() == Some(520) {
+        add_protocol(ses, "rip");
     }
 
     Ok(())

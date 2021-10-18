@@ -17,10 +17,8 @@ pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManage
 }
 
 fn classify(ses: &mut Session, pkt: &dyn Packet) -> Result<()> {
-    unsafe {
-        if pkt.src_port() != Some(123) && pkt.dst_port() != Some(123) {
-            return Ok(());
-        }
+    if pkt.src_port() != Some(123) && pkt.dst_port() != Some(123) {
+        return Ok(());
     }
 
     if pkt.payload().len() < 48 || pkt.payload()[1] > 16 {
