@@ -131,18 +131,28 @@ impl Plugin for IPProcessor {
     fn init(&mut self, alcfg: &api::config::Config) -> Result<()> {
         let db_dir = PathBuf::from(alcfg.get_str(&"ip.db.directory", "etc"));
         let db_path = db_dir.join("GeoLite2-ASN.mmdb");
+        if !db_path.exists() {
+            return Err(anyhow!("{} does not exist", db_path.to_string_lossy()));
+        }
+
         ASN_DB
             .set(GeoLiteReader::open_mmap(db_path)?)
             .ok()
             .ok_or(anyhow!("{} ASN_DBS are already set", self.name()))?;
 
         let db_path = db_dir.join("GeoLite2-Country.mmdb");
+        if !db_path.exists() {
+            return Err(anyhow!("{} does not exist", db_path.to_string_lossy()));
+        }
         COUNTRY_DB
             .set(GeoLiteReader::open_mmap(db_path)?)
             .ok()
             .ok_or(anyhow!("{} COUNTRY_DBS are already set", self.name()))?;
 
         let db_path = db_dir.join("GeoLite2-City.mmdb");
+        if !db_path.exists() {
+            return Err(anyhow!("{} does not exist", db_path.to_string_lossy()));
+        }
         CITY_DB
             .set(GeoLiteReader::open_mmap(db_path)?)
             .ok()
@@ -159,6 +169,9 @@ impl Plugin for IPProcessor {
             "Note",
         ]);
         let rir_path = db_dir.join("ipv4-address-space.csv");
+        if !rir_path.exists() {
+            return Err(anyhow!("{} does not exist", rir_path.to_string_lossy()));
+        }
         let mut reader = csv::Reader::from_path(rir_path)?;
         reader.set_headers(headers.clone());
         for (i, row) in reader.records().enumerate() {
