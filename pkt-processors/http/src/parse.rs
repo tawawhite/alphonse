@@ -338,6 +338,9 @@ pub(crate) fn on_message_complete(parser: &mut llhttp::Parser<Data>) -> Result<(
 }
 
 fn find_subsequence(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+    if needle.is_empty() {
+        return None;
+    }
     haystack
         .windows(needle.len())
         .position(|window| window == needle)
