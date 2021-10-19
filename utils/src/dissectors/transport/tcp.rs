@@ -7,6 +7,11 @@ use super::{Error, Protocol};
 pub fn dissect(data: &[u8]) -> IResult<(usize, Option<Protocol>), &[u8], Error<&[u8]>> {
     let (remain, data) = peek(take(13usize))(data)?;
     let tcp_hdr_len = ((data[12] >> 4) * 4) as usize;
+    if tcp_hdr_len < 20 {
+        return Err(nom::Err::Error(Error::CorruptPacket(
+            "Corrupted TCP packet, tcp header len too short",
+        )));
+    }
 
     let (remain, _) = take(tcp_hdr_len)(remain)?;
     return Ok(((tcp_hdr_len, Some(Protocol::APPLICATION)), remain));
