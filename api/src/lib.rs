@@ -2,6 +2,8 @@
 extern crate bitflags;
 #[macro_use]
 extern crate enum_primitive_derive;
+#[macro_use]
+extern crate strum;
 
 #[cfg(feature = "use-tcmalloc")]
 use tcmalloc::TCMalloc;

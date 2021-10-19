@@ -557,52 +557,84 @@ impl std::fmt::Debug for dyn Packet {
 }
 
 #[repr(u8)]
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, AsRefStr)]
 /// Protocol collection, 1 byte
 pub enum Protocol {
     // Data link layer protocols
+    #[strum(serialize = "null")]
     NULL,
+    #[strum(serialize = "ethernet")]
     ETHERNET,
+    #[strum(serialize = "raw")]
     RAW,
+    #[strum(serialize = "frame_relay")]
     FRAME_RELAY,
+    #[strum(serialize = "ppp")]
     PPP,
+    #[strum(serialize = "mpls")]
     MPLS,
+    #[strum(serialize = "pppoe")]
     PPPOE,
+    #[strum(serialize = "arp")]
     ARP,
 
     // Tunnel protocols
+    #[strum(serialize = "gre")]
     GRE,
+    #[strum(serialize = "l2tp")]
     L2TP,
+    #[strum(serialize = "erspan")]
     ERSPAN,
 
     // Network layer protocols
+    #[strum(serialize = "ipv4")]
     IPV4,
+    #[strum(serialize = "ipv6")]
     IPV6,
+    #[strum(serialize = "icmp")]
     ICMP,
+    #[strum(serialize = "clns")]
     CLNS,
+    #[strum(serialize = "ddp")]
     DDP,
+    #[strum(serialize = "egp")]
     EGP,
+    #[strum(serialize = "eigrp")]
     EIGRP,
+    #[strum(serialize = "igmp")]
     IGMP,
+    #[strum(serialize = "ipx")]
     IPX,
+    #[strum(serialize = "esp")]
     ESP,
+    #[strum(serialize = "ospf")]
     OSPF,
+    #[strum(serialize = "pim")]
     PIM,
+    #[strum(serialize = "rip")]
     RIP,
+    #[strum(serialize = "vlan")]
     VLAN,
+    #[strum(serialize = "wireguard")]
     WIREGUARD,
 
     // Transport layer protocols
+    #[strum(serialize = "tcp")]
     TCP,
+    #[strum(serialize = "udp")]
     UDP,
+    #[strum(serialize = "sctp")]
     SCTP,
 
     // Application layer protocols
+    #[strum(serialize = "http")]
     HTTP,
 
     // Unknown protocol
+    #[strum(serialize = "unknown")]
     UNKNOWN,
 
+    #[strum(serialize = "application")]
     APPLICATION,
 }
 
