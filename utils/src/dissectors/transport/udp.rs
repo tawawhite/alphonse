@@ -4,7 +4,7 @@ use nom::IResult;
 
 use super::{Error, Protocol};
 
-pub fn dissect(data: &[u8]) -> IResult<(usize, Option<Protocol>), &[u8], Error<&[u8]>> {
+pub fn dissect(data: &[u8]) -> IResult<(usize, Option<Protocol>), &[u8], Error> {
     let (remain, data) = take(8usize)(data)?;
 
     let (data, src_port) = be_u16(data)?;
@@ -39,7 +39,7 @@ mod test {
     fn test_pkt_too_short() {
         let buf = [0xf4];
         let result = dissect(&buf);
-        assert!(matches!(result, Err(nom::Err::Error(Error::Nom(_, _)))));
+        assert!(matches!(result, Err(nom::Err::Error(Error::Nom(_)))));
     }
 
     #[test]

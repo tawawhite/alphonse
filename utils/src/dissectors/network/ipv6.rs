@@ -5,7 +5,7 @@ use nom::IResult;
 use super::ip_proto;
 use crate::dissectors::{Error, Protocol};
 
-pub fn dissect(data: &[u8]) -> IResult<(usize, Option<Protocol>), &[u8], Error<&[u8]>> {
+pub fn dissect(data: &[u8]) -> IResult<(usize, Option<Protocol>), &[u8], Error> {
     let total_len = data.len();
     let (remain, data) = take(40usize)(data)?;
 
@@ -84,7 +84,7 @@ mod tests {
     fn test_err_pkt_too_short() {
         let buf = [0x60];
         let result = dissect(&buf);
-        assert!(matches!(result, Err(nom::Err::Error(Error::Nom(_, _)))));
+        assert!(matches!(result, Err(nom::Err::Error(Error::Nom(_)))));
     }
 
     #[test]
@@ -109,7 +109,7 @@ mod tests {
             0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02,
         ];
         let result = dissect(&buf);
-        assert!(matches!(result, Err(nom::Err::Error(Error::Nom(_, _)))));
+        assert!(matches!(result, Err(nom::Err::Error(Error::Nom(_)))));
     }
 
     #[test]

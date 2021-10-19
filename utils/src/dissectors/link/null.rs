@@ -3,7 +3,7 @@ use nom::IResult;
 
 use crate::dissectors::{Error, Protocol};
 
-pub fn dissect(data: &[u8]) -> IResult<(usize, Option<Protocol>), &[u8], Error<&[u8]>> {
+pub fn dissect(data: &[u8]) -> IResult<(usize, Option<Protocol>), &[u8], Error> {
     let (remain, data) = take(4usize)(data)?;
 
     let protocol = match data[0] {
@@ -59,7 +59,7 @@ mod tests {
     fn test_err_pkt_too_short() {
         let buf = [0x01];
         let result = dissect(&buf);
-        assert!(matches!(result, Err(nom::Err::Error(Error::Nom(_, _)))));
+        assert!(matches!(result, Err(nom::Err::Error(Error::Nom(_)))));
     }
 
     #[test]

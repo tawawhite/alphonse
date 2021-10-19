@@ -4,7 +4,7 @@ use nom::IResult;
 
 use super::{Error, Protocol};
 
-pub fn dissect(data: &[u8]) -> IResult<(usize, Option<Protocol>), &[u8], Error<&[u8]>> {
+pub fn dissect(data: &[u8]) -> IResult<(usize, Option<Protocol>), &[u8], Error> {
     let (remain, data) = peek(take(13usize))(data)?;
     let tcp_hdr_len = ((data[12] >> 4) * 4) as usize;
     if tcp_hdr_len < 20 {
@@ -37,7 +37,7 @@ mod tests {
         let buf = [0x04];
         let result = dissect(&buf);
         assert!(matches!(result, Err(_)));
-        assert!(matches!(result, Err(nom::Err::Error(Error::Nom(_, _)))));
+        assert!(matches!(result, Err(nom::Err::Error(Error::Nom(_)))));
     }
 
     #[test]
@@ -49,6 +49,6 @@ mod tests {
             0x04, 0x02,
         ];
         let result = dissect(&buf);
-        assert!(matches!(result, Err(nom::Err::Error(Error::Nom(_, _)))));
+        assert!(matches!(result, Err(nom::Err::Error(Error::Nom(_)))));
     }
 }

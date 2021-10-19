@@ -5,7 +5,7 @@ use num_traits::FromPrimitive;
 
 use crate::dissectors::{Error, EtherType, Protocol};
 
-pub fn dissect(data: &[u8]) -> IResult<(usize, Option<Protocol>), &[u8], Error<&[u8]>> {
+pub fn dissect(data: &[u8]) -> IResult<(usize, Option<Protocol>), &[u8], Error> {
     let (remain, data) = take(14usize)(data)?;
     let (_, etype) = be_u16(&data[12..])?;
     let protocol = match EtherType::from_u16(etype) {
@@ -34,7 +34,7 @@ mod tests {
             0x01, 0x80, 0xc2, 0x00, 0x00, 0x00, 0xcc, 0x04, 0x0d, 0x5c, 0xf0, 0x00,
         ];
         let result = dissect(&buf);
-        assert!(matches!(result, Err(nom::Err::Error(Error::Nom(_, _)))));
+        assert!(matches!(result, Err(nom::Err::Error(Error::Nom(_)))));
     }
 
     #[test]

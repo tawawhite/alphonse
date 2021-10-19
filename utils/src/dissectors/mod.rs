@@ -22,19 +22,19 @@ use link::LinkType;
 /// # Arguments
 ///
 /// * `data` - Data of this layer and its payload
-pub type Callback = fn(data: &[u8]) -> IResult<(usize, Option<Protocol>), &[u8], Error<&[u8]>>;
+pub type Callback = fn(data: &[u8]) -> IResult<(usize, Option<Protocol>), &[u8], Error>;
 
 #[derive(Debug)]
-pub enum Error<I> {
+pub enum Error {
     UnsupportProtocol(&'static str),
     UnsupportIPProtocol(u8),
     CorruptPacket(&'static str),
     UnknownProtocol,
     UnknownEtype(u16),
-    Nom(I, ErrorKind),
+    Nom(ErrorKind),
 }
 
-impl<I> Display for Error<I> {
+impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Error::UnknownProtocol => write!(f, "Unknown Protocol"),
@@ -43,14 +43,14 @@ impl<I> Display for Error<I> {
             Error::UnsupportIPProtocol(ip_proto) => {
                 write!(f, "Unsupport IP Protocol({})", ip_proto)
             }
-            Error::Nom(_, _) => write!(f, "Nom parse error",),
+            Error::Nom(_) => write!(f, "Nom parse error",),
         }
     }
 }
 
-impl<I> ParseError<I> for Error<I> {
-    fn from_error_kind(input: I, kind: ErrorKind) -> Self {
-        Error::Nom(input, kind)
+impl<I> ParseError<I> for Error {
+    fn from_error_kind(_: I, kind: ErrorKind) -> Self {
+        Error::Nom(kind)
     }
 
     fn append(_: I, _: ErrorKind, other: Self) -> Self {
@@ -58,7 +58,7 @@ impl<I> ParseError<I> for Error<I> {
     }
 }
 
-impl<I: std::fmt::Debug> std::error::Error for Error<I> {}
+impl std::error::Error for Error {}
 
 pub struct ProtocolDessector {
     /// SnapLen, Snap Length, or snapshot length is the amount of data for each frame
@@ -114,7 +114,7 @@ impl ProtocolDessector {
 
     /// parse a single packet
     #[inline]
-    pub fn parse_pkt(&self, pkt: &mut dyn Packet) -> Result<(), Error<&[u8]>> {
+    pub fn parse_pkt(&self, pkt: &mut dyn Packet) -> Result<(), Error> {
         let mut consumed = 0;
         let mut layers = Layers::default();
         let mut cur_proto = None;
@@ -130,7 +130,15 @@ impl ProtocolDessector {
         loop {
             let ((len, nxt_proto), data) = match result {
                 Ok(r) => r,
-                Err(_) => todo!("properly handle parse error"),
+                Err(e) => {
+                    match e {
+                        nom::Err::Error(e) => return Err(e),
+                        nom::Err::Incomplete(_) => {
+                            return Err(Error::Nom(nom::error::ErrorKind::Eof))
+                        }
+                        nom::Err::Failure(e) => return Err(e),
+                    };
+                }
             };
 
             match cur_proto {

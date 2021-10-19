@@ -43,7 +43,7 @@ fn l2tp_version(control: u16) -> u16 {
     control & 0x000f
 }
 
-pub fn dissect(data: &[u8]) -> IResult<(usize, Option<Protocol>), &[u8], Error<&[u8]>> {
+pub fn dissect(data: &[u8]) -> IResult<(usize, Option<Protocol>), &[u8], Error> {
     let org_len = data.len();
     let (data, control) = be_u16(data)?;
 

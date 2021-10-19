@@ -5,7 +5,7 @@ use nom::IResult;
 
 use super::{Error, Protocol};
 
-pub fn dissect(data: &[u8]) -> IResult<(usize, Option<Protocol>), &[u8], Error<&[u8]>> {
+pub fn dissect(data: &[u8]) -> IResult<(usize, Option<Protocol>), &[u8], Error> {
     let org_len = data.len();
     let (remain, data) = take(8usize)(data)?;
     if data[0] != 0x11 || data[1] != 0 {

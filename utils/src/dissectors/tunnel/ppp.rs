@@ -3,7 +3,7 @@ use nom::IResult;
 
 use super::{Error, Protocol};
 
-pub fn dissect(data: &[u8]) -> IResult<(usize, Option<Protocol>), &[u8], Error<&[u8]>> {
+pub fn dissect(data: &[u8]) -> IResult<(usize, Option<Protocol>), &[u8], Error> {
     let (remain, data) = take(4usize)(data)?;
     if data[2] != 0x00 {
         return Err(nom::Err::Error(Error::CorruptPacket(

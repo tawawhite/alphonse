@@ -15,7 +15,7 @@ enum Type {
     DesUnreachable = 3,
 }
 
-pub fn dissect(data: &[u8]) -> IResult<(usize, Option<Protocol>), &[u8], Error<&[u8]>> {
+pub fn dissect(data: &[u8]) -> IResult<(usize, Option<Protocol>), &[u8], Error> {
     let (data, icmp_type) = be_u8(data)?;
     let (data, code) = be_u8(data)?;
     let (data, checksum) = be_u16(data)?;

@@ -9,7 +9,7 @@ use crate::dissectors::link::ethernet;
 #[cfg(feature = "heuristic-mpls")]
 use crate::dissectors::network::{ipv4, ipv6};
 
-pub fn dissect(data: &[u8]) -> IResult<(usize, Option<Protocol>), &[u8], Error<&[u8]>> {
+pub fn dissect(data: &[u8]) -> IResult<(usize, Option<Protocol>), &[u8], Error> {
     let mut len = 0;
     let (mut remain, data) = take(4usize)(data)?;
     len += 4;
