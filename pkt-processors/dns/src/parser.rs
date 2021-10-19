@@ -25,8 +25,8 @@ impl<'a> Query<'a> {
             }
             let (tmp, part) = take(len)(tmp)?;
             s = tmp;
-            let part = unsafe { std::str::from_utf8_unchecked(part) };
-            name.push_str(part);
+            let part = String::from_utf8_lossy(part);
+            name.push_str(&part);
             name.push('.');
         }
         name.pop();
