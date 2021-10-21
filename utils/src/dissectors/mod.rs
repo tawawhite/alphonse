@@ -184,6 +184,7 @@ impl ProtocolDessector {
                     _ => p,
                 },
                 None => {
+                    *pkt.layers_mut() = layers;
                     return Ok(());
                 }
             };
