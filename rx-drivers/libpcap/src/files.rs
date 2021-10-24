@@ -178,7 +178,7 @@ impl RxThread {
         }
 
         // terminate alphonse after all packets are send to packet processing thread
-        while self.senders.iter().any(|s| s.len() != 0) {}
+        while self.senders.iter().any(|s| s.len() != 0) && !self.exit.load(Ordering::Relaxed) {}
         self.exit.swap(true, Ordering::Relaxed);
 
         println!("{} exit", self.name());
