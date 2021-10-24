@@ -15,12 +15,19 @@ use api::plugins::{
 };
 use api::session::Session;
 
-#[derive(Default)]
 pub struct Plugins {
+    dyreload: DynamicReload,
     pub plugins: Vec<Arc<Lib>>,
 }
 
 impl Plugins {
+    pub fn new(dyreload: DynamicReload) -> Self {
+        Self {
+            dyreload,
+            plugins: vec![],
+        }
+    }
+
     pub fn add_plugin(&mut self, plugin: &Arc<Lib>) {
         self.plugins.push(plugin.clone());
     }
@@ -100,7 +107,7 @@ pub fn load_plugins(cfg: &Config) -> Result<Plugins> {
     let load_tmp_dir = cfg.get_str("plugins.load.dir", "/tmp/alphonse/plugins");
     std::fs::create_dir_all(std::path::PathBuf::from(load_tmp_dir.clone()))?;
 
-    let mut reload_handler = DynamicReload::new(
+    let reload_handler = DynamicReload::new(
         Some(plugin_dirs),
         Some(load_tmp_dir.as_str()),
         Search::Default,
@@ -109,9 +116,9 @@ pub fn load_plugins(cfg: &Config) -> Result<Plugins> {
     let mut plugin_names = cfg.processors.clone();
     plugin_names.push(cfg.rx_driver.clone());
 
-    let mut plugins = Plugins::default();
+    let mut plugins = Plugins::new(reload_handler);
     for plg_name in &plugin_names {
-        match reload_handler.add_library(plg_name, PlatformName::Yes) {
+        match plugins.dyreload.add_library(plg_name, PlatformName::Yes) {
             Ok(lib) => plugins.add_plugin(&lib),
             Err(e) => {
                 return Err(anyhow!("Unable to load dynamic lib, err {:?}", e));
@@ -217,7 +224,6 @@ pub fn init_plugins(
                     })?;
                     warehouse.output_plugins.push(plugin)
                 }
-                _ => {}
             };
         }
     }
