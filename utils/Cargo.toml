@@ -23,4 +23,5 @@ serde_json = "1.0"
 [features]
 dissectors = ["alphonse-api", "enum-primitive-derive", "num-traits"]
 es = ["elasticsearch"]
+heuristic-mpls = []
 tcp-reassembly = ["alphonse-api", "bitflags"]
