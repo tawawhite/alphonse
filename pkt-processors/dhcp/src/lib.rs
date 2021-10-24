@@ -172,7 +172,6 @@ fn parse_dhcp(ses: &mut Session, pkt: &dyn Packet, dhcp: &mut DHCP) {
                     dhcp.msg_type.insert(msg_type_to_string(msg_type));
                 }
             };
-            println!("dhcp: {:?}", dhcp);
         }
         Err(e) => eprintln!("{}", e),
     };
