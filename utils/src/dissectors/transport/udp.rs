@@ -2,18 +2,18 @@ use nom::bytes::complete::take;
 use nom::number::complete::be_u16;
 use nom::IResult;
 
-use super::{Error, Protocol};
+use crate::dissectors::{DissectResult, Error, Protocol};
 
-pub fn dissect(data: &[u8]) -> IResult<(usize, Option<Protocol>), &[u8], Error> {
+pub fn dissect(data: &[u8]) -> IResult<&[u8], (usize, DissectResult), Error> {
     let (remain, data) = take(8usize)(data)?;
 
     let (data, src_port) = be_u16(data)?;
     let (data, dst_port) = be_u16(data)?;
     if src_port == 1701 && dst_port == 1701 {
-        return Ok(((8, Some(Protocol::L2TP)), remain));
+        return Ok((remain, (8, DissectResult::Ok(Protocol::L2TP))));
     }
 
-    return Ok(((8, Some(Protocol::APPLICATION)), remain));
+    return Ok((remain, (8, DissectResult::Ok(Protocol::APPLICATION))));
 }
 
 #[cfg(test)]
@@ -30,8 +30,8 @@ mod test {
         let result = dissect(&buf);
         assert!(matches!(result, Ok(_)));
 
-        let ((_, protocol), remain) = result.unwrap();
-        assert!(matches!(protocol, Some(Protocol::APPLICATION)));
+        let (remain, (_, protocol)) = result.unwrap();
+        assert!(matches!(protocol, DissectResult::Ok(Protocol::APPLICATION)));
         assert_eq!(remain.len(), 32);
     }
 
@@ -39,7 +39,7 @@ mod test {
     fn test_pkt_too_short() {
         let buf = [0xf4];
         let result = dissect(&buf);
-        assert!(matches!(result, Err(nom::Err::Error(Error::Nom(_)))));
+        assert!(matches!(result, Err(nom::Err::Error(_))));
     }
 
     #[test]
@@ -48,8 +48,8 @@ mod test {
         let result = dissect(&buf);
         assert!(matches!(result, Ok(_)));
 
-        let ((_, protocol), remain) = result.unwrap();
-        assert!(matches!(protocol, Some(Protocol::L2TP)));
+        let (remain, (_, protocol)) = result.unwrap();
+        assert!(matches!(protocol, DissectResult::Ok(Protocol::L2TP)));
         assert_eq!(remain.len(), 0);
     }
 }

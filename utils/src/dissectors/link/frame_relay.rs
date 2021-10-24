@@ -17,15 +17,15 @@ use nom::number::streaming::be_u16;
 use nom::IResult;
 use num_traits::FromPrimitive;
 
-use crate::dissectors::{Error, EtherType, Protocol};
+use crate::dissectors::{DissectResult, Error, EtherType};
 
-pub fn dissect(data: &[u8]) -> IResult<(usize, Option<Protocol>), &[u8], Error> {
+pub fn dissect(data: &[u8]) -> IResult<&[u8], (usize, DissectResult), Error> {
     let (data, _) = take(2usize)(data)?;
     let (data, proto) = be_u16(data)?;
-    let proto = match EtherType::from_u16(proto) {
-        None => Protocol::UNKNOWN,
-        Some(proto) => proto.into(),
+    let result = match EtherType::from_u16(proto) {
+        None => DissectResult::UnknownProtocol,
+        Some(proto) => DissectResult::Ok(proto.into()),
     };
 
-    Ok(((4, Some(proto)), data))
+    Ok((data, (4, result)))
 }

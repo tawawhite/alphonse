@@ -1,30 +1,22 @@
 use nom::bytes::complete::take;
 use nom::IResult;
 
-use crate::dissectors::{Error, Protocol};
+use crate::dissectors::{DissectResult, Error, Protocol};
 
-pub fn dissect(data: &[u8]) -> IResult<(usize, Option<Protocol>), &[u8], Error> {
+pub fn dissect(data: &[u8]) -> IResult<&[u8], (usize, DissectResult), Error> {
     let (remain, data) = take(4usize)(data)?;
 
-    let protocol = match data[0] {
-        2 => Protocol::IPV4,
+    let result = match data[0] {
+        2 => DissectResult::Ok(Protocol::IPV4),
         // OSI packets
-        7 => {
-            return Err(nom::Err::Error(Error::UnsupportProtocol(
-                "Does not support OSI packet",
-            )))
-        }
+        7 => DissectResult::UnsupportProtocol("OSI"),
         // IPX packets
-        23 => {
-            return Err(nom::Err::Error(Error::UnsupportProtocol(
-                "Does not support IPX packet",
-            )))
-        }
-        24 | 28 | 30 => Protocol::IPV6,
-        _ => return Err(nom::Err::Error(Error::UnknownProtocol)),
+        23 => DissectResult::UnsupportProtocol("IPX"),
+        24 | 28 | 30 => DissectResult::Ok(Protocol::IPV6),
+        _ => DissectResult::UnknownProtocol,
     };
 
-    Ok(((4, Some(protocol)), remain))
+    Ok((remain, (4, result)))
 }
 
 #[cfg(test)]
@@ -39,8 +31,8 @@ mod tests {
         let result = dissect(&buf);
         assert!(matches!(result, Ok(_)));
 
-        let ((_, protocol), _) = result.unwrap();
-        assert!(matches!(protocol, Some(Protocol::IPV4)));
+        let (_, (_, protocol)) = result.unwrap();
+        assert!(matches!(protocol, DissectResult::Ok(Protocol::IPV4)));
     }
 
     #[test]
@@ -51,15 +43,15 @@ mod tests {
         let result = dissect(&buf);
         assert!(matches!(result, Ok(_)));
 
-        let ((_, protocol), _) = result.unwrap();
-        assert!(matches!(protocol, Some(Protocol::IPV6)));
+        let (_, (_, protocol)) = result.unwrap();
+        assert!(matches!(protocol, DissectResult::Ok(Protocol::IPV6)));
     }
 
     #[test]
     fn test_err_pkt_too_short() {
         let buf = [0x01];
         let result = dissect(&buf);
-        assert!(matches!(result, Err(nom::Err::Error(Error::Nom(_)))));
+        assert!(matches!(result, Err(nom::Err::Error(_))));
     }
 
     #[test]
@@ -68,20 +60,18 @@ mod tests {
             0x07, 0x80, 0xc2, 0x00, 0x00, 0x00, 0xcc, 0x04, 0x0d, 0x5c, 0xf0, 0x00, 0x06, 0x00,
         ];
         let result = dissect(&buf);
-        assert!(matches!(result, Err(_)));
         assert!(matches!(
-            result.unwrap_err(),
-            nom::Err::Error(Error::UnsupportProtocol(_))
+            result.unwrap(),
+            (_, (_, DissectResult::UnsupportProtocol(_)))
         ));
 
         let buf = [
             23, 0x80, 0xc2, 0x00, 0x00, 0x00, 0xcc, 0x04, 0x0d, 0x5c, 0xf0, 0x00, 0x06, 0x00,
         ];
         let result = dissect(&buf);
-        assert!(matches!(result, Err(_)));
         assert!(matches!(
-            result.unwrap_err(),
-            nom::Err::Error(Error::UnsupportProtocol(_))
+            result.unwrap(),
+            (_, (_, DissectResult::UnsupportProtocol(_)))
         ));
     }
 }

@@ -1,9 +1,9 @@
 use nom::bytes::complete::take;
 use nom::IResult;
 
-use super::{Error, Protocol};
+use crate::dissectors::{DissectResult, Error, Protocol};
 
-pub fn dissect(data: &[u8]) -> IResult<(usize, Option<Protocol>), &[u8], Error> {
+pub fn dissect(data: &[u8]) -> IResult<&[u8], (usize, DissectResult), Error> {
     let (remain, _) = take(12usize)(data)?;
-    return Ok(((12, Some(Protocol::APPLICATION)), remain));
+    return Ok((remain, (12, DissectResult::Ok(Protocol::APPLICATION))));
 }

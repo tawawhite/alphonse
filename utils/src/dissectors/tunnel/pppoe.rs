@@ -3,15 +3,13 @@ use nom::combinator::peek;
 use nom::number::complete::be_u16;
 use nom::IResult;
 
-use super::{Error, Protocol};
+use crate::dissectors::{DissectResult, Error, Protocol};
 
-pub fn dissect(data: &[u8]) -> IResult<(usize, Option<Protocol>), &[u8], Error> {
+pub fn dissect(data: &[u8]) -> IResult<&[u8], (usize, DissectResult), Error> {
     let org_len = data.len();
     let (remain, data) = take(8usize)(data)?;
     if data[0] != 0x11 || data[1] != 0 {
-        return Err(nom::Err::Error(Error::CorruptPacket(
-            "Corrupted PPPOE packet",
-        )));
+        return Err(nom::Err::Error(Error("Corrupted PPPOE packet")));
     }
 
     let (_, plen) = be_u16(&data[4..])?;
@@ -21,8 +19,16 @@ pub fn dissect(data: &[u8]) -> IResult<(usize, Option<Protocol>), &[u8], Error> 
     let protocol = match protocol {
         0x21 => Protocol::IPV4,
         0x57 => Protocol::IPV6,
-        _ => Protocol::UNKNOWN,
+        _ => {
+            return Ok((
+                remain,
+                (org_len - remain.len(), DissectResult::UnknownProtocol),
+            ))
+        }
     };
 
-    Ok(((org_len - remain.len(), Some(protocol)), remain))
+    Ok((
+        remain,
+        (org_len - remain.len(), DissectResult::Ok(protocol)),
+    ))
 }

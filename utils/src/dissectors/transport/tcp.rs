@@ -2,19 +2,22 @@ use nom::bytes::complete::take;
 use nom::combinator::peek;
 use nom::IResult;
 
-use super::{Error, Protocol};
+use crate::dissectors::{DissectResult, Error, Protocol};
 
-pub fn dissect(data: &[u8]) -> IResult<(usize, Option<Protocol>), &[u8], Error> {
+pub fn dissect(data: &[u8]) -> IResult<&[u8], (usize, DissectResult), Error> {
     let (remain, data) = peek(take(13usize))(data)?;
     let tcp_hdr_len = ((data[12] >> 4) * 4) as usize;
     if tcp_hdr_len < 20 {
-        return Err(nom::Err::Error(Error::CorruptPacket(
+        return Err(nom::Err::Error(Error(
             "Corrupted TCP packet, tcp header len too short",
         )));
     }
 
     let (remain, _) = take(tcp_hdr_len)(remain)?;
-    return Ok(((tcp_hdr_len, Some(Protocol::APPLICATION)), remain));
+    return Ok((
+        remain,
+        (tcp_hdr_len, DissectResult::Ok(Protocol::APPLICATION)),
+    ));
 }
 
 #[cfg(test)]
@@ -37,7 +40,7 @@ mod tests {
         let buf = [0x04];
         let result = dissect(&buf);
         assert!(matches!(result, Err(_)));
-        assert!(matches!(result, Err(nom::Err::Error(Error::Nom(_)))));
+        assert!(matches!(result, Err(nom::Err::Error(_))));
     }
 
     #[test]
@@ -49,6 +52,6 @@ mod tests {
             0x04, 0x02,
         ];
         let result = dissect(&buf);
-        assert!(matches!(result, Err(nom::Err::Error(Error::Nom(_)))));
+        assert!(matches!(result, Err(nom::Err::Error(_))));
     }
 }

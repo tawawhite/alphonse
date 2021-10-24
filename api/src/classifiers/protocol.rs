@@ -124,5 +124,17 @@ mod test {
         assert_eq!(pkt.rules()[0].rule_type, matched::RuleType::Protocol);
         assert_eq!(pkt.rules()[0].processors[0], 1);
         assert_eq!(pkt.rules()[0].processors.len(), 1);
+
+        // classify a packet with no layers at all
+        let mut classifier = Box::new(Classifier::default());
+        let proto_rule = Rule(Protocol::ETHERNET);
+        let mut rule = crate::classifiers::Rule::new(1);
+        rule.rule_type = crate::classifiers::RuleType::Protocol(proto_rule);
+        classifier.add_rule(&mut rule).unwrap();
+
+        let pkt = Box::new(Packet::default());
+        let mut pkt: Box<dyn PacketTrait> = pkt;
+        classifier.classify(pkt.as_mut());
+        assert_eq!(pkt.rules().len(), 0);
     }
 }

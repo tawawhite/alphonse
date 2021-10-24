@@ -4,14 +4,14 @@ use nom::number::complete::be_u16;
 use nom::IResult;
 
 use super::ip_proto;
-use crate::dissectors::{Error, Protocol};
+use crate::dissectors::{DissectResult, Error, Protocol};
 
-pub fn dissect(data: &[u8]) -> IResult<(usize, Option<Protocol>), &[u8], Error> {
+pub fn dissect(data: &[u8]) -> IResult<&[u8], (usize, DissectResult), Error> {
     let ip_vhl = data[0];
     let ip_version = ip_vhl >> 4;
 
     if ip_version != 4 {
-        return Err(nom::Err::Error(Error::CorruptPacket(
+        return Err(nom::Err::Error(Error(
             "Corrupted IPV4 packet, ip vesrion not match",
         )));
     }
@@ -19,7 +19,7 @@ pub fn dissect(data: &[u8]) -> IResult<(usize, Option<Protocol>), &[u8], Error> 
     let ip_hdr_len = ((ip_vhl & 0x0f) * 4) as usize;
     if ip_hdr_len < 4 * 5 {
         // 如果报文中的IP头长度小于20字节或报文长度小于报文中声明的IP头长度, 数据包有错误
-        return Err(nom::Err::Error(Error::CorruptPacket(
+        return Err(nom::Err::Error(Error(
             "Corrupt IPV4 packet, ip header too short ",
         )));
     }
@@ -41,10 +41,15 @@ pub fn dissect(data: &[u8]) -> IResult<(usize, Option<Protocol>), &[u8], Error> 
         ip_proto::IPV6 => Protocol::IPV6,
         ip_proto::GRE => Protocol::GRE,
         ip_proto::SCTP => Protocol::SCTP,
-        _ => return Err(nom::Err::Error(Error::UnsupportIPProtocol(ip_proto))),
+        _ => {
+            return Ok((
+                remain,
+                (ip_hdr_len, DissectResult::UnsupportIPProtocol(ip_proto)),
+            ))
+        }
     };
 
-    Ok(((ip_hdr_len, Some(protocol)), remain))
+    Ok((remain, (ip_hdr_len, DissectResult::Ok(protocol))))
 }
 
 #[cfg(test)]
@@ -71,7 +76,7 @@ mod tests {
     fn test_err_pkt_too_short() {
         let buf = [0x45];
         let result = dissect(&buf);
-        assert!(matches!(result, Err(nom::Err::Error(Error::Nom(_)))));
+        assert!(matches!(result, Err(nom::Err::Error(_))));
     }
 
     #[test]
@@ -81,10 +86,7 @@ mod tests {
             0x02, 0x01, 0x0a, 0x22, 0x00, 0x01,
         ];
         let result = dissect(&buf);
-        assert!(matches!(
-            result.unwrap_err(),
-            nom::Err::Error(Error::CorruptPacket(_))
-        ));
+        assert!(matches!(result.unwrap_err(), nom::Err::Error(Error(_))));
     }
 
     #[test]
@@ -94,10 +96,7 @@ mod tests {
             0x02, 0x01, 0x0a, 0x22, 0x00, 0x01,
         ];
         let result = dissect(&buf);
-        assert!(matches!(
-            result.unwrap_err(),
-            nom::Err::Error(Error::CorruptPacket(_))
-        ));
+        assert!(matches!(result.unwrap_err(), nom::Err::Error(Error(_))));
     }
 
     #[test]
@@ -107,7 +106,7 @@ mod tests {
             0x02, 0x01, 0x0a, 0x22, 0x00, 0x01,
         ];
         let result = dissect(&buf);
-        assert!(matches!(result, Err(nom::Err::Error(Error::Nom(_)))));
+        assert!(matches!(result, Err(nom::Err::Error(_))));
     }
 
     #[test]
@@ -117,7 +116,7 @@ mod tests {
             0x02, 0x01, 0x0a, 0x22, 0x00, 0x01,
         ];
         let result = dissect(&buf);
-        assert!(matches!(result, Err(nom::Err::Error(Error::Nom(_)))));
+        assert!(matches!(result, Err(nom::Err::Error(_))));
     }
 
     #[test]
@@ -134,8 +133,8 @@ mod tests {
         ];
         let result = dissect(&buf);
         assert!(matches!(
-            result.unwrap_err(),
-            nom::Err::Error(Error::UnsupportIPProtocol(_))
+            result.unwrap(),
+            (_, (_, DissectResult::UnsupportIPProtocol(_)))
         ));
     }
 }

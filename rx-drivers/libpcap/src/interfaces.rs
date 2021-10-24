@@ -116,10 +116,7 @@ impl RxThread {
 
             match parser.parse_pkt(pkt.as_mut()) {
                 Ok(_) => {}
-                Err(e) => match e {
-                    utils::dissectors::Error::UnsupportProtocol(_) => {}
-                    _ => todo!(),
-                },
+                Err(_) => {}
             };
 
             rx_cnt += 1;

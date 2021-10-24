@@ -50,6 +50,15 @@ pub struct Layer {
     pub protocol: Protocol,
 }
 
+impl Layer {
+    pub fn new(protocol: Protocol, start: usize, end: usize) -> Self {
+        Layer {
+            protocol,
+            range: Range { start, end },
+        }
+    }
+}
+
 impl Hash for Layer {
     #[inline]
     fn hash<H: Hasher>(&self, state: &mut H) {

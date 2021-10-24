@@ -1,4 +1,3 @@
-use std::fmt::{Display, Formatter};
 use std::ops::Range;
 
 use anyhow::Result;
@@ -17,40 +16,30 @@ pub mod tunnel;
 pub use etype::EtherType;
 use link::LinkType;
 
-/// Parse current layer's protocol, return current layer's length, next layer's protocol and remaining data
-///
-/// # Arguments
-///
-/// * `data` - Data of this layer and its payload
-pub type Callback = fn(data: &[u8]) -> IResult<(usize, Option<Protocol>), &[u8], Error>;
+/// Dissector parse result. Means this layer's format and content is ok,
+/// but next layer's protocol maybe unsupported or unkown
+#[derive(Debug, PartialEq)]
+pub enum DissectResult {
+    /// Next layer's protocol
+    Ok(Protocol),
+    /// No next layer
+    None,
+    /// Next layer's protocol is unkown as unsupported
+    UnsupportProtocol(&'static str),
+    /// Next layer's IP protocol is unkown as unsupported
+    UnsupportIPProtocol(u8),
+    /// Next layer's protocol is unkown
+    UnknownProtocol,
+    /// Next layer's etype is unkown
+    UnknownEtype(u16),
+}
 
 #[derive(Debug)]
-pub enum Error {
-    UnsupportProtocol(&'static str),
-    UnsupportIPProtocol(u8),
-    CorruptPacket(&'static str),
-    UnknownProtocol,
-    UnknownEtype(u16),
-    Nom(ErrorKind),
-}
-
-impl Display for Error {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Error::UnknownProtocol => write!(f, "Unknown Protocol"),
-            Error::UnknownEtype(etype) => write!(f, "Unknown etype({})", etype),
-            Error::UnsupportProtocol(s) | Error::CorruptPacket(s) => write!(f, "{}", s),
-            Error::UnsupportIPProtocol(ip_proto) => {
-                write!(f, "Unsupport IP Protocol({})", ip_proto)
-            }
-            Error::Nom(_) => write!(f, "Nom parse error",),
-        }
-    }
-}
+pub struct Error(&'static str);
 
 impl<I> ParseError<I> for Error {
-    fn from_error_kind(_: I, kind: ErrorKind) -> Self {
-        Error::Nom(kind)
+    fn from_error_kind(_: I, _: ErrorKind) -> Self {
+        Self("nom parse error")
     }
 
     fn append(_: I, _: ErrorKind, other: Self) -> Self {
@@ -58,7 +47,12 @@ impl<I> ParseError<I> for Error {
     }
 }
 
-impl std::error::Error for Error {}
+/// Parse current layer's protocol, return current layer's length, next layer's protocol and remaining data
+///
+/// # Arguments
+///
+/// * `data` - Data of this layer and its payload
+pub type Callback = fn(data: &[u8]) -> IResult<&[u8], (usize, DissectResult), Error>;
 
 pub struct ProtocolDessector {
     /// SnapLen, Snap Length, or snapshot length is the amount of data for each frame
@@ -117,57 +111,47 @@ impl ProtocolDessector {
     pub fn parse_pkt(&self, pkt: &mut dyn Packet) -> Result<(), Error> {
         let mut consumed = 0;
         let mut layers = Layers::default();
-        let mut cur_proto = None;
 
-        let mut result = match self.link_type {
-            LinkType::NULL => Ok(((0, Some(Protocol::NULL)), pkt.raw())),
-            LinkType::ETHERNET => Ok(((0, Some(Protocol::ETHERNET)), pkt.raw())),
-            LinkType::FRAME_RELAY => Ok(((0, Some(Protocol::FRAME_RELAY)), pkt.raw())),
-            LinkType::RAW | LinkType::IPV4 => Ok(((0, Some(Protocol::IPV4)), pkt.raw())),
-            LinkType::IPV6 => Ok(((0, Some(Protocol::IPV6)), pkt.raw())),
+        let mut protocol = match self.link_type {
+            LinkType::NULL => Protocol::NULL,
+            LinkType::ETHERNET => Protocol::ETHERNET,
+            LinkType::FRAME_RELAY => Protocol::FRAME_RELAY,
+            LinkType::RAW | LinkType::IPV4 => Protocol::IPV4,
+            LinkType::IPV6 => Protocol::IPV6,
+        };
+
+        let mut result = match &self.callbacks[protocol as usize] {
+            Some(dissect) => dissect(pkt.raw()),
+            None => return Err(Error("Unsupport protocol")),
         };
 
         loop {
-            let ((len, nxt_proto), data) = match result {
+            let (data, (len, nxt_proto)) = match result {
                 Ok(r) => r,
                 Err(e) => {
                     match e {
                         nom::Err::Error(e) => return Err(e),
-                        nom::Err::Incomplete(_) => {
-                            return Err(Error::Nom(nom::error::ErrorKind::Eof))
-                        }
+                        nom::Err::Incomplete(_) => return Err(Error("Packet too short")),
                         nom::Err::Failure(e) => return Err(e),
                     };
                 }
             };
 
-            match cur_proto {
-                Some(protocol) => {
-                    let layer = Layer {
-                        protocol,
-                        range: Range {
-                            start: consumed,
-                            end: consumed + len,
-                        },
-                    };
-                    consumed += len;
-                    layers.as_mut().push(layer);
-                    match protocol {
-                        Protocol::ETHERNET => layers.datalink = Some(layers.len() as u8 - 1),
-                        Protocol::IPV4 | Protocol::IPV6 => {
-                            layers.network = Some(layers.len() as u8 - 1)
-                        }
-                        Protocol::TCP | Protocol::UDP | Protocol::SCTP => {
-                            layers.transport = Some(layers.len() as u8 - 1)
-                        }
-                        _ => {}
-                    };
+            // Push current layer into packet's protocol stack
+            let layer = Layer::new(protocol, consumed, consumed + len);
+            consumed += len;
+            layers.as_mut().push(layer);
+            match protocol {
+                Protocol::ETHERNET => layers.datalink = Some(layers.len() as u8 - 1),
+                Protocol::IPV4 | Protocol::IPV6 => layers.network = Some(layers.len() as u8 - 1),
+                Protocol::TCP | Protocol::UDP | Protocol::SCTP => {
+                    layers.transport = Some(layers.len() as u8 - 1)
                 }
-                None => {}
+                _ => {}
             };
 
-            let nxt_proto = match nxt_proto {
-                Some(p) => match p {
+            protocol = match nxt_proto {
+                DissectResult::Ok(p) => match p {
                     Protocol::APPLICATION => {
                         let layer = Layer {
                             protocol: p,
@@ -183,18 +167,15 @@ impl ProtocolDessector {
                     }
                     _ => p,
                 },
-                None => {
+                _ => {
                     *pkt.layers_mut() = layers;
                     return Ok(());
                 }
             };
-            cur_proto = Some(nxt_proto);
 
-            result = match &self.callbacks[nxt_proto as usize] {
+            result = match &self.callbacks[protocol as usize] {
                 Some(dissect) => dissect(data),
-                None => {
-                    return Err(Error::UnsupportProtocol(""));
-                }
+                None => return Err(Error("Unsupport protocol")),
             };
         }
     }

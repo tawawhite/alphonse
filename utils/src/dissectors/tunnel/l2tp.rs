@@ -2,7 +2,7 @@ use nom::bytes::complete::take;
 use nom::number::complete::be_u16;
 use nom::IResult;
 
-use super::{Error, Protocol};
+use crate::dissectors::{DissectResult, Error, Protocol};
 
 const DATAMESSAGE: u16 = 0b0000000000000000;
 const CONTROLMESSAGE: u16 = 0b1000000000000000;
@@ -43,14 +43,14 @@ fn l2tp_version(control: u16) -> u16 {
     control & 0x000f
 }
 
-pub fn dissect(data: &[u8]) -> IResult<(usize, Option<Protocol>), &[u8], Error> {
+pub fn dissect(data: &[u8]) -> IResult<&[u8], (usize, DissectResult), Error> {
     let org_len = data.len();
     let (data, control) = be_u16(data)?;
 
     match l2tp_version(control) {
         2 | 3 => {}
         _ => {
-            return Err(nom::Err::Error(Error::CorruptPacket(
+            return Err(nom::Err::Error(Error(
                 "Unsupported or invalid L2TP version",
             )))
         }
@@ -66,9 +66,7 @@ pub fn dissect(data: &[u8]) -> IResult<(usize, Option<Protocol>), &[u8], Error> 
             data = remain
         }
         if control & OFFSET == OFFSET {
-            println!("offset flag on");
             let (remain, _) = take(2usize)(data)?;
-            println!("remain len: {}", remain.len());
             data = remain
         }
         if control & PRIORITY == PRIORITY {
@@ -77,10 +75,12 @@ pub fn dissect(data: &[u8]) -> IResult<(usize, Option<Protocol>), &[u8], Error> 
         }
         data
     };
-    println!("data len: {}", data.len());
     let (data, _) = take(4usize)(data)?;
 
-    return Ok(((org_len - data.len(), Some(Protocol::PPP)), data));
+    return Ok((
+        data,
+        (org_len - data.len(), DissectResult::Ok(Protocol::PPP)),
+    ));
 }
 
 #[cfg(test)]
@@ -95,8 +95,8 @@ mod test {
         let result = dissect(&buf);
         assert!(matches!(result, Ok(_)));
 
-        let ((len, protocol), data) = result.unwrap();
-        assert!(matches!(protocol, Some(Protocol::PPP)));
+        let (data, (len, protocol)) = result.unwrap();
+        assert!(matches!(protocol, DissectResult::Ok(Protocol::PPP)));
         assert_eq!(data.len(), 8);
     }
 
@@ -109,8 +109,8 @@ mod test {
         let result = dissect(&buf);
         assert!(matches!(result, Ok(_)));
 
-        let ((len, protocol), data) = result.unwrap();
-        assert!(matches!(protocol, Some(Protocol::PPP)));
+        let (data, (len, protocol)) = result.unwrap();
+        assert!(matches!(protocol, DissectResult::Ok(Protocol::PPP)));
         assert_eq!(data.len(), 12);
     }
 
@@ -120,8 +120,8 @@ mod test {
         let result = dissect(&buf);
         assert!(matches!(result, Ok(_)));
 
-        let ((len, protocol), data) = result.unwrap();
-        assert!(matches!(protocol, Some(Protocol::PPP)));
+        let (data, (len, protocol)) = result.unwrap();
+        assert!(matches!(protocol, DissectResult::Ok(Protocol::PPP)));
         assert_eq!(data.len(), 0);
     }
 }
