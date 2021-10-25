@@ -37,10 +37,6 @@ static mut HANDLES: OnceCell<Vec<JoinHandle<Result<()>>>> = OnceCell::new();
 static mut SCHEDULERS: OnceCell<Vec<Mutex<Scheduler>>> = OnceCell::new();
 static RT: OnceCell<tokio::runtime::Runtime> = OnceCell::new();
 
-fn default_es_host() -> String {
-    "http://elasticsearch:9200".to_string()
-}
-
 #[derive(Clone, Debug, Default)]
 pub struct Config {
     /// Whether save packets to disk or not
@@ -166,7 +162,7 @@ impl Plugin for SimpleWriterProcessor {
         cfg.exit = alcfg.exit.clone();
         cfg.node = alcfg.node.clone();
         cfg.enable_arkime = alcfg.get_boolean("arkime.enable", false);
-        cfg.es_host = alcfg.get_str("elasticsearch", &default_es_host());
+        cfg.es_host = alcfg.get_str("elasticsearch", &"http://localhost:9200");
         cfg.prefix = alcfg.get_str("prefix", "");
 
         // Prepare global packet write info writer
@@ -209,9 +205,7 @@ impl Plugin for SimpleWriterProcessor {
             let es = Arc::new(Elasticsearch::new(ts));
             let id = rt.block_on(async { arkime::get_sequence_number(&es, &cfg).await })?;
             FILE_ID.store(id as u32, Ordering::SeqCst);
-        }
-        #[cfg(not(feature = "arkime"))]
-        {
+        } else {
             let id = (FILE_ID.load(Ordering::Relaxed) + 1) as u64;
             FILE_ID.store(id as u32, Ordering::SeqCst);
         }
