@@ -174,18 +174,12 @@ impl Processor for DNSProcessor {
         let mut remain = msg.queries;
         for _ in 0..msg.qry_num as usize {
             let (tmp, query) = match parse_dns_query(remain) {
-                Err(e) => {
-                    eprintln!("dns parse query: {}", e);
-                    return Ok(());
-                }
+                Err(_) => return Ok(()),
                 Ok(r) => r,
             };
 
             let name = match query.name() {
-                Err(e) => {
-                    eprintln!("dns parse name: {}", e);
-                    return Ok(());
-                }
+                Err(_) => return Ok(()),
                 Ok((_, name)) => name,
             };
 
@@ -231,10 +225,7 @@ impl DNSProcessor {
         answers: &'a [u8],
     ) -> Result<&'a [u8]> {
         let remain = match parse_dns_resource_records(answers) {
-            Err(e) => {
-                eprintln!("on resource records: {}", e);
-                &[]
-            }
+            Err(_) => &[],
             Ok((remain, records)) => {
                 for record in records {
                     let class = match Class::from_u16(record.class) {

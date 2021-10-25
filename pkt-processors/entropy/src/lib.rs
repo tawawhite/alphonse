@@ -198,7 +198,6 @@ impl Prcr for Processor {
             .count();
 
         ses.add_field(&"entropy", json!(entropy));
-        println!("{}", serde_json::to_string_pretty(ses).unwrap());
 
         self.dst_entropy.clear();
         self.src_entropy.clear();

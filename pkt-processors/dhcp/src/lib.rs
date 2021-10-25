@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use dhcp_parser2::{parse_dhcp_message, DHCPMessageType};
 use fnv::FnvHashSet;
 use mac_address::MacAddress;
@@ -173,7 +173,7 @@ fn parse_dhcp(ses: &mut Session, pkt: &dyn Packet, dhcp: &mut DHCP) {
                 }
             };
         }
-        Err(e) => eprintln!("{}", e),
+        Err(_) => {}
     };
     ses.add_protocol(&"dhcp", ProtocolLayer::Application);
 }
