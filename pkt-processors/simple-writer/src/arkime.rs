@@ -63,7 +63,6 @@ pub(crate) async fn get_sequence_number(es: &Arc<Elasticsearch>, cfg: &Arc<Confi
     }
 }
 
-#[cfg(feature = "arkime")]
 pub(crate) async fn update_file_size(
     es: Arc<Elasticsearch>,
     cfg: Arc<Config>,

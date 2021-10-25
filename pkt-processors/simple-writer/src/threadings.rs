@@ -2,20 +2,19 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use crossbeam_channel::Receiver;
 use elasticsearch::http::transport::Transport;
 use elasticsearch::Elasticsearch;
 use tokio::runtime::Handle;
 
-#[cfg(feature = "arkime")]
 use crate::arkime::{get_sequence_number, update_file_size};
 use crate::{Config, PacketInfo, SimpleWriter, FILE_ID};
 
 pub(crate) fn main_loop(cfg: Arc<Config>, receiver: Receiver<Box<PacketInfo>>) -> Result<()> {
-    let mut writer = SimpleWriter::default();
     let ts = Transport::single_node(cfg.es_host.as_str())?;
     let es = Arc::new(Elasticsearch::new(ts));
+    let mut writer = SimpleWriter::new(cfg.enable_arkime, es.clone());
 
     loop {
         let info = match receiver.try_recv() {
@@ -31,8 +30,7 @@ pub(crate) fn main_loop(cfg: Arc<Config>, receiver: Receiver<Box<PacketInfo>>) -
 
         if info.closing {
             // Update last pcap file's filesize
-            #[cfg(feature = "arkime")]
-            {
+            if cfg.enable_arkime {
                 let cfg = cfg.clone();
                 let es = es.clone();
                 let id = FILE_ID.load(Ordering::Relaxed) as u64;
@@ -50,8 +48,7 @@ pub(crate) fn main_loop(cfg: Arc<Config>, receiver: Receiver<Box<PacketInfo>>) -
             }
 
             // If current pcap file is about to close, update global file ID
-            #[cfg(feature = "arkime")]
-            {
+            if cfg.enable_arkime {
                 let cfg = cfg.clone();
                 let es = es.clone();
                 Handle::current().block_on(async move {
@@ -61,26 +58,19 @@ pub(crate) fn main_loop(cfg: Arc<Config>, receiver: Receiver<Box<PacketInfo>>) -
                     }
                     let id = match result {
                         Ok(id) => id,
-                        Err(e) => return Err(anyhow!("{}", e)),
+                        Err(e) => return Err(anyhow::anyhow!("{}", e)),
                     };
                     FILE_ID.store(id as u32, Ordering::SeqCst);
                     Ok(())
                 })?;
-            }
-            #[cfg(not(feature = "arkime"))]
-            {
-                let id = get_sequence_number(&es, &cfg)?;
+            } else {
+                let id = (FILE_ID.load(Ordering::Relaxed) + 1) as u64;
                 FILE_ID.store(id as u32, Ordering::SeqCst);
             }
         }
 
-        writer.write(info, &es)?;
+        writer.write(info)?;
     }
 
     Ok(())
-}
-
-#[cfg(not(feature = "arkime"))]
-fn get_sequence_number(_: &Arc<Elasticsearch>, _: &Arc<Config>) -> Result<u64> {
-    Ok((FILE_ID.load(Ordering::Relaxed) + 1) as u64)
 }

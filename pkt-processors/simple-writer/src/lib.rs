@@ -10,7 +10,7 @@ use elasticsearch::http::transport::Transport;
 use elasticsearch::Elasticsearch;
 use fnv::FnvHasher;
 use once_cell::sync::OnceCell;
-use serde::{Deserialize, Serialize, Serializer};
+use serde::{Serialize, Serializer};
 use serde_json::json;
 use tokio::task::JoinHandle;
 
@@ -22,7 +22,6 @@ use api::plugins::processor::{Processor, ProcessorID};
 use api::plugins::{Plugin, PluginType};
 use api::session::Session;
 
-#[cfg(feature = "arkime")]
 mod arkime;
 mod scheuler;
 mod threadings;
@@ -38,43 +37,31 @@ static mut HANDLES: OnceCell<Vec<JoinHandle<Result<()>>>> = OnceCell::new();
 static mut SCHEDULERS: OnceCell<Vec<Mutex<Scheduler>>> = OnceCell::new();
 static RT: OnceCell<tokio::runtime::Runtime> = OnceCell::new();
 
-#[derive(Clone, Debug, Default, Deserialize)]
+fn default_es_host() -> String {
+    "http://elasticsearch:9200".to_string()
+}
+
+#[derive(Clone, Debug, Default)]
 pub struct Config {
     /// Whether save packets to disk or not
-    #[serde(skip_deserializing)]
     pub dryrun: bool,
-
+    /// Whether enable arkime stat function or not
+    pub enable_arkime: bool,
     /// Output pcap directory
-    #[serde(rename = "pcap.dirs")]
     pub pcap_dirs: Vec<String>,
-
     /// Output pcap directory
-    #[serde(rename = "max.file.size")]
     pub max_file_size: usize,
-
     /// Whether alphonse run in offline replay mode
-    #[serde(skip_deserializing)]
     pub offline: bool,
-
     /// Current alphonse node name
-    #[serde(skip_deserializing)]
     pub node: String,
-
     /// Current alphonse node name
-    #[serde(skip_deserializing)]
     pub prefix: String,
-
     /// Original yaml config
-    #[serde(skip_deserializing)]
     pub doc: Yaml,
-
     /// Alphonse exit flag
-    #[serde(skip_deserializing)]
     pub exit: Arc<AtomicBool>,
-
     /// Arkime Elasticsearch host name
-    #[serde(skip_deserializing)]
-    #[cfg(feature = "arkime")]
     pub es_host: String,
 }
 
@@ -111,7 +98,7 @@ struct PcapFileInfo {
     /// First packet timestamp
     first: u64,
     last: u64,
-    #[cfg_attr(feature = "arkime", serde(serialize_with = "bool_serialize"))]
+    #[serde(serialize_with = "bool_serialize")]
     locked: bool,
     name: PathBuf,
     node: String,
@@ -178,12 +165,9 @@ impl Plugin for SimpleWriterProcessor {
         ) as usize;
         cfg.exit = alcfg.exit.clone();
         cfg.node = alcfg.node.clone();
-
-        #[cfg(feature = "arkime")]
-        {
-            cfg.es_host = alcfg.get_str("elasticsearch", "http://localhost:9200");
-            cfg.prefix = alcfg.get_str("prefix", "");
-        }
+        cfg.enable_arkime = alcfg.get_boolean("arkime.enable", false);
+        cfg.es_host = alcfg.get_str("elasticsearch", &default_es_host());
+        cfg.prefix = alcfg.get_str("prefix", "");
 
         // Prepare global packet write info writer
         let (sender, receiver) = crossbeam_channel::bounded(100000);
@@ -219,8 +203,7 @@ impl Plugin for SimpleWriterProcessor {
 
         let cfg = Arc::new(cfg);
         // Initialize pcap file sequence ID number
-        #[cfg(feature = "arkime")]
-        {
+        if cfg.enable_arkime {
             let cfg = cfg.clone();
             let ts = Transport::single_node(cfg.es_host.as_str())?;
             let es = Arc::new(Elasticsearch::new(ts));
@@ -229,7 +212,7 @@ impl Plugin for SimpleWriterProcessor {
         }
         #[cfg(not(feature = "arkime"))]
         {
-            let id = get_sequence_number(&es, &cfg)?;
+            let id = (FILE_ID.load(Ordering::Relaxed) + 1) as u64;
             FILE_ID.store(id as u32, Ordering::SeqCst);
         }
 

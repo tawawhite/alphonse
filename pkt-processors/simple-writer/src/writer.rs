@@ -3,11 +3,9 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
-
 use elasticsearch::Elasticsearch;
 use tokio::runtime::Handle;
 
-#[cfg(feature = "arkime")]
 use crate::arkime::index_file_info;
 use crate::PacketInfo;
 
@@ -67,22 +65,13 @@ enum WriteError {
 /// Pcap writer, write pacp to disk or remote filesystem or whatever
 #[derive(Debug)]
 pub struct SimpleWriter {
+    enable_arkime: bool,
+    es: Arc<Elasticsearch>,
     fname: PathBuf,
     /// Current opened pcap file handle
     file: Option<std::fs::File>,
     format: Format,
     pcap_file_header: PcapFileHeader,
-}
-
-impl Default for SimpleWriter {
-    fn default() -> Self {
-        Self {
-            fname: PathBuf::default(),
-            file: None,
-            format: Format::default(),
-            pcap_file_header: PcapFileHeader::default(),
-        }
-    }
 }
 
 impl Clone for SimpleWriter {
@@ -92,8 +81,19 @@ impl Clone for SimpleWriter {
 }
 
 impl SimpleWriter {
+    pub fn new(enable_arkime: bool, es: Arc<Elasticsearch>) -> Self {
+        Self {
+            enable_arkime,
+            es,
+            fname: PathBuf::default(),
+            file: None,
+            format: Format::default(),
+            pcap_file_header: PcapFileHeader::default(),
+        }
+    }
+
     /// Wirte packet to disk
-    pub fn write(&mut self, info: Box<PacketInfo>, es: &Arc<Elasticsearch>) -> Result<()> {
+    pub fn write(&mut self, info: Box<PacketInfo>) -> Result<()> {
         let pkt = info.buf.as_slice();
         if info.closing || self.file.is_none() {
             // Open new pcap file for writing
@@ -106,9 +106,8 @@ impl SimpleWriter {
             let mut file = std::fs::File::create(&info.name)?;
 
             // Update file information in Elasticsearch
-            #[cfg(feature = "arkime")]
-            {
-                let es = es.clone();
+            if self.enable_arkime {
+                let es = self.es.clone();
                 let info = Box::new(info.clone());
                 Handle::current().spawn(async {
                     match index_file_info(es, info).await {
