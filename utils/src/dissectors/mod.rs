@@ -175,7 +175,10 @@ impl ProtocolDessector {
 
             result = match &self.callbacks[protocol as usize] {
                 Some(dissect) => dissect(data),
-                None => return Err(Error("Unsupport protocol")),
+                None => {
+                    *pkt.layers_mut() = layers;
+                    return Err(Error("Unsupport protocol"));
+                }
             };
         }
     }
