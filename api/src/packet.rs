@@ -167,6 +167,7 @@ impl Default for PacketHashMethod {
 #[derive(Debug, Eq)]
 pub struct PacketHashKey {
     pub hash_method: PacketHashMethod,
+    pub datalink_proto: Protocol,
     pub network_proto: Protocol,
     pub trans_proto: Protocol,
     pub src_port: u16,
@@ -183,6 +184,7 @@ impl Default for PacketHashKey {
     fn default() -> PacketHashKey {
         PacketHashKey {
             hash_method: PacketHashMethod::FiveTuple,
+            datalink_proto: Protocol::default(),
             network_proto: Protocol::default(),
             trans_proto: Protocol::default(),
             src_port: 0,
@@ -200,6 +202,10 @@ impl Default for PacketHashKey {
 impl From<&dyn Packet> for PacketHashKey {
     fn from(pkt: &dyn Packet) -> Self {
         let mut key = Self::default();
+        key.datalink_proto = pkt
+            .layers()
+            .datalink()
+            .map_or(Protocol::UNKNOWN, |l| l.protocol);
         key.network_proto = pkt
             .layers()
             .network()
@@ -286,7 +292,10 @@ impl Hash for PacketHashKey {
 
 impl PartialEq for PacketHashKey {
     fn eq(&self, other: &PacketHashKey) -> bool {
-        if self.trans_proto != other.trans_proto {
+        if self.trans_proto != other.trans_proto
+            || self.network_proto != other.network_proto
+            || self.datalink_proto != other.datalink_proto
+        {
             return false;
         }
 
