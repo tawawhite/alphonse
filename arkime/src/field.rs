@@ -1,6 +1,9 @@
 use std::convert::TryFrom;
 use std::fmt;
+use std::fs::File;
 use std::hash::Hash;
+use std::io::Read;
+use std::path::Path;
 
 use anyhow::{anyhow, Result};
 use serde::de::{self, SeqAccess, Visitor};
@@ -108,7 +111,7 @@ pub struct Field {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub db_field: Option<String>,
     pub db_field2: String,
-    #[serde(skip_serializing)]
+    #[serde(rename(serialize = "_id"))]
     pub expression: String,
     #[serde(skip_serializing)]
     pub flags: Option<FieldFlags>,
@@ -157,8 +160,15 @@ impl TryFrom<&Yaml> for Field {
 ///
 /// Of course one can choose to define fields in pkt processor impl. However, it would be more
 /// clear and more flexible to be able to define a field in a yaml file
-pub fn get_fields_from_yaml(doc: &yaml_rust::Yaml, name: &str) -> Result<Vec<Field>> {
-    match &doc[name] {
+pub fn get_fields_from_yaml<P: AsRef<Path>>(fpath: &P) -> Result<Vec<Field>> {
+    let mut s = String::new();
+    File::open(fpath)?.read_to_string(&mut s)?;
+    let docs = yaml_rust::YamlLoader::load_from_str(&s)?;
+    let doc = docs
+        .get(0)
+        .ok_or(anyhow!("No document founded in {:?}", fpath.as_ref()))?;
+
+    match &doc {
         Yaml::Array(arr) => {
             let mut fields = vec![];
             for elm in arr {
