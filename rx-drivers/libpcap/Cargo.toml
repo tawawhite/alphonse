@@ -9,7 +9,7 @@ name = "rxlibpcap"
 
 [dependencies]
 alphonse-api = { path = "../../api", version = "0.1.0" }
-alphonse-arkime = { path = "../../arkime", version = "0.1.0" }
+alphonse-arkime = { path = "../../arkime", version = "0.1.0", features = ["stats"] }
 alphonse-utils = { path = "../../utils", version = "0.1.0", features = ["dissectors", "es"] }
 anyhow = "1.0"
 crossbeam-channel = "0.5"
