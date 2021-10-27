@@ -1,0 +1,406 @@
+# http
+- expression: host.http
+  group: http
+  type: lotermfield
+  friendlyName: Hostname
+  help: HTTP host header field
+  dbField2: http.host
+  flags: [cnt]
+  aliases: [http.host]
+  category: [host]
+- expression: host.http.tokens
+  group: http
+  type: lotextfield
+  friendlyName: Hostname Tokens
+  help: HTTP host Tokens header field
+  dbField2: http.hostTokens
+  flags: [fake]
+  aliases: [http.host.tokens]
+- expression: http.uri
+  group: http
+  type: termfield
+  friendlyName: URI
+  help: URIs for request
+  dbField2: http.uri
+  flags: [cnt]
+  category: [url, host]
+- expression: http.uri.tokens
+  group: http
+  type: lotextfield
+  friendlyName: URI Tokens
+  help: URIs Tokens for request
+  dbField2: http.uri.tokens
+  flags: [fake]
+- expression: ip.xff
+  group: http
+  type: ip
+  friendlyName: XFF IP
+  help: X-Forwarded-For Header
+  dbField2: http.xffIp
+  flags: [cnt, ip]
+  category: [ip]
+- expression: http.user-agent
+  group: http
+  type: termfield
+  friendlyName: Http Usergent
+  help: User-Agent Header
+  dbField2: http.useragent
+  flags: [cnt]
+- expression: http.user-agent.tokens
+  group: http
+  type: lotextfield
+  friendlyName: Http Usergent Tokens
+  help: User-Agent Header Tokens
+  dbField2: http.useragentTokens
+  flags: [fake]
+- expression: http.hasheader.src
+  group: http
+  type: lotermfield
+  friendlyName: Has Src Header
+  help: Request has header present
+  dbField2: http.requestHeader
+  flags: [cnt]
+- expression: http.hasheader.dst
+  group: http
+  type: lotermfield
+  friendlyName: Has Dst Header
+  help: Response has header present
+  dbField2: http.responseHeader
+  flags: [cnt]
+- expression: http.hasheader.src.value
+  group: http
+  type: lotermfield
+  friendlyName: Request Header Values
+  help: Contains request header values
+  dbField2: http.requestHeaderValue
+  flags: [cnt]
+- expression: http.hasheader.dst.value
+  group: http
+  type: lotermfield
+  friendlyName: Response Header Values
+  help: Contains Response header values
+  dbField2: http.responseHeaderValue
+  flags: [cnt]
+- expression: http.hasheader
+  group: http
+  type: lotermfield
+  friendlyName: Has Src or Dst Header
+  help: Shorthand for http.hasheader.src or http.hasheader.dst
+  dbField2: hhall
+  regex: ^http\.hasheader\.(?:(?!(cnt|value)$).)*$
+  flags: [fake]
+- expression: http.hasheader.value
+  group: http
+  type: lotermfield
+  friendlyName: Has Value in Src or Dst Header
+  help: Shorthand for http.hasheader.src.value or http.hasheader.dst.value
+  dbField2: hhvalueall
+  regex: ^http\.hasheader\.(src|dst)\.value$
+  flags: [fake]
+- expression: http.md5
+  group: http
+  type: lotermfield
+  friendlyName: Body MD5
+  help: MD5 of http body response
+  dbField2: http.md5
+  flags: [cnt]
+  category: [md5]
+- expression: http.sha256
+  group: http
+  type: lotermfield
+  friendlyName: Body SHA256
+  help: SHA256 of http body response
+  dbField2: http.sha256
+  flags: [cnt]
+  category: [sha256]
+- expression: http.version
+  group: http
+  type: termfield
+  friendlyName: HTTP Protocol Version
+  help: HTTP version number
+  dbField2: http.version
+  flags: [fake]
+  regex: "^http.version.[a-z]+$"
+- expression: http.version.src
+  group: http
+  type: termfield
+  friendlyName: HTTP Protocol reqeust Version
+  help: Request HTTP version number
+  dbField2: http.clientVersion
+  flags: [cnt]
+- expression: http.version.dst
+  group: http
+  type: termfield
+  friendlyName: HTTP Protocol response Version
+  help: Request HTTP version number
+  dbField2: http.serverVersion
+  flags: [cnt]
+- expression: http.uri.path
+  group: http
+  type: termfield
+  friendlyName: HTTP URI path
+  help: Path portion of URI
+  dbField2: http.path
+  flags: [cnt]
+- expression: http.uri.key
+  group: http
+  type: termfield
+  friendlyName: HTTP QS key
+  help: Keys from query string of URI
+  dbField2: http.key
+  flags: [cnt]
+- expression: http.uri.value
+  group: http
+  type: termfield
+  friendlyName: HTTP QS values
+  help: Values from query string of URI
+  dbField2: http.value
+  flags: [cnt]
+- expression: http.cookie.key
+  group: http
+  type: termfield
+  friendlyName: HTTP Cookie Keys
+  help: The keys to cookies sent up in requests
+  dbField2: http.cookieKey
+  flags: [cnt]
+- expression: http.cookie.value
+  group: http
+  type: termfield
+  friendlyName: HTTP Cookie Values
+  help: The values to cookies sent up in requests
+  dbField2: http.cookieValue
+  flags: [cnt]
+- expression: http.mothod
+  group: http
+  type: termfield
+  friendlyName: HTTP Request Method
+  help: HTTP Request Method
+  dbField2: http.method
+  flags: [cnt]
+- expression: http.bodymagic
+  group: http
+  type: termfield
+  friendlyName: HTTP Body Magic
+  help: The content type of body determined by libfile/magic
+  dbField2: http.bodyMagic
+  flags: [cnt]
+- expression: http.user
+  group: http
+  type: termfield
+  friendlyName: User
+  help: HTTP Auth User
+  dbField2: http.user
+  flags: [cnt]
+  category: [user]
+- expression: http.authtype
+  group: http
+  type: termfield
+  friendlyName: HTTP Auth Type
+  help: HTTP Auth Type
+  dbField2: http.authType
+  flags: [cnt]
+- expression: http.statuscode
+  group: http
+  type: integer
+  friendlyName: HTTP Status Code
+  help: Response HTTP numeric status code
+  dbField2: http.statuscode
+  flags: [cnt]
+- expression: http.reqbody
+  group: http
+  type: termfield
+  friendlyName: HTTP Request Body
+  help: Response HTTP numeric status code
+  dbField2: http.reqBody
+# dns
+- expression: ip.dns
+  group: dns
+  type: ip
+  friendlyName: IP
+  help: IP from DNS result
+  dbField2: dns.ip
+  aliases: [dns.ip]
+  flags: [cnt]
+  category: ip
+- expression: ip.dns.nameserver
+  group: dns
+  type: ip
+  friendlyName: IP
+  help: IPs for nameservers
+  dbField2: dns.nameserverIP
+  flags: [cnt]
+  category: ip
+- expression: ip.dns.mailserver
+  group: dns
+  type: ip
+  friendlyName: IP
+  help: IPs for mailservers
+  dbField2: dns.mailserverIp
+  flags: [cnt]
+  category: ip
+- expression: ip.dns.all
+  group: dns
+  type: ip
+  friendlyName: IP
+  help: Shorthand for ip.dns or ip.dns.nameserver
+  dbField2: dnsipall
+  flags: [fake]
+  regex: ^ip\\\\.dns(?:(?!\\\\.(cnt|all)$).)*$
+- expression: host.dns
+  group: dns
+  type: lotermfield
+  friendlyName: IP
+  help: DNS lookup hostname
+  dbField2: dns.host
+  aliases: [dns.host]
+  flags: [cnt]
+  category: ip
+# add missing dns fields
+# bgp
+- expression: bgp.type
+  group: bgp
+  type: uptermfield
+  friendlyName: Type
+  help: BGP Type field
+  dbField2: bgp.type
+# dhcp
+- expression: dhcp.type
+  group: dhcp
+  type: uptermfield
+  friendlyName: Type
+  help: DHCP Type
+  flags: [cnt]
+  dbField2: dhcp.type
+- expression: dhcp.host
+  group: dhcp
+  type: lotermfield
+  friendlyName: Host
+  help: DHCP Host
+  flags: [cnt]
+  aliases: [dhcp.host]
+  dbField2: dhcp.type
+  category: host
+- expression: dhcp.host.tokens
+  group: dhcp
+  type: lotextfield
+  friendlyName: Hostname Tokens
+  help: DHCP Hostname Tokens
+  flags: [cnt]
+  aliases: [host.dhcp.tokens]
+  dbField2: dhcp.hostTokens
+  category: host
+- expression: dhcp.mac
+  group: dhcp
+  type: lotermfield
+  friendlyName: Client Mac
+  help: Client ethernet Mac
+  flags: [cnt]
+  dbField2: dhcp.mac
+- expression: dhcp.oui
+  group: dhcp
+  type: termfield
+  friendlyName: Client OUI
+  help: Client ethernet OUI
+  flags: [cnt]
+  dbField2: dhcp.oui
+- expression: dhcp.id
+  group: dhcp
+  type: termfield
+  friendlyName: Transaction id
+  help: Transaction id
+  flags: [cnt]
+  dbField2: dhcp.id
+# icmp
+- expression: icmp.type
+  group: general
+  type: integer
+  friendlyName: ICMP Type
+  help: ICMP type field values
+  dbField2: icmp.type
+- expression: icmp.code
+  group: general
+  type: integer
+  friendlyName: ICMP Code
+  help: ICMP code field values
+  dbField2: icmp.code
+# irc
+- expression: irc.nick
+  group: irc
+  type: termfield
+  friendlyName: Nickname
+  help: Nicknames set
+  dbField2: irc.nic
+  flags: [cnt]
+  category: user
+- expression: irc.channel
+  group: irc
+  type: termfield
+  friendlyName: Channel
+  help: Channel joined
+  dbField2: irc.channel
+  flags: [cnt]
+# isis
+- expression: isis.msgType
+  group: isis
+  type: lotermfield
+  friendlyName: isis.msgType
+  help: ISIS Msg Type field
+  dbField2: isis.msgType
+# krb5
+- expression: krb5.realm
+  group: krb5
+  type: termfield
+  friendlyName: Realm
+  help: Kerberos 5 Realm
+  dbField2: krb5.realm
+  flags: [cnt]
+- expression: krb5.cname
+  group: krb5
+  type: termfield
+  friendlyName: cname
+  help: Kerberos 5 cname
+  dbField2: krb5.cname
+  flags: [cnt]
+- expression: krb5.sname
+  group: krb5
+  type: termfield
+  friendlyName: sname
+  help: Kerberos 5 sname
+  dbField2: krb5.sname
+  flags: [cnt]
+- expression: krb5.crealm
+  group: krb5
+  type: termfield
+  friendlyName: crealm
+  help: Kerberos 5 crealm
+  dbField2: krb5.crealm
+  flags: [cnt]
+- expression: krb5.ticketSname
+  group: krb5
+  type: termfield
+  friendlyName: Ticket Sname
+  help: Kerberos 5 Ticket Sname
+  dbField2: krb5.ticketSname
+  flags: [cnt]
+- expression: krb5.ticketRealm
+  group: krb5
+  type: termfield
+  friendlyName: Ticket Realm
+  help: Kerberos 5 Ticket Realm
+  dbField2: krb5.ticketRealm
+  flags: [cnt]
+# ldap
+- expression: ldap.authtype
+  group: ldap
+  type: termfield
+  friendlyName: Auth Type
+  help: The auth type of ldap bind
+  dbField2: ldap.authtype
+  flags: [cnt]
+- expression: ldap.bindname
+  group: ldap
+  type: termfield
+  friendlyName: Bind Name
+  help: The bind name of ldap bind
+  dbField2: ldap.bindname
+  flags: [cnt]

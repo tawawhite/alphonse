@@ -68,10 +68,14 @@ dependencies = [
 name = "alphonse-arkime"
 version = "0.1.0"
 dependencies = [
+ "alphonse-utils",
  "anyhow",
+ "bitflags",
  "elasticsearch",
  "serde",
  "serde_json",
+ "serde_yaml",
+ "yaml-rust",
 ]
 
 [[package]]
@@ -79,6 +83,7 @@ name = "alphonse-elasticsearch"
 version = "0.1.0"
 dependencies = [
  "alphonse-api",
+ "alphonse-arkime",
  "alphonse-utils",
  "anyhow",
  "chrono",

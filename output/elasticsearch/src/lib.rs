@@ -10,6 +10,7 @@ use tokio::runtime::Handle;
 use tokio::task::JoinHandle;
 
 use alphonse_api as api;
+use alphonse_arkime as arkime;
 use alphonse_utils as utils;
 use api::config::Config;
 use api::plugins::output::OutputPlugin;
@@ -161,6 +162,17 @@ impl OutputThread {
         let mut last_send_time = SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)?
             .as_secs();
+
+        Handle::current().block_on(async {
+            let fpath = cfg.get_str(&"arkime.fields", "./etc/fields.yml");
+            let fields = arkime::fields::get_fields_from_yaml(&fpath)?;
+            let mut arkime_cfg = arkime::Config::default();
+            arkime_cfg.hostname = cfg.hostname.clone();
+            arkime_cfg.node = cfg.node.clone();
+            arkime_cfg.prefix = cfg.get_str(&"arkime.prefix", "");
+            arkime_cfg.elasticsearch = host;
+            arkime::fields::add_fields(&es, &arkime_cfg, fields).await
+        })?;
 
         println!("{} started", self.name());
 

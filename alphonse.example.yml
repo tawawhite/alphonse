@@ -2,6 +2,9 @@ rx.stats.log.interval: 1
 channel.pkt.size: 2000000
 
 rx.libpcap.interfaces: ["eth0"]
+arkime.enable: false
+arkime.fields: "./etc/fields.yml"
+arkime.prefix: ""
 
 dpdk.eal.args: [
     "-l", "0-3",
