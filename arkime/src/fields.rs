@@ -57,7 +57,7 @@ impl Default for FieldFlags {
 }
 
 struct FlagsVisitor;
-const FLAGS_STRING: &[&str] = &["linked-sessions", "nodb", "fake", "disabled", "cnt", "ip"];
+const FLAGS_STRING: &[&str] = &["fake", "disabled", "cnt", "ip"];
 
 impl<'de> Visitor<'de> for FlagsVisitor {
     type Value = FieldFlags;
@@ -471,12 +471,6 @@ mod tests {
     fn field_flags_deserialize() {
         let flags: FieldFlags = serde_yaml::from_str("[cnt]").unwrap();
         assert_eq!(flags, FieldFlags::CNT);
-
-        let flags: FieldFlags = serde_yaml::from_str("[linked-sessions]").unwrap();
-        assert_eq!(flags, FieldFlags::LINKED_SESSIONS);
-
-        let flags: FieldFlags = serde_yaml::from_str("[nodb]").unwrap();
-        assert_eq!(flags, FieldFlags::NODB);
 
         let flags: FieldFlags = serde_yaml::from_str("[disabled]").unwrap();
         assert_eq!(flags, FieldFlags::DISABLED);

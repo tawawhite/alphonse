@@ -67,13 +67,6 @@
   help: Response has header present
   dbField2: http.responseHeader
   flags: [cnt]
-- expression: http.header.request.field
-  group: http
-  type: lotermfield
-  friendlyName: Request Header Fields
-  help: Contains Request header fields
-  dbField2: http.requestHeaderField
-  flags: [nodb]
 - expression: http.hasheader.src.value
   group: http
   type: lotermfield
@@ -81,13 +74,6 @@
   help: Contains request header values
   dbField2: http.requestHeaderValue
   flags: [cnt]
-- expression: http.header.response.field
-  group: http
-  type: lotermfield
-  friendlyName: Response Header Fields
-  help: Contains Response header fields
-  dbField2: http.responseHeaderField
-  flags: [nodb]
 - expression: http.hasheader.dst.value
   group: http
   type: lotermfield
