@@ -9,6 +9,7 @@ name = "es"
 
 [dependencies]
 alphonse-api = { path = "../../api", version = "0.1.0" }
+alphonse-arkime = { path = "../../arkime", version = "0.1.0", features = ["fields"] }
 alphonse-utils = { path = "../../utils", version = "0.1.0", features = ["es"] }
 anyhow = "1.0"
 chrono = "0.4"

@@ -83,6 +83,7 @@ name = "alphonse-elasticsearch"
 version = "0.1.0"
 dependencies = [
  "alphonse-api",
+ "alphonse-arkime",
  "alphonse-utils",
  "anyhow",
  "chrono",

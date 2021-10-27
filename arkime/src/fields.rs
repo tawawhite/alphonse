@@ -4,7 +4,6 @@ use std::fs::File;
 use std::hash::Hash;
 use std::io::Read;
 use std::path::Path;
-use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
 use elasticsearch::Elasticsearch;
@@ -201,7 +200,7 @@ pub fn get_fields_from_yaml<P: AsRef<Path>>(fpath: &P) -> Result<Vec<Field>> {
     }
 }
 
-async fn load_fields(es: Arc<Elasticsearch>, cfg: &Config) -> Result<Vec<Field>> {
+async fn load_fields(es: &Elasticsearch, cfg: &Config) -> Result<Vec<Field>> {
     let index = format!("{}fields", cfg.prefix);
     let resp = es
         .search(SearchParts::Index(&[&index]))
@@ -241,8 +240,8 @@ async fn load_fields(es: Arc<Elasticsearch>, cfg: &Config) -> Result<Vec<Field>>
 }
 
 /// Add local fields into Elasticsearch
-pub async fn add_fields(es: Arc<Elasticsearch>, cfg: &Config, fields: Vec<Field>) -> Result<()> {
-    let mut existing_fields = load_fields(es.clone(), cfg).await?;
+pub async fn add_fields(es: &Elasticsearch, cfg: &Config, fields: Vec<Field>) -> Result<()> {
+    let mut existing_fields = load_fields(es, cfg).await?;
 
     for field in fields {
         let exists = existing_fields
@@ -365,7 +364,7 @@ pub async fn add_fields(es: Arc<Elasticsearch>, cfg: &Config, fields: Vec<Field>
 }
 
 /// Add an field into Elasticsearch
-async fn add_field(es: &Arc<Elasticsearch>, cfg: &Config, field: &Field) -> Result<()> {
+async fn add_field(es: &Elasticsearch, cfg: &Config, field: &Field) -> Result<()> {
     let index = format!("{}fields", cfg.prefix);
     let resp = es
         .index(IndexParts::IndexId(&index, &field.expression))
@@ -376,7 +375,7 @@ async fn add_field(es: &Arc<Elasticsearch>, cfg: &Config, field: &Field) -> Resu
     Ok(())
 }
 
-async fn update_field(es: &Arc<Elasticsearch>, cfg: &Config, field: &Field) -> Result<()> {
+async fn update_field(es: &Elasticsearch, cfg: &Config, field: &Field) -> Result<()> {
     let index = format!("{}fields", cfg.prefix);
     let resp = es
         .update(UpdateParts::IndexId(&index, &field.expression))
