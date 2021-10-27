@@ -4,8 +4,8 @@ extern crate bitflags;
 
 pub mod config;
 #[cfg(feature = "fields")]
-pub mod field;
+pub mod fields;
 #[cfg(feature = "stats")]
-pub mod stat;
+pub mod stats;
 
 pub use config::Config;
