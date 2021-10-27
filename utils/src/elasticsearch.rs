@@ -1,6 +1,19 @@
 use anyhow::Result;
-use elasticsearch::http::response::Response;
+use elasticsearch::http::{headers::HeaderMap, response::Response, Method};
+use elasticsearch::Elasticsearch;
 use serde_json::json;
+
+pub async fn index_exists(es: &Elasticsearch, index: &str) -> Result<bool> {
+    match es
+        .send::<&str, &str>(Method::Head, index, HeaderMap::default(), None, None, None)
+        .await?
+        .status_code()
+        .as_u16()
+    {
+        200 => Ok(true),
+        _ => Ok(false),
+    }
+}
 
 /// Handle Elasticsearch general response
 pub async fn handle_resp(resp: Response) -> Result<()> {

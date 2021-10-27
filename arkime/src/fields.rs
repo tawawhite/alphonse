@@ -241,6 +241,10 @@ async fn load_fields(es: &Elasticsearch, cfg: &Config) -> Result<Vec<Field>> {
 
 /// Add local fields into Elasticsearch
 pub async fn add_fields(es: &Elasticsearch, cfg: &Config, fields: Vec<Field>) -> Result<()> {
+    if !utils::elasticsearch::index_exists(es, &"fields_v3").await? {
+        return Err(anyhow!("No fields_v3 index founded"));
+    }
+
     let mut existing_fields = load_fields(es, cfg).await?;
 
     for field in fields {
