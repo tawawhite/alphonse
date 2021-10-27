@@ -11,15 +11,17 @@ use num_traits::cast::FromPrimitive;
 use path_absolutize::Absolutize;
 
 use alphonse_api as api;
+use alphonse_arkime as arkime;
 use alphonse_utils as utils;
 use api::config::Config;
 use api::packet::Packet as PacketTrait;
 use api::packet::PacketHashKey;
 use api::plugins::rx::RxStat;
 use api::plugins::Plugin;
+use arkime::stats::StatUnit;
 use utils::dissectors::link::LinkType;
 
-use crate::{CaptureUnit, Driver, Packet};
+use crate::{Driver, Packet};
 
 impl Driver {
     pub(crate) fn start_files(
@@ -195,15 +197,7 @@ struct Offline {
     cap: pcap::Capture<pcap::Offline>,
 }
 
-impl CaptureUnit for Offline {
-    #[inline]
-    fn next(&self) -> Result<Box<dyn PacketTrait>, pcap::Error> {
-        let c = unsafe { &mut (*(&self.cap as *const _ as *mut pcap::Capture<pcap::Offline>)) };
-        let raw = c.next()?;
-        let pkt = Box::new(Packet::from(&raw));
-        Ok(pkt)
-    }
-
+impl StatUnit for Offline {
     fn stats(&self) -> Result<RxStat> {
         let mut stats = RxStat::default();
         let c = unsafe { &mut (*(&self.cap as *const _ as *mut pcap::Capture<pcap::Offline>)) };
@@ -216,6 +210,14 @@ impl CaptureUnit for Offline {
 }
 
 impl Offline {
+    #[inline]
+    fn next(&self) -> Result<Box<dyn PacketTrait>, pcap::Error> {
+        let c = unsafe { &mut (*(&self.cap as *const _ as *mut pcap::Capture<pcap::Offline>)) };
+        let raw = c.next()?;
+        let pkt = Box::new(Packet::from(&raw));
+        Ok(pkt)
+    }
+
     pub fn try_from_path<P: AsRef<Path>>(path: P) -> Result<Offline> {
         if !path.as_ref().exists() {
             return Err(anyhow!("File does not exist"));

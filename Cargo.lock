@@ -68,6 +68,7 @@ dependencies = [
 name = "alphonse-arkime"
 version = "0.1.0"
 dependencies = [
+ "alphonse-api",
  "alphonse-utils",
  "anyhow",
  "bitflags",
@@ -1319,7 +1320,6 @@ dependencies = [
  "alphonse-utils",
  "anyhow",
  "crossbeam-channel",
- "elasticsearch",
  "fnv",
  "futures",
  "libc",
@@ -1327,7 +1327,6 @@ dependencies = [
  "path-absolutize",
  "pcap",
  "serde",
- "serde_json",
  "tokio",
 ]
 

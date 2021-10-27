@@ -8,18 +8,18 @@ use fnv::FnvHasher;
 use pcap::{Active, Capture};
 
 use alphonse_api as api;
+use alphonse_arkime as arkime;
 use alphonse_utils as utils;
 use api::config::Config;
 use api::packet::Packet as PacketTrait;
 use api::packet::PacketHashKey;
 use api::plugins::rx::RxStat;
 use api::plugins::Plugin;
+use arkime::stats::StatUnit;
 use utils::dissectors::link::LinkType;
 use utils::dissectors::ProtocolDessector;
 
-#[cfg(feature = "arkime")]
-use crate::arkime;
-use crate::{CaptureUnit, Driver, Packet};
+use crate::{Driver, Packet};
 
 impl Driver {
     pub(crate) fn start_interfaces(
@@ -52,14 +52,21 @@ impl Driver {
             };
             let hdl = rt.spawn_blocking(move || thread.spawn(cfg));
             self.handles.push(hdl);
-            let cap = cap as Arc<dyn CaptureUnit>;
+            let cap = cap as Arc<dyn StatUnit>;
             self.caps.push(cap);
         }
 
-        #[cfg(feature = "arkime")]
-        {
+        if cfg.get_boolean("arkime.enable", false) {
             let caps = self.caps.clone();
-            let hdl = rt.spawn_blocking(move || arkime::main_loop(cfg, caps));
+            let cfg = cfg.clone();
+            let hdl = rt.spawn(async move {
+                let mut akcfg = arkime::Config::default();
+                akcfg.elasticsearch = cfg.get_str(&"elasticsearch", "http://localhost:9200");
+                akcfg.hostname = cfg.hostname.clone();
+                akcfg.node = cfg.node.clone();
+                akcfg.prefix = cfg.get_str(&"arkime.prefix", "");
+                arkime::stats::main_loop(cfg.exit.clone(), Arc::new(akcfg), caps).await
+            });
             self.handles.push(hdl);
         }
 
@@ -174,15 +181,7 @@ struct NetworkInterface {
     overload_pkts: AtomicU64,
 }
 
-impl CaptureUnit for NetworkInterface {
-    #[inline]
-    fn next(&self) -> Result<Box<dyn PacketTrait>, pcap::Error> {
-        let c = unsafe { &mut (*(&self.cap as *const _ as *mut Capture<Active>)) };
-        let raw = c.next()?;
-        let pkt: Box<Packet> = Box::new(Packet::from(&raw));
-        Ok(pkt)
-    }
-
+impl StatUnit for NetworkInterface {
     #[inline]
     fn stats(&self) -> Result<RxStat> {
         let mut stats = RxStat::default();
@@ -198,6 +197,14 @@ impl CaptureUnit for NetworkInterface {
 }
 
 impl NetworkInterface {
+    #[inline]
+    fn next(&self) -> Result<Box<dyn PacketTrait>, pcap::Error> {
+        let c = unsafe { &mut (*(&self.cap as *const _ as *mut Capture<Active>)) };
+        let raw = c.next()?;
+        let pkt: Box<Packet> = Box::new(Packet::from(&raw));
+        Ok(pkt)
+    }
+
     /// Initialize a Libpcap instance from a network interface
     pub fn try_from_str<S: AsRef<str>>(interface: S) -> Result<NetworkInterface> {
         let interface = String::from(interface.as_ref());

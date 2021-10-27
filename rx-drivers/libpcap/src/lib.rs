@@ -5,40 +5,24 @@ use crossbeam_channel::Sender;
 use tokio::task::JoinHandle;
 
 use alphonse_api as api;
+use alphonse_arkime as arkime;
 use api::classifiers::matched::Rule;
 use api::config::Config;
 use api::packet::Packet as PacketTrait;
 use api::packet::{Layers, Rules, Tunnel};
 use api::plugins::rx::{RxDriver, RxStat};
 use api::plugins::{Plugin, PluginType};
+use arkime::stats::StatUnit;
 
-#[cfg(feature = "arkime")]
-mod arkime;
 mod files;
 mod interfaces;
-
-trait CaptureUnit: Send + Sync {
-    fn next(&self) -> Result<Box<dyn PacketTrait>, pcap::Error>;
-    fn stats(&self) -> Result<RxStat>;
-}
-
-fn gather_stats(caps: &[&dyn CaptureUnit]) -> Result<RxStat> {
-    let mut stat = RxStat::default();
-    for cap in caps {
-        match cap.stats() {
-            Ok(stats) => stat += stats,
-            Err(e) => eprintln!("{}", e),
-        }
-    }
-    Ok(stat)
-}
 
 #[derive(Default)]
 struct Driver {
     rt: Option<tokio::runtime::Runtime>,
     /// Thread handles
     handles: Vec<JoinHandle<Result<()>>>,
-    caps: Vec<Arc<dyn CaptureUnit>>,
+    caps: Vec<Arc<dyn StatUnit>>,
     cfg: Arc<Config>,
 }
 
