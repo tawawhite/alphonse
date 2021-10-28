@@ -26,7 +26,6 @@ fn classify(ses: &mut Session, pkt: &dyn Packet) -> Result<()> {
 fn _classify<'a>(ses: &mut Session, pkt: &'a dyn Packet) -> nom::IResult<&'a [u8], ()> {
     let (data, len) = le_u32(pkt.payload())?;
     if data.len() < len as usize || data.len() < 9 {
-        println!("shit {} {}", data.len(), len);
         return Ok((&[], ()));
     }
 
