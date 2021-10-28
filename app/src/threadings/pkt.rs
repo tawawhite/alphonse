@@ -43,55 +43,6 @@ impl PktThread {
         format!("alphonse-pkt{}", self.id)
     }
 
-    #[inline]
-    fn parse_pkt(
-        &self,
-        scratch: &mut api::classifiers::ClassifyScratch,
-        processors: &mut Box<Vec<Box<dyn Processor>>>,
-        pkt: &mut dyn Packet,
-        ses_data: &mut SessionData,
-    ) -> Result<()> {
-        self.classifier.classify(pkt, scratch)?;
-
-        for rule in pkt.rules().iter() {
-            for id in rule.processors.iter() {
-                match ses_data.processors.get_mut(id) {
-                    Some(_) => {}
-                    None => {
-                        let processor = processors[*id as usize].clone_processor();
-                        ses_data.processors.insert(processor.id(), processor);
-                    }
-                };
-            }
-        }
-
-        for (_, processor) in ses_data.processors.iter_mut() {
-            let mut matched = false;
-            for rule in pkt.rules().iter() {
-                // If processor has bind a rule this packet matches, parse with this rule
-                // otherwise this pkt just belongs to the same session, parse without rule information
-                for id in rule.processors.iter() {
-                    if *id == processor.id() {
-                        match processor.parse_pkt(pkt, Some(rule), ses_data.info.as_mut()) {
-                            Ok(_) => {}
-                            Err(e) => {
-                                eprintln!("{}: {}", processor.name(), e);
-                                return Err(e);
-                            }
-                        };
-                        matched = true;
-                    }
-                }
-            }
-
-            if !matched {
-                processor.parse_pkt(pkt, None, ses_data.info.as_mut())?;
-            }
-        }
-
-        Ok(())
-    }
-
     pub fn spawn(
         &self,
         cfg: Arc<Config>,
@@ -114,38 +65,77 @@ impl PktThread {
             };
             last_packet.store(pkt.ts().tv_sec as u64, Ordering::Relaxed);
 
+            self.classifier
+                .classify(pkt.as_mut(), &mut classify_scratch)?;
+
             let key = PacketHashKey::from(pkt.as_ref());
             match self.session_table.get_mut(&key) {
                 Some(mut ses) => {
                     ses.info.update(pkt.as_ref());
-                    self.parse_pkt(
-                        &mut classify_scratch,
-                        &mut processors,
-                        pkt.as_mut(),
-                        ses.as_mut(),
-                    )?
+                    parse_pkt(&mut processors, pkt.as_mut(), ses.as_mut())?;
+                    continue;
                 }
-                None => {
-                    let mut ses = Box::new(SessionData::default());
-                    ses.info.start_time = TimeVal::new(*pkt.ts());
-                    ses.info.save_time = pkt.ts().tv_sec as u64 + cfg.ses_save_timeout as u64;
-                    ses.info.src_direction = pkt.direction();
-                    ses.info.add_field(&"node", json!(cfg.node));
-                    ses.info.update(pkt.as_ref());
-                    self.parse_pkt(
-                        &mut classify_scratch,
-                        &mut processors,
-                        pkt.as_mut(),
-                        ses.as_mut(),
-                    )?;
-
-                    self.session_table.insert(key, ses);
-                }
+                None => {}
             };
+
+            let mut ses = Box::new(SessionData::default());
+            ses.info.start_time = TimeVal::new(*pkt.ts());
+            ses.info.save_time = pkt.ts().tv_sec as u64 + cfg.ses_save_timeout as u64;
+            ses.info.src_direction = pkt.direction();
+            ses.info.add_field(&"node", json!(cfg.node));
+            ses.info.update(pkt.as_ref());
+            parse_pkt(&mut processors, pkt.as_mut(), ses.as_mut())?;
+
+            self.session_table.insert(key, ses);
         }
 
         println!("{} exit", self.name());
 
         Ok(())
     }
+}
+
+#[inline]
+fn parse_pkt(
+    processors: &mut Box<Vec<Box<dyn Processor>>>,
+    pkt: &mut dyn Packet,
+    ses_data: &mut SessionData,
+) -> Result<()> {
+    for rule in pkt.rules().iter() {
+        for id in rule.processors.iter() {
+            match ses_data.processors.get_mut(id) {
+                Some(_) => {}
+                None => {
+                    let processor = processors[*id as usize].clone_processor();
+                    ses_data.processors.insert(processor.id(), processor);
+                }
+            };
+        }
+    }
+
+    for (_, processor) in ses_data.processors.iter_mut() {
+        let mut matched = false;
+        for rule in pkt.rules().iter() {
+            // If processor has bind a rule this packet matches, parse with this rule
+            // otherwise this pkt just belongs to the same session, parse without rule information
+            for id in rule.processors.iter() {
+                if *id == processor.id() {
+                    match processor.parse_pkt(pkt, Some(rule), ses_data.info.as_mut()) {
+                        Ok(_) => {}
+                        Err(e) => {
+                            eprintln!("{}: {}", processor.name(), e);
+                            return Err(e);
+                        }
+                    };
+                    matched = true;
+                }
+            }
+        }
+
+        if !matched {
+            processor.parse_pkt(pkt, None, ses_data.info.as_mut())?;
+        }
+    }
+
+    Ok(())
 }
