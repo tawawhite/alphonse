@@ -1,6 +1,6 @@
 use std::collections::HashSet;
+use std::hash::Hash;
 use std::hash::Hasher;
-use std::hash::{BuildHasher, Hash};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex, TryLockError};
@@ -18,7 +18,9 @@ use alphonse_api as api;
 use api::classifiers::{matched::Rule, ClassifierManager};
 use api::config::Yaml;
 use api::packet::{Packet, PacketHashKey};
-use api::plugins::processor::{Processor, ProcessorID};
+use api::plugins::processor::{
+    Builder as ProcessorBuilder, Processor as PktProcessor, ProcessorID,
+};
 use api::plugins::{Plugin, PluginType};
 use api::session::Session;
 
@@ -115,33 +117,35 @@ pub struct PacketInfo {
     file_info: Option<(PcapFileInfo, usize)>,
 }
 
-#[derive(Default)]
-struct SimpleWriterProcessor {
-    /// Processor ID
+#[derive(Debug, Default)]
+struct Builder {
     id: ProcessorID,
-    /// Actual packet disk position
-    packet_pos: Box<Vec<isize>>,
-    /// File sequence ID
-    file_id: Box<HashSet<u32>>,
-    /// Hasher to decide which scheduler to use
-    hasher: fnv::FnvHasher,
-    /// Current file ID
-    fid: u32,
 }
 
-impl Clone for SimpleWriterProcessor {
-    fn clone(&self) -> Self {
-        Self {
-            id: self.id,
-            packet_pos: Default::default(),
-            file_id: Default::default(),
-            hasher: fnv::FnvBuildHasher::default().build_hasher(),
-            fid: 0,
-        }
+impl ProcessorBuilder for Builder {
+    fn build(&self, _: &api::config::Config) -> Box<dyn PktProcessor> {
+        Box::new(Processor::new(self.id))
+    }
+
+    fn id(&self) -> ProcessorID {
+        self.id
+    }
+
+    fn set_id(&mut self, id: ProcessorID) {
+        self.id = id
+    }
+
+    fn register_classify_rules(&mut self, manager: &mut ClassifierManager) -> Result<()> {
+        let mut rule = api::classifiers::Rule::new(self.id);
+        rule.rule_type = api::classifiers::RuleType::All;
+        rule.priority = 0;
+        manager.add_rule(&mut rule)?;
+
+        Ok(())
     }
 }
 
-impl Plugin for SimpleWriterProcessor {
+impl Plugin for Builder {
     fn plugin_type(&self) -> PluginType {
         PluginType::PacketProcessor
     }
@@ -245,26 +249,35 @@ impl Plugin for SimpleWriterProcessor {
     }
 }
 
-impl Processor for SimpleWriterProcessor {
-    fn clone_processor(&self) -> Box<dyn Processor> {
-        Box::new(self.clone())
-    }
+#[derive(Default)]
+struct Processor {
+    /// Processor ID
+    id: ProcessorID,
+    /// Actual packet disk position
+    packet_pos: Box<Vec<isize>>,
+    /// File sequence ID
+    file_id: Box<HashSet<u32>>,
+    /// Hasher to decide which scheduler to use
+    hasher: fnv::FnvHasher,
+    /// Current file ID
+    fid: u32,
+}
 
+impl Processor {
+    fn new(id: ProcessorID) -> Self {
+        let mut p = Self::default();
+        p.id = id;
+        p
+    }
+}
+
+impl PktProcessor for Processor {
     fn id(&self) -> ProcessorID {
         self.id
     }
 
-    fn set_id(&mut self, id: ProcessorID) {
-        self.id = id
-    }
-
-    fn register_classify_rules(&mut self, manager: &mut ClassifierManager) -> Result<()> {
-        let mut rule = api::classifiers::Rule::new(self.id);
-        rule.rule_type = api::classifiers::RuleType::All;
-        rule.priority = 0;
-        manager.add_rule(&mut rule)?;
-
-        Ok(())
+    fn name(&self) -> &'static str {
+        &"simple-writer"
     }
 
     fn parse_pkt(
@@ -318,8 +331,8 @@ impl Processor for SimpleWriterProcessor {
 }
 
 #[no_mangle]
-pub extern "C" fn al_new_pkt_processor() -> Box<Box<dyn Processor>> {
-    Box::new(Box::new(SimpleWriterProcessor::default()))
+pub extern "C" fn al_new_pkt_processor_builder() -> Box<Box<dyn ProcessorBuilder>> {
+    Box::new(Box::new(Builder::default()))
 }
 
 #[no_mangle]
@@ -333,7 +346,7 @@ mod tests {
 
     #[test]
     fn finish() {
-        let mut processor = SimpleWriterProcessor::default();
+        let mut processor = Processor::default();
         processor.packet_pos = Box::new(vec![-1, 1, 2, 3, 4, 5]);
 
         let mut ses = Session::new();

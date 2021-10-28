@@ -37,8 +37,12 @@ fn main() -> Result<()> {
     plugins::init_plugins(&plugins, &mut warehouse, &cfg)?;
 
     let mut classifier_manager = classifiers::ClassifierManager::new();
-    for processor in &mut warehouse.pkt_processors {
-        processor.register_classify_rules(&mut classifier_manager)?;
+    for builder in &mut warehouse.pkt_processor_builders {
+        let builder = match Arc::get_mut(builder) {
+            None => unreachable!("this would never happens"),
+            Some(b) => b,
+        };
+        builder.register_classify_rules(&mut classifier_manager)?;
     }
 
     classifier_manager.prepare()?;
@@ -108,16 +112,10 @@ fn main() -> Result<()> {
     // start all pkt threads
     for thread in pkt_threads {
         let cfg = cfg.clone();
-        let parsers = Box::new(
-            warehouse
-                .pkt_processors
-                .iter()
-                .map(|p| p.clone_processor())
-                .collect(),
-        );
+        let builders = warehouse.pkt_processor_builders.clone();
         let builder = std::thread::Builder::new().name(thread.name());
         let last_packet = &LAST_PACKET.get().ok_or(anyhow!(""))?[thread.id as usize];
-        let handle = builder.spawn(move || thread.spawn(cfg, parsers, last_packet.clone()))?;
+        let handle = builder.spawn(move || thread.spawn(cfg, builders, last_packet.clone()))?;
         handles.push(handle);
     }
 
@@ -138,7 +136,7 @@ fn main() -> Result<()> {
         };
     }
 
-    plugins::cleanup_plugins(&mut warehouse)?;
+    plugins::cleanup_plugins(warehouse)?;
 
     Ok(())
 }

@@ -7,7 +7,10 @@ use api::session::Session;
 
 use super::{add_dpi_rule_with_func, add_dpi_tcp_rule_with_func, MatchCallBack, Misc};
 
-pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManager) -> Result<()> {
+pub fn register_classify_rules(
+    builder: &mut Builder,
+    manager: &mut ClassifierManager,
+) -> Result<()> {
     add_dpi_tcp_rule_with_func!(r"^.{2}\x00\x00\x01\x00\x00\x00", classify, parser, manager);
     Ok(())
 }
@@ -29,7 +32,7 @@ mod test {
     use api::packet::Protocol;
     use api::plugins::processor::Processor;
     use api::session::Session;
-    use api::utils::packet::Packet as Packet;
+    use api::utils::packet::Packet;
 
     use crate::Misc;
 

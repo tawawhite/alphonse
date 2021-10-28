@@ -10,7 +10,7 @@ use alphonse_api as api;
 use api::config::Config;
 use api::packet::Packet;
 use api::plugins::{
-    output, output::OutputPlugin, processor, processor::Processor, rx, rx::RxDriver, PluginType,
+    output, output::OutputPlugin, processor, processor::Builder, rx, rx::RxDriver, PluginType,
     PluginTypeFunc, PLUGIN_TYPE_FUNC_NAME,
 };
 use api::session::Session;
@@ -57,7 +57,7 @@ impl Plugins {
 #[derive(Default)]
 pub struct PluginWarehouse {
     pub rx_driver: Option<Box<dyn RxDriver>>,
-    pub pkt_processors: Vec<Box<dyn Processor>>,
+    pub pkt_processor_builders: Vec<Arc<dyn Builder>>,
     pub output_plugins: Vec<Box<dyn OutputPlugin>>,
 }
 
@@ -193,21 +193,21 @@ pub fn init_plugins(
                 PluginType::PacketProcessor => {
                     let func = plugin
                         .lib
-                        .get::<processor::NewProcessorFunc>(
-                            processor::NEW_PKT_PROCESSOR_FUNC_NAME.as_bytes(),
+                        .get::<processor::NewProcessorBuilderFunc>(
+                            processor::NEW_PKT_PROCESSOR_BUILDER_FUNC_NAME.as_bytes(),
                         )
                         .map_err(|e| anyhow!("{}", e))?;
-                    let mut processor = *func();
-                    println!("Initializing {} pkt processor", processor.name());
-                    processor.init(cfg).map_err(|e| {
+                    let mut builder = *func();
+                    println!("Initializing {} pkt processor builder", builder.name());
+                    builder.init(cfg).map_err(|e| {
                         anyhow!(
-                            "Initializing {} pkt processor failed: {}",
-                            processor.name(),
+                            "Initializing {} pkt processor builder failed: {}",
+                            builder.name(),
                             e
                         )
                     })?;
-                    processor.set_id(pkt_processor_cnt);
-                    warehouse.pkt_processors.push(processor);
+                    builder.set_id(pkt_processor_cnt);
+                    warehouse.pkt_processor_builders.push(Arc::from(builder));
                     pkt_processor_cnt += 1;
                 }
                 PluginType::OutputPlugin => {
@@ -231,14 +231,19 @@ pub fn init_plugins(
     Ok(())
 }
 
-pub fn cleanup_plugins(warehouse: &mut PluginWarehouse) -> Result<()> {
+pub fn cleanup_plugins(mut warehouse: PluginWarehouse) -> Result<()> {
     match &mut warehouse.rx_driver {
         Some(driver) => driver.cleanup()?,
         None => {}
     };
 
-    for processor in &mut warehouse.pkt_processors {
-        processor.cleanup()?;
+    for mut builder in warehouse.pkt_processor_builders {
+        match Arc::get_mut(&mut builder) {
+            None => {
+                unreachable!("while cleanup plugins, there should be no other builder pointers")
+            }
+            Some(b) => b.cleanup()?,
+        };
     }
 
     for plugin in &mut warehouse.output_plugins {

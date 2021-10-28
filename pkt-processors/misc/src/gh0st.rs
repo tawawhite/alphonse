@@ -5,17 +5,20 @@ use api::classifiers::ClassifierManager;
 use api::packet::Packet;
 use api::session::Session;
 
-use super::{add_protocol, ClassifyFunc, Misc};
+use super::{add_protocol, Builder, ClassifyFunc};
 
-pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManager) -> Result<()> {
+pub fn register_classify_rules(
+    builder: &mut Builder,
+    manager: &mut ClassifierManager,
+) -> Result<()> {
     let c = Box::new(classify_windows as ClassifyFunc);
-    parser.add_tcp_dpi_rule_with_func(
+    builder.add_tcp_dpi_rule_with_func(
         r"^[a-zA-z0-9:]{5}..\x00\x00....\x78\x9c",
         c.as_ref(),
         manager,
     )?;
     let c = Box::new(classify_mac as ClassifyFunc);
-    parser.add_tcp_dpi_rule_with_func(r"^[a-zA-z0-9:]{5}\x00\x00.{6}\x78\x9c", c.as_ref(), manager)
+    builder.add_tcp_dpi_rule_with_func(r"^[a-zA-z0-9:]{5}\x00\x00.{6}\x78\x9c", c.as_ref(), manager)
 }
 
 fn classify_windows(ses: &mut Session, pkt: &dyn Packet) -> Result<()> {

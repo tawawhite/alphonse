@@ -10,7 +10,9 @@ use alphonse_api as api;
 use api::classifiers::{dpi, ClassifierManager, RuleID};
 use api::hyperscan;
 use api::packet::Packet;
-use api::plugins::processor::{Processor, ProcessorID};
+use api::plugins::processor::{
+    Builder as ProcessorBuilder, Processor as PktProcessor, ProcessorID,
+};
 use api::plugins::{Plugin, PluginType};
 use api::session::{ProtocolLayer, Session};
 
@@ -59,71 +61,24 @@ enum MatchCallBack {
     Tag(String),
 }
 
-#[derive(Clone, Default)]
-pub struct Misc {
+#[derive(Default)]
+pub struct Builder {
     id: ProcessorID,
-    classified: bool,
     match_cbs: FnvHashMap<RuleID, Vec<MatchCallBack>>,
     rules: Arc<HashSet<MiscRule>>,
 }
 
-type ClassifyFunc = fn(ses: &mut Session, pkt: &dyn Packet) -> Result<()>;
-
-impl MiscProcessUnit for ClassifyFunc {
-    fn process(&mut self, ses: &mut Session, pkt: &dyn Packet) -> Result<()> {
-        self(ses, pkt)
+impl ProcessorBuilder for Builder {
+    fn build(&self, _: &api::config::Config) -> Box<dyn PktProcessor> {
+        let mut p = Box::new(Misc::default());
+        p.id = self.id;
+        p
     }
 
-    fn box_clone(&self) -> Box<dyn MiscProcessUnit> {
-        Box::new(self.clone())
-    }
-}
-
-impl Plugin for Misc {
-    fn plugin_type(&self) -> PluginType {
-        PluginType::PacketProcessor
-    }
-
-    fn init(&mut self, cfg: &api::config::Config) -> Result<()> {
-        let rules = cfg.get_object("misc.rules");
-        match rules {
-            yaml_rust::Yaml::Array(a) => {
-                let mut rules = std::collections::HashSet::new();
-                for rule in a {
-                    let mut out_str = String::new();
-                    let mut emitter = yaml_rust::YamlEmitter::new(&mut out_str);
-                    emitter.dump(rule)?;
-                    let rule: MiscRule = serde_yaml::from_str(&out_str)?;
-                    rules.insert(rule);
-                }
-                self.rules = Arc::new(rules);
-            }
-            yaml_rust::Yaml::Null => println!("misc pkt-processor has no rule to load"),
-            _ => {
-                eprintln!("Couldn't load misc.rules, invalid value type or bad array value");
-                return Err(anyhow!("Failed to load misc.rules"));
-            }
-        }
-
-        Ok(())
-    }
-
-    fn name(&self) -> &str {
-        "misc"
-    }
-}
-
-impl Processor for Misc {
-    fn clone_processor(&self) -> Box<dyn Processor> {
-        Box::new(self.clone())
-    }
-
-    /// Get parser id
     fn id(&self) -> ProcessorID {
         self.id
     }
 
-    /// Get parser id
     fn set_id(&mut self, id: ProcessorID) {
         self.id = id
     }
@@ -162,46 +117,43 @@ impl Processor for Misc {
 
         Ok(())
     }
+}
 
-    fn parse_pkt(
-        &mut self,
-        pkt: &dyn api::packet::Packet,
-        rule: Option<&api::classifiers::matched::Rule>,
-        ses: &mut api::session::Session,
-    ) -> Result<()> {
-        let rule = match rule {
-            None => {
-                return Ok(());
-            }
-            Some(r) => r,
-        };
-        match self.match_cbs.get_mut(&rule.id()) {
-            Some(cbs) => {
-                for cb in cbs {
-                    match cb {
-                        MatchCallBack::ProtocolName(protocol) => {
-                            ses.add_protocol(protocol, ProtocolLayer::Application);
-                        }
-                        MatchCallBack::Tag(tag) => {
-                            ses.add_tag(tag);
-                        }
-                        MatchCallBack::Func(func) => {
-                            func.process(ses, pkt)?;
-                        }
-                    };
+impl Plugin for Builder {
+    fn plugin_type(&self) -> PluginType {
+        PluginType::PacketProcessor
+    }
+
+    fn init(&mut self, cfg: &api::config::Config) -> Result<()> {
+        let rules = cfg.get_object("misc.rules");
+        match rules {
+            yaml_rust::Yaml::Array(a) => {
+                let mut rules = std::collections::HashSet::new();
+                for rule in a {
+                    let mut out_str = String::new();
+                    let mut emitter = yaml_rust::YamlEmitter::new(&mut out_str);
+                    emitter.dump(rule)?;
+                    let rule: MiscRule = serde_yaml::from_str(&out_str)?;
+                    rules.insert(rule);
                 }
+                self.rules = Arc::new(rules);
             }
-            None => {
-                todo!("handle rule matched, but no callback found")
+            yaml_rust::Yaml::Null => println!("misc pkt-processor has no rule to load"),
+            _ => {
+                eprintln!("Couldn't load misc.rules, invalid value type or bad array value");
+                return Err(anyhow!("Failed to load misc.rules"));
             }
-        };
+        }
+
         Ok(())
     }
 
-    fn save(&mut self, _: &mut Session) {}
+    fn name(&self) -> &str {
+        "misc"
+    }
 }
 
-impl Misc {
+impl Builder {
     fn insert_cb(&mut self, id: RuleID, cb: MatchCallBack) {
         match self.match_cbs.get_mut(&id) {
             None => {
@@ -327,13 +279,80 @@ impl Misc {
     }
 }
 
+#[derive(Clone, Default)]
+pub struct Misc {
+    id: ProcessorID,
+    classified: bool,
+    match_cbs: FnvHashMap<RuleID, Vec<MatchCallBack>>,
+    rules: Arc<HashSet<MiscRule>>,
+}
+
+type ClassifyFunc = fn(ses: &mut Session, pkt: &dyn Packet) -> Result<()>;
+
+impl MiscProcessUnit for ClassifyFunc {
+    fn process(&mut self, ses: &mut Session, pkt: &dyn Packet) -> Result<()> {
+        self(ses, pkt)
+    }
+
+    fn box_clone(&self) -> Box<dyn MiscProcessUnit> {
+        Box::new(self.clone())
+    }
+}
+
+impl PktProcessor for Misc {
+    fn id(&self) -> ProcessorID {
+        self.id
+    }
+
+    fn name(&self) -> &'static str {
+        &"misc"
+    }
+
+    fn parse_pkt(
+        &mut self,
+        pkt: &dyn api::packet::Packet,
+        rule: Option<&api::classifiers::matched::Rule>,
+        ses: &mut api::session::Session,
+    ) -> Result<()> {
+        let rule = match rule {
+            None => {
+                return Ok(());
+            }
+            Some(r) => r,
+        };
+        match self.match_cbs.get_mut(&rule.id()) {
+            Some(cbs) => {
+                for cb in cbs {
+                    match cb {
+                        MatchCallBack::ProtocolName(protocol) => {
+                            ses.add_protocol(protocol, ProtocolLayer::Application);
+                        }
+                        MatchCallBack::Tag(tag) => {
+                            ses.add_tag(tag);
+                        }
+                        MatchCallBack::Func(func) => {
+                            func.process(ses, pkt)?;
+                        }
+                    };
+                }
+            }
+            None => {
+                todo!("handle rule matched, but no callback found")
+            }
+        };
+        Ok(())
+    }
+
+    fn save(&mut self, _: &mut Session) {}
+}
+
 fn add_protocol<S: AsRef<str>>(ses: &mut Session, protocol: S) {
     ses.add_protocol(&protocol, ProtocolLayer::Application)
 }
 
 #[no_mangle]
-pub extern "C" fn al_new_pkt_processor() -> Box<Box<dyn Processor>> {
-    Box::new(Box::new(Misc::default()))
+pub extern "C" fn al_new_pkt_processor_builder() -> Box<Box<dyn ProcessorBuilder>> {
+    Box::new(Box::new(Builder::default()))
 }
 
 #[no_mangle]

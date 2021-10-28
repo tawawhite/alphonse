@@ -6,9 +6,11 @@ use serde_json::json;
 
 use alphonse_api as api;
 use alphonse_utils as utils;
-use api::classifiers::{matched, ClassifierManager, Rule, RuleType};
+use api::classifiers::{matched, ClassifierManager};
 use api::packet::{Direction, Packet, Protocol};
-use api::plugins::processor::{Processor, ProcessorID};
+use api::plugins::processor::{
+    Builder as ProcessorBuilder, Processor as PktProcessor, ProcessorID,
+};
 use api::plugins::{Plugin, PluginType};
 use api::session::{ProtocolLayer, Session};
 use utils::tcp_reassembly::{TcpFlags, TcpHdr};
@@ -41,10 +43,45 @@ struct TcpFlagsCnt {
     urg: usize,
 }
 
-#[derive(Clone, Debug, Default)]
-struct ProtocolParser {
+#[derive(Debug, Default)]
+struct Builder {
     id: ProcessorID,
-    name: String,
+}
+
+impl Plugin for Builder {
+    fn plugin_type(&self) -> PluginType {
+        PluginType::PacketProcessor
+    }
+
+    fn name(&self) -> &str {
+        &"tcp"
+    }
+}
+
+impl ProcessorBuilder for Builder {
+    fn build(&self, _: &api::config::Config) -> Box<dyn PktProcessor> {
+        let mut p = Box::new(Processor::default());
+        p.id = self.id;
+        p
+    }
+
+    fn id(&self) -> ProcessorID {
+        self.id
+    }
+
+    fn set_id(&mut self, id: ProcessorID) {
+        self.id = id
+    }
+
+    fn register_classify_rules(&mut self, manager: &mut ClassifierManager) -> Result<()> {
+        manager.add_protocol_rule(self.id(), Protocol::TCP)?;
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, Default)]
+struct Processor {
+    id: ProcessorID,
     classified: bool,
     src_dir: Direction,
     flags_cnt: TcpFlagsCnt,
@@ -53,44 +90,14 @@ struct ProtocolParser {
     seq: [u32; 2],
 }
 
-impl Plugin for ProtocolParser {
-    fn plugin_type(&self) -> PluginType {
-        PluginType::PacketProcessor
-    }
-
-    fn name(&self) -> &str {
-        &self.name.as_str()
-    }
-}
-
-impl ProtocolParser {
-    fn new() -> ProtocolParser {
-        let mut parser = ProtocolParser::default();
-        parser.name = String::from("tcp");
-        parser
-    }
-}
-
-impl Processor for ProtocolParser {
-    fn clone_processor(&self) -> Box<dyn Processor> {
-        Box::new(self.clone())
-    }
-
+impl PktProcessor for Processor {
     /// Get parser id
     fn id(&self) -> ProcessorID {
         self.id
     }
 
-    /// Get parser id
-    fn set_id(&mut self, id: ProcessorID) {
-        self.id = id
-    }
-
-    fn register_classify_rules(&mut self, manager: &mut ClassifierManager) -> Result<()> {
-        let mut rule = Rule::new(self.id);
-        rule.rule_type = RuleType::Protocol(api::classifiers::protocol::Rule(Protocol::TCP));
-        manager.add_rule(&mut rule)?;
-        Ok(())
+    fn name(&self) -> &'static str {
+        &"tcp"
     }
 
     fn parse_pkt(
@@ -184,13 +191,12 @@ impl Processor for ProtocolParser {
 
     fn save(&mut self, ses: &mut Session) {
         ses.add_field(&"tcpflags", json!(self.flags_cnt));
-        // println!("{}", serde_json::to_string_pretty(ses).unwrap());
     }
 }
 
 #[no_mangle]
-pub extern "C" fn al_new_pkt_processor() -> Box<Box<dyn Processor>> {
-    Box::new(Box::new(ProtocolParser::new()))
+pub extern "C" fn al_new_pkt_processor_builder() -> Box<Box<dyn ProcessorBuilder>> {
+    Box::new(Box::new(Builder::default()))
 }
 
 #[no_mangle]

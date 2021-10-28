@@ -13,7 +13,7 @@ use alphonse_utils as utils;
 use api::classifiers;
 use api::classifiers::{matched, RuleID};
 use api::packet::{Direction, Packet, Protocol};
-use api::plugins::processor::{Processor, ProcessorID};
+use api::plugins::processor::{Builder as ProcessorBuilder, Processor, ProcessorID};
 use api::plugins::{Plugin, PluginType};
 use api::session::Session;
 use utils::tcp_reassembly::TcpReorder;
@@ -47,6 +47,54 @@ struct TLS {
     ja3sstring: HashSet<String>,
 }
 
+#[derive(Debug, Default)]
+struct Builder {
+    id: ProcessorID,
+    tcp_rule_id: RuleID,
+    udp_rule_id: RuleID,
+}
+
+impl Plugin for Builder {
+    fn plugin_type(&self) -> PluginType {
+        PluginType::PacketProcessor
+    }
+
+    fn name(&self) -> &str {
+        "tls"
+    }
+}
+
+impl ProcessorBuilder for Builder {
+    fn build(&self, _: &api::config::Config) -> Box<dyn Processor> {
+        let mut pcr = Box::new(TlsProcessor::default());
+        pcr.id = self.id();
+        pcr.tcp_rule_id = self.tcp_rule_id;
+        pcr.udp_rule_id = self.udp_rule_id;
+        pcr.tcp_reorder[0] = TcpReorder::with_capacity(8);
+        pcr.tcp_reorder[1] = TcpReorder::with_capacity(8);
+        pcr
+    }
+
+    fn id(&self) -> ProcessorID {
+        self.id
+    }
+
+    fn set_id(&mut self, id: ProcessorID) {
+        self.id = id
+    }
+
+    fn register_classify_rules(
+        &mut self,
+        manager: &mut classifiers::ClassifierManager,
+    ) -> Result<()> {
+        self.tcp_rule_id = manager.add_tcp_dpi_rule(self.id, r"^\x16\x03")?;
+        self.udp_rule_id =
+            manager.add_tcp_dpi_rule(self.id, r"^\x16(\x01\x00|\xfe[\xff\xfe\xfd])")?;
+
+        Ok(())
+    }
+}
+
 #[derive(Clone, Default)]
 struct TlsProcessor {
     id: ProcessorID,
@@ -67,41 +115,14 @@ struct TlsProcessor {
 unsafe impl Send for TlsProcessor {}
 unsafe impl Sync for TlsProcessor {}
 
-impl Plugin for TlsProcessor {
-    fn plugin_type(&self) -> PluginType {
-        PluginType::PacketProcessor
-    }
-
-    fn name(&self) -> &str {
-        "tls"
-    }
-}
-
 impl Processor for TlsProcessor {
-    fn clone_processor(&self) -> Box<dyn Processor> {
-        Box::new(self.clone())
-    }
-
     /// Get parser id
     fn id(&self) -> ProcessorID {
         self.id
     }
 
-    /// Get parser id
-    fn set_id(&mut self, id: ProcessorID) {
-        self.id = id
-    }
-
-    fn register_classify_rules(
-        &mut self,
-        manager: &mut classifiers::ClassifierManager,
-    ) -> Result<()> {
-        self.tcp_rule_id = manager.add_tcp_dpi_rule(self.id, r"^\x16\x03")?;
-
-        self.udp_rule_id =
-            manager.add_udp_dpi_rule(self.id, r"^\x16(\x01\x00|\xfe[\xff\xfe\xfd])")?;
-
-        Ok(())
+    fn name(&self) -> &'static str {
+        &"tls"
     }
 
     fn parse_pkt(
@@ -153,12 +174,6 @@ impl Processor for TlsProcessor {
 }
 
 impl TlsProcessor {
-    fn new() -> Self {
-        let mut tp = Self::default();
-        tp.tcp_reorder = [TcpReorder::with_capacity(16), TcpReorder::with_capacity(16)];
-        tp
-    }
-
     fn handle_client_hello<'a, H: ClientHello<'a>>(&mut self, dir: Direction, hello: &H) {
         self.client_direction = dir;
         match hello.session_id() {
@@ -254,67 +269,9 @@ impl TlsProcessor {
     }
 }
 
-#[cfg(test)]
-mod test {
-    use super::*;
-    use api::classifiers::ClassifierManager;
-    use api::packet::test::Packet;
-    use api::packet::Protocol;
-    use api::plugins::processor::Processor;
-
-    #[test]
-    fn classify() {
-        let mut manager = ClassifierManager::new();
-        let mut parser = TlsProcessor::default();
-        parser.register_classify_rules(&mut manager).unwrap();
-        manager.prepare().unwrap();
-        let mut scratch = manager.alloc_scratch().unwrap();
-
-        // \x16\x01\x00
-        let mut pkt: Box<Packet> = Box::new(Packet::default());
-        pkt.raw = Box::new(b"\x16\x01\x00".to_vec());
-        pkt.layers.trans.protocol = Protocol::UDP;
-        let mut pkt: Box<dyn api::packet::Packet> = pkt;
-        manager.classify(pkt.as_mut(), &mut scratch).unwrap();
-        assert_eq!(pkt.rules().len(), 1);
-
-        // \x16\xfe\xff
-        let mut pkt: Box<Packet> = Box::new(Packet::default());
-        pkt.raw = Box::new(b"\x16\xfe\xff".to_vec());
-        pkt.layers.trans.protocol = Protocol::UDP;
-        let mut pkt: Box<dyn api::packet::Packet> = pkt;
-        manager.classify(pkt.as_mut(), &mut scratch).unwrap();
-        assert_eq!(pkt.rules().len(), 1);
-
-        // \x16\xfe\xfe
-        let mut pkt: Box<Packet> = Box::new(Packet::default());
-        pkt.raw = Box::new(b"\x16\xfe\xfe".to_vec());
-        pkt.layers.trans.protocol = Protocol::UDP;
-        let mut pkt: Box<dyn api::packet::Packet> = pkt;
-        manager.classify(pkt.as_mut(), &mut scratch).unwrap();
-        assert_eq!(pkt.rules().len(), 1);
-
-        // \x16\xfe\xfd
-        let mut pkt: Box<Packet> = Box::new(Packet::default());
-        pkt.raw = Box::new(b"\x16\xfe\xfd".to_vec());
-        pkt.layers.trans.protocol = Protocol::UDP;
-        let mut pkt: Box<dyn api::packet::Packet> = pkt;
-        manager.classify(pkt.as_mut(), &mut scratch).unwrap();
-        assert_eq!(pkt.rules().len(), 1);
-
-        // \x16\x03
-        let mut pkt: Box<Packet> = Box::new(Packet::default());
-        pkt.raw = Box::new(b"\x16\x03".to_vec());
-        pkt.layers.trans.protocol = Protocol::TCP;
-        let mut pkt: Box<dyn api::packet::Packet> = pkt;
-        manager.classify(pkt.as_mut(), &mut scratch).unwrap();
-        assert_eq!(pkt.rules().len(), 1);
-    }
-}
-
 #[no_mangle]
-pub extern "C" fn al_new_pkt_processor() -> Box<Box<dyn Processor>> {
-    Box::new(Box::new(TlsProcessor::new()))
+pub extern "C" fn al_new_pkt_processor_builder() -> Box<Box<dyn ProcessorBuilder>> {
+    Box::new(Box::new(Builder::default()))
 }
 
 #[no_mangle]

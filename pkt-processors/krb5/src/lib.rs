@@ -13,7 +13,7 @@ use serde_json::json;
 use alphonse_api as api;
 use api::classifiers::{ClassifierManager, RuleID};
 use api::packet::{Direction, Protocol};
-use api::plugins::processor::{Processor as Pcr, ProcessorID};
+use api::plugins::processor::{Builder as ProcessorBuilder, Processor as Pcr, ProcessorID};
 use api::plugins::{Plugin, PluginType};
 use api::session::{ProtocolLayer, Session};
 
@@ -35,16 +35,33 @@ struct Kerberos {
 }
 
 #[derive(Clone, Debug, Default)]
-struct Processor {
+struct Builder {
     id: ProcessorID,
-    classified: bool,
-    client_direction: Direction,
-    tcp_rule_id: RuleID,
-    udp_rule_id: RuleID,
-    fields: Option<Box<Kerberos>>,
 }
 
-impl Plugin for Processor {
+impl ProcessorBuilder for Builder {
+    fn build(&self, _: &api::config::Config) -> Box<dyn Pcr> {
+        let mut p = Box::new(Processor::default());
+        p.id = self.id;
+        p
+    }
+
+    fn id(&self) -> ProcessorID {
+        self.id
+    }
+
+    fn set_id(&mut self, id: ProcessorID) {
+        self.id = id
+    }
+
+    fn register_classify_rules(&mut self, manager: &mut ClassifierManager) -> Result<()> {
+        manager.add_tcp_udp_dpi_rule(self.id(), r"^.*\x03\x02\x01\x05")?;
+
+        Ok(())
+    }
+}
+
+impl Plugin for Builder {
     /// Get parser name
     fn name(&self) -> &str {
         "krb5"
@@ -55,25 +72,23 @@ impl Plugin for Processor {
     }
 }
 
-impl Pcr for Processor {
-    fn clone_processor(&self) -> Box<dyn Pcr> {
-        Box::new(self.clone())
-    }
+#[derive(Clone, Debug, Default)]
+struct Processor {
+    id: ProcessorID,
+    classified: bool,
+    client_direction: Direction,
+    tcp_rule_id: RuleID,
+    udp_rule_id: RuleID,
+    fields: Option<Box<Kerberos>>,
+}
 
-    /// Get parser id
+impl Pcr for Processor {
     fn id(&self) -> ProcessorID {
         self.id
     }
 
-    /// Get parser id
-    fn set_id(&mut self, id: ProcessorID) {
-        self.id = id
-    }
-
-    fn register_classify_rules(&mut self, manager: &mut ClassifierManager) -> Result<()> {
-        manager.add_tcp_udp_dpi_rule(self.id(), r"^.*\x03\x02\x01\x05")?;
-
-        Ok(())
+    fn name(&self) -> &'static str {
+        &"krb5"
     }
 
     fn parse_pkt(
@@ -246,8 +261,8 @@ impl Processor {
 }
 
 #[no_mangle]
-pub extern "C" fn al_new_pkt_processor() -> Box<Box<dyn Pcr>> {
-    Box::new(Box::new(Processor::default()))
+pub extern "C" fn al_new_pkt_processor_builder() -> Box<Box<dyn ProcessorBuilder>> {
+    Box::new(Box::new(Builder::default()))
 }
 
 #[no_mangle]

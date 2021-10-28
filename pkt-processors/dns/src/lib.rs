@@ -14,7 +14,9 @@ use serde_json::json;
 use alphonse_api as api;
 use api::classifiers::{ClassifierManager, RuleID};
 use api::packet::Protocol;
-use api::plugins::processor::{Processor, ProcessorID};
+use api::plugins::processor::{
+    Builder as ProcessorBuilder, Processor as PktProcessor, ProcessorID,
+};
 use api::plugins::{Plugin, PluginType};
 use api::session::{ProtocolLayer, Session};
 
@@ -54,38 +56,25 @@ struct DNS {
 }
 
 #[derive(Clone, Debug, Default)]
-struct DNSProcessor {
+struct Builder {
     id: ProcessorID,
-    classified: bool,
     tcp_rule_id: RuleID,
     udp_rule_id: RuleID,
     llmnr_rule_id: RuleID,
     mdns_rule_id: RuleID,
-    fields: Option<Box<DNS>>,
 }
 
-impl Plugin for DNSProcessor {
-    /// Get parser name
-    fn name(&self) -> &str {
-        "dns"
+impl ProcessorBuilder for Builder {
+    fn build(&self, _: &api::config::Config) -> Box<dyn PktProcessor> {
+        let mut p = Box::new(DNSProcessor::default());
+        p.id = self.id;
+        p
     }
 
-    fn plugin_type(&self) -> PluginType {
-        PluginType::PacketProcessor
-    }
-}
-
-impl Processor for DNSProcessor {
-    fn clone_processor(&self) -> Box<dyn Processor> {
-        Box::new(self.clone())
-    }
-
-    /// Get parser id
     fn id(&self) -> ProcessorID {
         self.id
     }
 
-    /// Get parser id
     fn set_id(&mut self, id: ProcessorID) {
         self.id = id
     }
@@ -102,6 +91,38 @@ impl Processor for DNSProcessor {
         self.llmnr_rule_id = manager.add_udp_port_rule(self.id(), 5355)?;
 
         Ok(())
+    }
+}
+
+impl Plugin for Builder {
+    /// Get parser name
+    fn name(&self) -> &str {
+        "dns"
+    }
+
+    fn plugin_type(&self) -> PluginType {
+        PluginType::PacketProcessor
+    }
+}
+
+#[derive(Clone, Debug, Default)]
+struct DNSProcessor {
+    id: ProcessorID,
+    classified: bool,
+    tcp_rule_id: RuleID,
+    udp_rule_id: RuleID,
+    llmnr_rule_id: RuleID,
+    mdns_rule_id: RuleID,
+    fields: Option<Box<DNS>>,
+}
+
+impl PktProcessor for DNSProcessor {
+    fn id(&self) -> ProcessorID {
+        self.id
+    }
+
+    fn name(&self) -> &'static str {
+        &"dns"
     }
 
     fn parse_pkt(
@@ -355,8 +376,8 @@ impl DNSProcessor {
 }
 
 #[no_mangle]
-pub extern "C" fn al_new_pkt_processor() -> Box<Box<dyn Processor>> {
-    Box::new(Box::new(DNSProcessor::default()))
+pub extern "C" fn al_new_pkt_processor_builder() -> Box<Box<dyn ProcessorBuilder>> {
+    Box::new(Box::new(Builder::default()))
 }
 
 #[no_mangle]

@@ -6,7 +6,7 @@ use api::classifiers::ClassifierManager;
 use api::packet::Packet;
 use api::session::Session;
 
-use crate::{add_protocol, ClassifyFunc, Misc};
+use crate::{add_protocol, Builder, ClassifyFunc};
 
 const MARKER: [u8; 16] = [0xff; 16];
 const TYPE: &[&str] = &[
@@ -18,9 +18,12 @@ const TYPE: &[&str] = &[
     "ROUTE-REFRESH",
 ];
 
-pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManager) -> Result<()> {
+pub fn register_classify_rules(
+    builder: &mut Builder,
+    manager: &mut ClassifierManager,
+) -> Result<()> {
     let c = Box::new(classify as ClassifyFunc);
-    parser.add_tcp_port_rule_with_func(179, c.as_ref(), manager)
+    builder.add_tcp_port_rule_with_func(179, c.as_ref(), manager)
 }
 
 fn classify(ses: &mut Session, pkt: &dyn Packet) -> Result<()> {

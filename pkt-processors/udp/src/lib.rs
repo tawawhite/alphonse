@@ -2,20 +2,43 @@ use anyhow::Result;
 use serde_json::json;
 
 use alphonse_api as api;
-use api::classifiers::{matched, ClassifierManager, Rule, RuleType};
+use api::classifiers::{matched, ClassifierManager};
+use api::config::Config;
 use api::packet::{Packet, Protocol};
-use api::plugins::processor::{Processor, ProcessorID};
+use api::plugins::processor::{
+    Builder as ProcessorBuilder, Processor as PktProcessor, ProcessorID,
+};
 use api::plugins::{Plugin, PluginType};
 use api::session::{ProtocolLayer, Session};
 
 #[derive(Clone, Debug, Default)]
-struct ProtocolParser {
+struct Builder {
     id: ProcessorID,
     name: String,
-    classified: bool,
 }
 
-impl Plugin for ProtocolParser {
+impl ProcessorBuilder for Builder {
+    fn build(&self, _: &Config) -> Box<dyn PktProcessor> {
+        let mut p = Box::new(Processor::default());
+        p.id = p.id();
+        p
+    }
+
+    fn id(&self) -> ProcessorID {
+        self.id
+    }
+
+    fn set_id(&mut self, id: ProcessorID) {
+        self.id = id
+    }
+
+    fn register_classify_rules(&mut self, manager: &mut ClassifierManager) -> Result<()> {
+        manager.add_protocol_rule(self.id(), Protocol::UDP)?;
+        Ok(())
+    }
+}
+
+impl Plugin for Builder {
     fn plugin_type(&self) -> PluginType {
         PluginType::PacketProcessor
     }
@@ -25,34 +48,19 @@ impl Plugin for ProtocolParser {
     }
 }
 
-impl ProtocolParser {
-    fn new() -> ProtocolParser {
-        let mut parser = ProtocolParser::default();
-        parser.name = String::from("tcp");
-        parser
-    }
+#[derive(Clone, Debug, Default)]
+struct Processor {
+    id: ProcessorID,
+    classified: bool,
 }
 
-impl Processor for ProtocolParser {
-    fn clone_processor(&self) -> Box<dyn Processor> {
-        Box::new(self.clone())
-    }
-
-    /// Get parser id
+impl PktProcessor for Processor {
     fn id(&self) -> ProcessorID {
         self.id
     }
 
-    /// Get parser id
-    fn set_id(&mut self, id: ProcessorID) {
-        self.id = id
-    }
-
-    fn register_classify_rules(&mut self, manager: &mut ClassifierManager) -> Result<()> {
-        let mut rule = Rule::new(self.id);
-        rule.rule_type = RuleType::Protocol(api::classifiers::protocol::Rule(Protocol::UDP));
-        manager.add_rule(&mut rule)?;
-        Ok(())
+    fn name(&self) -> &'static str {
+        &"udp"
     }
 
     fn parse_pkt(
@@ -63,10 +71,14 @@ impl Processor for ProtocolParser {
     ) -> Result<()> {
         if !self.classified {
             self.classified = true;
-            ses.add_protocol(&self.name(), ProtocolLayer::Transport);
-            unsafe {
-                ses.add_field(&"srcPort", json!(pkt.src_port()));
-                ses.add_field(&"dstPort", json!(pkt.dst_port()));
+            ses.add_protocol(&"dns", ProtocolLayer::Transport);
+            match pkt.src_port() {
+                Some(port) => ses.add_field(&"srcPort", json!(port)),
+                None => unreachable!("udp processor get a pkt without src port"),
+            }
+            match pkt.dst_port() {
+                Some(port) => ses.add_field(&"dstPort", json!(port)),
+                None => unreachable!("udp processor get a pkt without dst port"),
             }
         }
 
@@ -79,8 +91,8 @@ impl Processor for ProtocolParser {
 }
 
 #[no_mangle]
-pub extern "C" fn al_new_pkt_processor() -> Box<Box<dyn Processor>> {
-    Box::new(Box::new(ProtocolParser::new()))
+pub extern "C" fn al_new_pkt_processor_builder() -> Box<Box<dyn ProcessorBuilder>> {
+    Box::new(Box::new(Builder::default()))
 }
 
 #[no_mangle]

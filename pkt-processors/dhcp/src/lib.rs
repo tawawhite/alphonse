@@ -10,7 +10,9 @@ use serde_json::json;
 use alphonse_api as api;
 use api::classifiers::{ClassifierManager, RuleID};
 use api::packet::{Packet, Protocol};
-use api::plugins::processor::{Processor, ProcessorID};
+use api::plugins::processor::{
+    Builder as ProcessorBuilder, Processor as PktProcessor, ProcessorID,
+};
 use api::plugins::{Plugin, PluginType};
 use api::session::{ProtocolLayer, Session};
 
@@ -53,36 +55,23 @@ struct DHCP {
 }
 
 #[derive(Clone, Debug, Default)]
-struct DHCPProcessor {
+struct Builder {
     id: ProcessorID,
-    classified: bool,
     v4_rule_id: RuleID,
     v6_rule_id: RuleID,
-    fields: Option<Box<DHCP>>,
 }
 
-impl Plugin for DHCPProcessor {
-    /// Get parser name
-    fn name(&self) -> &str {
-        "dhcp"
+impl ProcessorBuilder for Builder {
+    fn build(&self, _: &api::config::Config) -> Box<dyn PktProcessor> {
+        let mut p = Box::new(DHCPProcessor::default());
+        p.id = self.id;
+        p
     }
 
-    fn plugin_type(&self) -> PluginType {
-        PluginType::PacketProcessor
-    }
-}
-
-impl Processor for DHCPProcessor {
-    fn clone_processor(&self) -> Box<dyn Processor> {
-        Box::new(self.clone())
-    }
-
-    /// Get parser id
     fn id(&self) -> ProcessorID {
         self.id
     }
 
-    /// Get parser id
     fn set_id(&mut self, id: ProcessorID) {
         self.id = id
     }
@@ -93,6 +82,36 @@ impl Processor for DHCPProcessor {
         self.v6_rule_id = manager.add_udp_port_rule(self.id(), 547)?;
 
         Ok(())
+    }
+}
+
+impl Plugin for Builder {
+    /// Get parser name
+    fn name(&self) -> &str {
+        "dhcp"
+    }
+
+    fn plugin_type(&self) -> PluginType {
+        PluginType::PacketProcessor
+    }
+}
+
+#[derive(Clone, Debug, Default)]
+struct DHCPProcessor {
+    id: ProcessorID,
+    classified: bool,
+    v4_rule_id: RuleID,
+    v6_rule_id: RuleID,
+    fields: Option<Box<DHCP>>,
+}
+
+impl PktProcessor for DHCPProcessor {
+    fn id(&self) -> ProcessorID {
+        self.id
+    }
+
+    fn name(&self) -> &'static str {
+        &"dhcp"
     }
 
     fn parse_pkt(
@@ -190,11 +209,9 @@ fn parse_dhcpv6(ses: &mut Session, pkt: &dyn Packet) {
     ses.add_protocol(&"dhcpv6", ProtocolLayer::Application);
 }
 
-impl DHCPProcessor {}
-
 #[no_mangle]
-pub extern "C" fn al_new_pkt_processor() -> Box<Box<dyn Processor>> {
-    Box::new(Box::new(DHCPProcessor::default()))
+pub extern "C" fn al_new_pkt_processor_builder() -> Box<Box<dyn ProcessorBuilder>> {
+    Box::new(Box::new(Builder::default()))
 }
 
 #[no_mangle]

@@ -9,7 +9,7 @@ use alphonse_api as api;
 use api::classifiers::ClassifierManager;
 use api::config::Config;
 use api::packet::{Packet, PacketHashKey};
-use api::plugins::processor::Processor;
+use api::plugins::processor::Builder;
 use api::session::TimeVal;
 
 use crate::threadings::{SessionData, SessionTable};
@@ -46,9 +46,10 @@ impl PktThread {
     pub fn spawn(
         &self,
         cfg: Arc<Config>,
-        mut processors: Box<Vec<Box<dyn Processor>>>,
+        builders: Vec<Arc<dyn Builder>>,
         last_packet: Arc<AtomicU64>,
     ) -> Result<()> {
+        let builders = builders.iter().map(|b| b.as_ref()).collect::<Vec<_>>();
         let mut classify_scratch = match self.classifier.alloc_scratch() {
             Ok(scratch) => scratch,
             Err(_) => todo!(),
@@ -72,7 +73,7 @@ impl PktThread {
             match self.session_table.get_mut(&key) {
                 Some(mut ses) => {
                     ses.info.update(pkt.as_ref());
-                    parse_pkt(&mut processors, pkt.as_mut(), ses.as_mut())?;
+                    parse_pkt(&cfg, &builders, pkt.as_mut(), ses.as_mut())?;
                     continue;
                 }
                 None => {}
@@ -85,7 +86,7 @@ impl PktThread {
             ses.info.src_direction = pkt.direction();
             ses.info.add_field(&"node", json!(cfg.node));
             ses.info.update(pkt.as_ref());
-            parse_pkt(&mut processors, pkt.as_mut(), ses.as_mut())?;
+            parse_pkt(&cfg, &builders, pkt.as_mut(), ses.as_mut())?;
 
             self.session_table.insert(key, ses);
         }
@@ -98,7 +99,8 @@ impl PktThread {
 
 #[inline]
 fn parse_pkt(
-    processors: &mut Box<Vec<Box<dyn Processor>>>,
+    cfg: &Config,
+    builders: &[&dyn Builder],
     pkt: &mut dyn Packet,
     ses_data: &mut SessionData,
 ) -> Result<()> {
@@ -107,8 +109,9 @@ fn parse_pkt(
             match ses_data.processors.get_mut(id) {
                 Some(_) => {}
                 None => {
-                    let processor = processors[*id as usize].clone_processor();
-                    ses_data.processors.insert(processor.id(), processor);
+                    let builder = &builders[*id as usize];
+                    let processor = builders[*id as usize].build(&cfg);
+                    ses_data.processors.insert(builder.id(), processor);
                 }
             };
         }

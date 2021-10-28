@@ -2,6 +2,7 @@ use anyhow::Result;
 
 use crate::classifiers::matched;
 use crate::classifiers::ClassifierManager;
+use crate::config::Config;
 use crate::packet::Packet;
 use crate::plugins::Plugin;
 use crate::session::Session;
@@ -9,12 +10,11 @@ use crate::session::Session;
 pub type ProcessorID = u8;
 
 /// Create a Box of the packet processor
-pub type NewProcessorFunc = extern "C" fn() -> Box<Box<dyn Processor>>;
-pub const NEW_PKT_PROCESSOR_FUNC_NAME: &str = "al_new_pkt_processor";
+pub type NewProcessorBuilderFunc = extern "C" fn() -> Box<Box<dyn Builder>>;
+pub const NEW_PKT_PROCESSOR_BUILDER_FUNC_NAME: &str = "al_new_pkt_processor_builder";
 
-pub trait Processor: Send + Sync + Plugin {
-    /// Clone a Protocol Processor
-    fn clone_processor(&self) -> Box<dyn Processor>;
+pub trait Builder: Send + Sync + Plugin {
+    fn build(&self, cfg: &Config) -> Box<dyn Processor>;
 
     /// Get processor id
     fn id(&self) -> ProcessorID;
@@ -24,6 +24,13 @@ pub trait Processor: Send + Sync + Plugin {
 
     /// Register protocol classify rules
     fn register_classify_rules(&mut self, manager: &mut ClassifierManager) -> Result<()>;
+}
+
+pub trait Processor: Send + Sync {
+    /// Get processor id
+    fn id(&self) -> ProcessorID;
+
+    fn name(&self) -> &'static str;
 
     /// Parse a single packet and maybe update session information
     fn parse_pkt(

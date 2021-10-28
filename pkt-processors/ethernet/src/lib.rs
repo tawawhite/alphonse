@@ -10,7 +10,9 @@ use serde_json::json;
 use alphonse_api as api;
 use api::classifiers;
 use api::packet::{Direction, Protocol};
-use api::plugins::processor::{Processor, ProcessorID};
+use api::plugins::processor::{
+    Builder as ProcessorBuilder, Processor as PktProcessor, ProcessorID,
+};
 use api::plugins::{Plugin, PluginType};
 use api::session::{ProtocolLayer, Session};
 
@@ -27,16 +29,36 @@ impl Default for MacInfo {
     }
 }
 
-#[derive(Clone, Default)]
-struct EthernetProcessor {
+#[derive(Clone, Debug, Default)]
+struct Builder {
     id: ProcessorID,
-    classified: bool,
-    src_direction: Direction,
-    src_macs: FnvHashSet<MacInfo>,
-    dst_macs: FnvHashSet<MacInfo>,
 }
 
-impl Plugin for EthernetProcessor {
+impl ProcessorBuilder for Builder {
+    fn build(&self, _: &api::config::Config) -> Box<dyn PktProcessor> {
+        let mut p = Box::new(Processor::default());
+        p.id = self.id;
+        p
+    }
+
+    fn id(&self) -> ProcessorID {
+        self.id
+    }
+
+    fn set_id(&mut self, id: ProcessorID) {
+        self.id = id
+    }
+
+    fn register_classify_rules(
+        &mut self,
+        manager: &mut classifiers::ClassifierManager,
+    ) -> Result<()> {
+        manager.add_protocol_rule(self.id(), Protocol::ETHERNET)?;
+        Ok(())
+    }
+}
+
+impl Plugin for Builder {
     fn plugin_type(&self) -> PluginType {
         PluginType::PacketProcessor
     }
@@ -52,27 +74,22 @@ impl Plugin for EthernetProcessor {
     }
 }
 
-impl Processor for EthernetProcessor {
-    fn clone_processor(&self) -> Box<dyn Processor> {
-        Box::new(self.clone())
-    }
+#[derive(Clone, Default)]
+struct Processor {
+    id: ProcessorID,
+    classified: bool,
+    src_direction: Direction,
+    src_macs: FnvHashSet<MacInfo>,
+    dst_macs: FnvHashSet<MacInfo>,
+}
 
-    /// Get parser id
+impl PktProcessor for Processor {
     fn id(&self) -> ProcessorID {
         self.id
     }
 
-    /// Get parser id
-    fn set_id(&mut self, id: ProcessorID) {
-        self.id = id
-    }
-
-    fn register_classify_rules(
-        &mut self,
-        manager: &mut classifiers::ClassifierManager,
-    ) -> Result<()> {
-        manager.add_protocol_rule(self.id(), Protocol::ETHERNET)?;
-        Ok(())
+    fn name(&self) -> &'static str {
+        &"ethernet"
     }
 
     fn parse_pkt(
@@ -141,8 +158,8 @@ impl Processor for EthernetProcessor {
 }
 
 #[no_mangle]
-pub extern "C" fn al_new_pkt_processor() -> Box<Box<dyn Processor>> {
-    Box::new(Box::new(EthernetProcessor::default()))
+pub extern "C" fn al_new_pkt_processor_builder() -> Box<Box<dyn ProcessorBuilder>> {
+    Box::new(Box::new(Builder::default()))
 }
 
 #[no_mangle]

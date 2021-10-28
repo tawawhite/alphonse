@@ -11,7 +11,9 @@ use serde_json::json;
 use alphonse_api as api;
 use api::classifiers;
 use api::packet::Protocol;
-use api::plugins::processor::{Processor, ProcessorID};
+use api::plugins::processor::{
+    Builder as ProcessorBuilder, Processor as PktProcessor, ProcessorID,
+};
 use api::plugins::{Plugin, PluginType};
 use api::session::{ProtocolLayer, Session};
 
@@ -108,17 +110,37 @@ fn ip_get_rir(addr: &IpAddr, rir: &mut String) {
     }
 }
 
-#[derive(Clone, Default)]
-struct IPProcessor {
+#[derive(Clone, Debug, Default)]
+struct Builder {
     id: ProcessorID,
-    classified: bool,
-    processed: bool,
-    ip_protocol: u8,
-    src_ip: IpInfo,
-    dst_ip: IpInfo,
 }
 
-impl Plugin for IPProcessor {
+impl ProcessorBuilder for Builder {
+    fn build(&self, _: &api::config::Config) -> Box<dyn PktProcessor> {
+        let mut p = Box::new(IPProcessor::default());
+        p.id = self.id;
+        p
+    }
+
+    fn id(&self) -> ProcessorID {
+        self.id
+    }
+
+    fn set_id(&mut self, id: ProcessorID) {
+        self.id = id
+    }
+
+    fn register_classify_rules(
+        &mut self,
+        manager: &mut classifiers::ClassifierManager,
+    ) -> Result<()> {
+        manager.add_protocol_rule(self.id(), Protocol::IPV4)?;
+        manager.add_protocol_rule(self.id(), Protocol::IPV6)?;
+        Ok(())
+    }
+}
+
+impl Plugin for Builder {
     fn plugin_type(&self) -> PluginType {
         PluginType::PacketProcessor
     }
@@ -190,28 +212,23 @@ impl Plugin for IPProcessor {
     }
 }
 
-impl Processor for IPProcessor {
-    fn clone_processor(&self) -> Box<dyn Processor> {
-        Box::new(self.clone())
-    }
+#[derive(Clone, Default)]
+struct IPProcessor {
+    id: ProcessorID,
+    classified: bool,
+    processed: bool,
+    ip_protocol: u8,
+    src_ip: IpInfo,
+    dst_ip: IpInfo,
+}
 
-    /// Get parser id
+impl PktProcessor for IPProcessor {
     fn id(&self) -> ProcessorID {
         self.id
     }
 
-    /// Get parser id
-    fn set_id(&mut self, id: ProcessorID) {
-        self.id = id
-    }
-
-    fn register_classify_rules(
-        &mut self,
-        manager: &mut classifiers::ClassifierManager,
-    ) -> Result<()> {
-        manager.add_protocol_rule(self.id(), Protocol::IPV4)?;
-        manager.add_protocol_rule(self.id(), Protocol::IPV6)?;
-        Ok(())
+    fn name(&self) -> &'static str {
+        &"ip"
     }
 
     fn parse_pkt(
@@ -366,8 +383,8 @@ fn city_to_string(city: &Option<geoip2::City>) -> String {
 }
 
 #[no_mangle]
-pub extern "C" fn al_new_pkt_processor() -> Box<Box<dyn Processor>> {
-    Box::new(Box::new(IPProcessor::default()))
+pub extern "C" fn al_new_pkt_processor_builder() -> Box<Box<dyn ProcessorBuilder>> {
+    Box::new(Box::new(Builder::default()))
 }
 
 #[no_mangle]

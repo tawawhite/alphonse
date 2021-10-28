@@ -14,7 +14,9 @@ use api::classifiers;
 use api::classifiers::{dpi, matched::Rule, RuleID};
 use api::config::Config;
 use api::packet::{Direction, Packet, Protocol};
-use api::plugins::processor::{Processor, ProcessorID};
+use api::plugins::processor::{
+    Builder as ProcessorBuilder, Processor as PktProcessor, ProcessorID,
+};
 use api::plugins::{Plugin, PluginType};
 use api::session::{ProtocolLayer, Session};
 use utils::tcp_reassembly::TcpReorder;
@@ -88,105 +90,23 @@ struct HTTP {
     value: HashSet<String>,
 }
 
-#[derive(Clone, Default)]
-struct HttpProcessor<'a> {
+#[derive(Clone, Debug, Default)]
+struct Builder {
     id: ProcessorID,
-    name: String,
-    classified: bool,
-    parsers: [llhttp::Parser<'a, Data>; 2],
-    tcp_reorder: [TcpReorder; 2],
     resp_rule_id: RuleID,
-    client_direction: Direction,
 }
 
-unsafe impl Send for HttpProcessor<'_> {}
-unsafe impl Sync for HttpProcessor<'_> {}
-
-impl<'a> HttpProcessor<'a> {
-    fn new() -> Self {
-        let mut p = Self::default();
-        p.name = String::from("http");
-        p.tcp_reorder = [
-            TcpReorder::with_capacity(128),
-            TcpReorder::with_capacity(128),
-        ];
+impl ProcessorBuilder for Builder {
+    fn build(&self, _: &Config) -> Box<dyn PktProcessor> {
+        let mut p = Box::new(HttpProcessor::default());
+        p.tcp_reorder = [TcpReorder::with_capacity(16), TcpReorder::with_capacity(16)];
         p
     }
-}
 
-impl<'a> Plugin for HttpProcessor<'a> {
-    fn plugin_type(&self) -> PluginType {
-        PluginType::PacketProcessor
-    }
-
-    fn name(&self) -> &str {
-        &self.name.as_str()
-    }
-
-    fn init(&mut self, cfg: &Config) -> Result<()> {
-        // initialize global llhttp settings
-        let mut settings = llhttp::Settings::default();
-
-        llhttp::cb_wrapper!(_on_message_begin, on_message_begin, Data);
-        settings.on_message_begin(Some(_on_message_begin));
-
-        llhttp::data_cb_wrapper!(_on_url, on_url, Data);
-        settings.on_url(Some(_on_url));
-
-        llhttp::data_cb_wrapper!(_on_header_field, on_header_field, Data);
-        settings.on_header_field(Some(_on_header_field));
-
-        llhttp::data_cb_wrapper!(_on_header_value, on_header_value, Data);
-        settings.on_header_value(Some(_on_header_value));
-
-        llhttp::cb_wrapper!(_on_header_complete, on_headers_complete, Data);
-        settings.on_headers_complete(Some(_on_header_complete));
-
-        llhttp::data_cb_wrapper!(_on_body, on_body, Data);
-        settings.on_body(Some(_on_body));
-
-        llhttp::cb_wrapper!(_on_message_complete, on_message_complete, Data);
-        settings.on_message_complete(Some(_on_message_complete));
-
-        SETTINGS.set(settings).unwrap();
-
-        let mut parse_config = ParseConfig::default();
-        parse_config.parse_qs_value = cfg.get_boolean("http.parseQSValue", false);
-        parse_config.parse_cookie_value = cfg.get_boolean("http.parseCookieValue", false);
-        parse_config.parse_all_request_headers =
-            cfg.get_boolean("http.parseHTTPHeaderRequestAll", false);
-        parse_config.parse_all_response_headers =
-            cfg.get_boolean("http.parseHTTPHeaderResponseAll", false);
-
-        parse_config.headers = cfg.get_str_arr("http.headers").into_iter().collect();
-        parse_config.req_headers = cfg
-            .get_str_arr("http.request.headers")
-            .into_iter()
-            .collect();
-        parse_config.resp_headers = cfg
-            .get_str_arr("http.response.headers")
-            .into_iter()
-            .collect();
-
-        PARSE_CFG.set(Arc::new(parse_config)).or(Err(anyhow!(
-            "http pkt parser's PARSE_CFG is already setted"
-        )))?;
-
-        Ok(())
-    }
-}
-
-impl<'a> Processor for HttpProcessor<'static> {
-    fn clone_processor(&self) -> Box<dyn Processor> {
-        Box::new(self.clone())
-    }
-
-    /// Get parser id
     fn id(&self) -> ProcessorID {
         self.id
     }
 
-    /// Get parser id
     fn set_id(&mut self, id: ProcessorID) {
         self.id = id
     }
@@ -260,6 +180,91 @@ impl<'a> Processor for HttpProcessor<'static> {
             manager.add_simple_dpi_rule(self.id(), "^HTTP", dpi::Protocol::all())?;
 
         Ok(())
+    }
+}
+
+impl Plugin for Builder {
+    fn plugin_type(&self) -> PluginType {
+        PluginType::PacketProcessor
+    }
+
+    fn name(&self) -> &str {
+        &"http"
+    }
+
+    fn init(&mut self, cfg: &Config) -> Result<()> {
+        // initialize global llhttp settings
+        let mut settings = llhttp::Settings::default();
+
+        llhttp::cb_wrapper!(_on_message_begin, on_message_begin, Data);
+        settings.on_message_begin(Some(_on_message_begin));
+
+        llhttp::data_cb_wrapper!(_on_url, on_url, Data);
+        settings.on_url(Some(_on_url));
+
+        llhttp::data_cb_wrapper!(_on_header_field, on_header_field, Data);
+        settings.on_header_field(Some(_on_header_field));
+
+        llhttp::data_cb_wrapper!(_on_header_value, on_header_value, Data);
+        settings.on_header_value(Some(_on_header_value));
+
+        llhttp::cb_wrapper!(_on_header_complete, on_headers_complete, Data);
+        settings.on_headers_complete(Some(_on_header_complete));
+
+        llhttp::data_cb_wrapper!(_on_body, on_body, Data);
+        settings.on_body(Some(_on_body));
+
+        llhttp::cb_wrapper!(_on_message_complete, on_message_complete, Data);
+        settings.on_message_complete(Some(_on_message_complete));
+
+        SETTINGS.set(settings).unwrap();
+
+        let mut parse_config = ParseConfig::default();
+        parse_config.parse_qs_value = cfg.get_boolean("http.parseQSValue", false);
+        parse_config.parse_cookie_value = cfg.get_boolean("http.parseCookieValue", false);
+        parse_config.parse_all_request_headers =
+            cfg.get_boolean("http.parseHTTPHeaderRequestAll", false);
+        parse_config.parse_all_response_headers =
+            cfg.get_boolean("http.parseHTTPHeaderResponseAll", false);
+
+        parse_config.headers = cfg.get_str_arr("http.headers").into_iter().collect();
+        parse_config.req_headers = cfg
+            .get_str_arr("http.request.headers")
+            .into_iter()
+            .collect();
+        parse_config.resp_headers = cfg
+            .get_str_arr("http.response.headers")
+            .into_iter()
+            .collect();
+
+        PARSE_CFG.set(Arc::new(parse_config)).or(Err(anyhow!(
+            "http pkt parser's PARSE_CFG is already setted"
+        )))?;
+
+        Ok(())
+    }
+}
+
+#[derive(Clone, Default)]
+struct HttpProcessor<'a> {
+    id: ProcessorID,
+    classified: bool,
+    parsers: [llhttp::Parser<'a, Data>; 2],
+    tcp_reorder: [TcpReorder; 2],
+    resp_rule_id: RuleID,
+    client_direction: Direction,
+}
+
+unsafe impl Send for HttpProcessor<'_> {}
+unsafe impl Sync for HttpProcessor<'_> {}
+
+impl<'a> PktProcessor for HttpProcessor<'static> {
+    fn id(&self) -> ProcessorID {
+        self.id
+    }
+
+    fn name(&self) -> &'static str {
+        &"http"
     }
 
     fn parse_pkt(&mut self, pkt: &dyn Packet, rule: Option<&Rule>, _: &mut Session) -> Result<()> {
@@ -392,8 +397,8 @@ impl<'a> HttpProcessor<'a> {
 }
 
 #[no_mangle]
-pub extern "C" fn al_new_pkt_processor() -> Box<Box<dyn Processor>> {
-    Box::new(Box::new(HttpProcessor::new()))
+pub extern "C" fn al_new_pkt_processor_builder() -> Box<Box<dyn ProcessorBuilder>> {
+    Box::new(Box::new(Builder::default()))
 }
 
 #[no_mangle]

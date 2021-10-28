@@ -5,11 +5,14 @@ use api::classifiers::ClassifierManager;
 use api::packet::Packet;
 use api::session::Session;
 
-use crate::{ClassifyFunc, Misc};
+use crate::{Builder, ClassifyFunc};
 
-pub fn register_classify_rules(parser: &mut Misc, manager: &mut ClassifierManager) -> Result<()> {
+pub fn register_classify_rules(
+    builder: &mut Builder,
+    manager: &mut ClassifierManager,
+) -> Result<()> {
     let c = Box::new(classify as ClassifyFunc);
-    parser.add_tcp_dpi_rule_with_func(r"^USER.*((\nNICK)|(\s\+iw))", c.as_ref(), manager)
+    builder.add_tcp_dpi_rule_with_func(r"^USER.*((\nNICK)|(\s\+iw))", c.as_ref(), manager)
 }
 
 fn classify(ses: &mut Session, pkt: &dyn Packet) -> Result<()> {

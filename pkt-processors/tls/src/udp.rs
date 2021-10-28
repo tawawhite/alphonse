@@ -5,7 +5,6 @@ use tls_parser::{
 
 use alphonse_api as api;
 use api::packet::{Direction, Packet};
-use api::plugins::Plugin;
 use api::session::{ProtocolLayer, Session};
 
 use crate::TlsProcessor;
@@ -15,7 +14,7 @@ impl TlsProcessor {
         if !self.classified {
             // If this session is already classified as this protocol, skip
             self.classified = true;
-            ses.add_protocol(&self.name(), ProtocolLayer::Application);
+            ses.add_protocol(&"dtls", ProtocolLayer::Application);
         }
 
         let (_, results) = match parse_dtls_plaintext_records(pkt.payload()) {
