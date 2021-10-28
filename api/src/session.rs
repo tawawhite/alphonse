@@ -141,11 +141,6 @@ pub struct Session {
     #[serde(skip_serializing_if = "String::is_empty")]
     pub id: Box<String>,
 
-    /// Some session only contains one direction's packets
-    /// Some protocols may work in that way
-    /// but network problems could cause single direction
-    pub single_direction: bool,
-
     /// Store which direction is src to dst
     #[serde(skip_serializing)]
     pub src_direction: packet::Direction,
@@ -172,6 +167,9 @@ pub struct Session {
     /// session end time
     #[cfg_attr(feature = "arkime", serde(rename = "lastPacket"))]
     pub end_time: TimeVal,
+
+    /// session process timestamp
+    pub timestamp: TimeVal,
 
     /// Session next save time, used for long connection with few packets
     #[serde(skip_serializing)]

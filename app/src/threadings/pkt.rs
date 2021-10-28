@@ -80,6 +80,7 @@ impl PktThread {
 
             let mut ses = Box::new(SessionData::default());
             ses.info.start_time = TimeVal::new(*pkt.ts());
+            ses.info.timestamp = TimeVal::new(*pkt.ts());
             ses.info.save_time = pkt.ts().tv_sec as u64 + cfg.ses_save_timeout as u64;
             ses.info.src_direction = pkt.direction();
             ses.info.add_field(&"node", json!(cfg.node));
