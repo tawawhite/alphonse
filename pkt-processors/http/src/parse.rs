@@ -6,7 +6,7 @@ use std::ops::DerefMut;
 use anyhow::Result;
 use combine::parser::byte::{byte, bytes, space, spaces, take_until_byte, take_until_byte2};
 use combine::parser::choice::optional;
-use combine::parser::range::{range, take_while, take_while1};
+use combine::parser::range::{range, take, take_while, take_while1};
 use combine::parser::repeat::skip_until;
 use combine::parser::Parser;
 use combine::{many1, skip_many};
@@ -154,6 +154,7 @@ fn parse_authorization(state: &mut State) -> Result<()> {
         }
         b"digest" => {
             let mut parser = skip_until(bytes(b"username"))
+                .skip(take(8))
                 .skip(spaces())
                 .skip(byte(b'='))
                 .skip(spaces())
