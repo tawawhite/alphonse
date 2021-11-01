@@ -303,8 +303,8 @@ impl PartialEq for PacketHashKey {
             Protocol::TCP | Protocol::UDP | Protocol::SCTP => {
                 let self_src_port = self.src_port;
                 let self_dst_port = self.dst_port;
-                let other_src_port = self.src_port;
-                let other_dst_port = self.dst_port;
+                let other_src_port = other.src_port;
+                let other_dst_port = other.dst_port;
 
                 let self_cmp = self_src_port > self_dst_port;
                 let other_cmp = other_src_port > other_dst_port;
