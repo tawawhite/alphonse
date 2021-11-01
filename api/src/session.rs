@@ -281,29 +281,20 @@ impl Session {
         !self.protocols.app.is_empty()
     }
 
-    /// Whether this session needs to do a middle save operation
-    #[inline]
-    pub fn need_mid_save(&self, max_packets: u32, tv_sec: u64) -> bool {
-        if self.truncate(max_packets as u32) {
-            return true;
-        }
-
+    /// Whether session connection active too long
+    pub fn idle_too_long(&self, tv_sec: u64) -> bool {
         if self.save_time < tv_sec {
-            // If session connection active too long, need to save a middle result
             return true;
         }
-
         false
     }
 
     /// Whether should truncate this session into a smaller session
-    #[inline]
-    pub fn truncate(&self, max_packets: u32) -> bool {
+    pub fn too_much_packets(&self, max_packets: u32) -> bool {
         if self.pkt_count[0] + self.pkt_count[1] >= max_packets {
-            true
-        } else {
-            false
+            return true;
         }
+        false
     }
 
     /// Reset mid saved session

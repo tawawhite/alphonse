@@ -148,7 +148,7 @@ impl AsMut<TinyVec<[Layer; MAX_LAYERS]>> for Layers {
 }
 
 #[repr(u8)]
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PacketHashMethod {
     /// Normal 5 tuple hash
     FiveTuple,
@@ -164,7 +164,7 @@ impl Default for PacketHashMethod {
 }
 
 #[repr(C)]
-#[derive(Debug, Eq)]
+#[derive(Clone, Debug, Eq)]
 pub struct PacketHashKey {
     pub hash_method: PacketHashMethod,
     pub datalink_proto: Protocol,
