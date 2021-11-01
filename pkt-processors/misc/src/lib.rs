@@ -72,6 +72,8 @@ impl ProcessorBuilder for Builder {
     fn build(&self, _: &api::config::Config) -> Box<dyn PktProcessor> {
         let mut p = Box::new(Misc::default());
         p.id = self.id;
+        p.match_cbs = self.match_cbs.clone();
+        p.rules = self.rules.clone();
         p
     }
 
