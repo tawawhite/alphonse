@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use anyhow::Result;
-use crossbeam_channel::{Receiver, Sender};
+use crossbeam_channel::{Receiver, Sender, TrySendError};
 use fnv::{FnvBuildHasher, FnvHashMap};
 use serde_json::json;
 
@@ -199,7 +199,15 @@ impl PktThread {
                     }
                     let info = Arc::new(std::mem::replace(&mut ses.info, Box::new(Session::new())));
                     for sender in &self.senders {
-                        sender.try_send(info.clone()).unwrap();
+                        match sender.try_send(info.clone()) {
+                            Ok(_) => {}
+                            Err(e) => match e {
+                                TrySendError::Disconnected(_) => break,
+                                TrySendError::Full(_) => {
+                                    eprintln!("send mid save session overload")
+                                }
+                            },
+                        };
                     }
                 }
             };
@@ -218,7 +226,15 @@ impl PktThread {
                     info_new.timestamp = TimeVal::new(*pkt.ts());
                     let info = Arc::new(std::mem::replace(&mut ses.info, info_new));
                     for sender in &self.senders {
-                        sender.try_send(info.clone()).unwrap();
+                        match sender.try_send(info.clone()) {
+                            Ok(_) => {}
+                            Err(e) => match e {
+                                TrySendError::Disconnected(_) => break,
+                                TrySendError::Full(_) => {
+                                    eprintln!("send mid save session overload")
+                                }
+                            },
+                        };
                     }
                     ses.info.mid_save_reset(now + cfg.ses_save_timeout as u64);
                     self.session_table.insert(key, ses);
@@ -257,7 +273,18 @@ impl PktThread {
             }
             let info = Arc::new(std::mem::replace(&mut ses.info, Box::new(Session::new())));
             for sender in &self.senders {
-                sender.try_send(info.clone()).unwrap();
+                match sender.try_send(info.clone()) {
+                    Ok(_) => {}
+                    Err(e) => match e {
+                        TrySendError::Disconnected(_) => {
+                            println!("{} exit", self.name());
+                            return;
+                        }
+                        TrySendError::Full(_) => {
+                            eprintln!("send mid save session overload")
+                        }
+                    },
+                };
             }
         }
 
