@@ -1,4 +1,4 @@
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
@@ -99,8 +99,6 @@ pub async fn main_loop(
         stats.push(stat);
     }
 
-    let db_version = Arc::new(AtomicU64::default());
-
     let times = [2, 5, 60, 600];
 
     let mut last_time = [0; 4];
@@ -109,7 +107,7 @@ pub async fn main_loop(
         &cfg.elasticsearch,
     )?));
 
-    db_version.store(load_stats(&cfg, &es).await?, Ordering::Relaxed);
+    let mut db_version = load_stats(&cfg, &es).await?;
 
     while !exit.load(Ordering::Relaxed) {
         // 0.5 seconds
@@ -142,7 +140,7 @@ pub async fn main_loop(
                 let cfg = cfg.clone();
                 let es = es.clone();
                 let stats = stats[i].clone();
-                let db_version = db_version.clone();
+                db_version += 1;
                 update_stats(cfg, es, stats, i, db_version).await?;
 
                 last_time[i] = now;
@@ -176,7 +174,7 @@ async fn update_stats(
     es: Arc<Elasticsearch>,
     stat: Stat,
     i: usize,
-    db_version: Arc<AtomicU64>,
+    db_version: u64,
 ) -> Result<()> {
     let intervals = [1, 5, 60, 600];
 
@@ -189,7 +187,7 @@ async fn update_stats(
         let parts = IndexParts::IndexId(&index, &cfg.node);
         es.index(parts)
             .version_type(VersionType::External)
-            .version(db_version.load(Ordering::Relaxed) as i64)
+            .version(db_version as i64)
             .body(json!(stat))
             .send()
             .await?
