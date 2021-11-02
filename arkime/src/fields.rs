@@ -105,6 +105,8 @@ pub enum Category {
     Multiple(Vec<String>),
 }
 
+pub type Aliases = Category;
+
 // Currently I haven't find a good way to dynamically convert an arbitray yaml hashmap
 // into a json object, so Field struct needs to have all the possible fields have been
 // defined in Arkime
@@ -113,7 +115,7 @@ pub enum Category {
 #[serde(rename_all = "camelCase")]
 pub struct Field {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub aliases: Option<Vec<String>>,
+    pub aliases: Option<Aliases>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub category: Option<Category>,
     #[serde(skip_serializing_if = "Option::is_none")]
