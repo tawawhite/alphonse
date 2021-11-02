@@ -278,7 +278,7 @@ impl PktThread {
                     Err(e) => match e {
                         TrySendError::Disconnected(_) => {
                             println!("{} exit", self.name());
-                            return;
+                            return Ok(());
                         }
                         TrySendError::Full(_) => {
                             eprintln!("send mid save session overload")
