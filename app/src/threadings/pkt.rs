@@ -66,7 +66,11 @@ impl SessionTable {
         self.raw.insert(key, ses);
     }
 
-    fn expire(&mut self, cfg: &Config, now: u64) -> Option<(ExpireReason, Box<SessionData>)> {
+    fn expire(
+        &mut self,
+        cfg: &Config,
+        now: u64,
+    ) -> Option<(ExpireReason, PacketHashKey, Box<SessionData>)> {
         // get least updated session's mut ref
         let key = match self.lru.back() {
             None => return None,
@@ -108,7 +112,7 @@ impl SessionTable {
                     None => unreachable!("Here hashmap always return Some"),
                     Some(ses) => ses,
                 };
-                Some((r, ses))
+                Some((r, key, ses))
             }
         }
     }
@@ -171,7 +175,7 @@ impl PktThread {
 
             match self.session_table.expire(&cfg, now) {
                 None => {}
-                Some((reason, mut ses)) => match reason {
+                Some((reason, key, mut ses)) => match reason {
                     ExpireReason::SessionIdleTooLong | ExpireReason::TooMuchPackets => {
                         for (_, processor) in ses.processors.iter_mut() {
                             processor.mid_save(ses.info.as_mut());
@@ -185,7 +189,7 @@ impl PktThread {
                             sender.try_send(info.clone()).unwrap();
                         }
                         ses.info.mid_save_reset(now + cfg.ses_save_timeout as u64);
-                        self.session_table.insert(key.clone(), ses);
+                        self.session_table.insert(key, ses);
                     }
                     ExpireReason::Timeout => {
                         for (_, processor) in ses.processors.iter_mut() {
