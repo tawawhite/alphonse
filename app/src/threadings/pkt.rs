@@ -32,18 +32,15 @@ impl Default for SessionData {
     }
 }
 
-/// All the possible session timeout reasons
-#[derive(Debug)]
-enum ExpireReason {
-    Timeout,
-    TooMuchPackets,
-    SessionIdleTooLong,
-}
-
 /// Thread local session table, only used by one single pkt process thread
 struct SessionTable {
     raw: FnvHashMap<PacketHashKey, Box<SessionData>>,
     lru: clru::CLruCache<PacketHashKey, (), FnvBuildHasher>,
+    tcp_timeout: u16,
+    udp_timeout: u16,
+    sctp_timeout: u16,
+    default_timeout: u16,
+    ses_max_packets: usize,
 }
 
 impl SessionTable {
@@ -51,6 +48,11 @@ impl SessionTable {
         Self {
             raw: FnvHashMap::with_capacity_and_hasher(capacity.get(), FnvBuildHasher::default()),
             lru: clru::CLruCache::with_hasher(capacity, FnvBuildHasher::default()),
+            tcp_timeout: 0,
+            udp_timeout: 0,
+            sctp_timeout: 0,
+            default_timeout: 0,
+            ses_max_packets: 0,
         }
     }
 
@@ -66,11 +68,33 @@ impl SessionTable {
         self.raw.insert(key, ses);
     }
 
-    fn expire(
-        &mut self,
-        cfg: &Config,
-        now: u64,
-    ) -> Option<(ExpireReason, PacketHashKey, Box<SessionData>)> {
+    fn mid_save_expire(&mut self, now: u64) -> Option<(PacketHashKey, Box<SessionData>)> {
+        // get least updated session's mut ref
+        let key = match self.lru.front() {
+            None => return None,
+            Some((key, _)) => key,
+        };
+        let ses = match self.raw.get_mut(key) {
+            None => unreachable!("Key founded in lru but not in hashmap, should never happens"),
+            Some(ses) => ses,
+        };
+
+        if !ses.info.idle_too_long(now) && !ses.info.too_much_packets(self.ses_max_packets as u32) {
+            return None;
+        }
+
+        let key = match self.lru.pop_front() {
+            None => unreachable!("Here lru always pops out a value"),
+            Some((key, _)) => key,
+        };
+        let ses = match self.raw.remove(&key) {
+            None => unreachable!("Here hashmap always return Some"),
+            Some(ses) => ses,
+        };
+        Some((key, ses))
+    }
+
+    fn timeout_expire(&mut self, now: u64) -> Option<(PacketHashKey, Box<SessionData>)> {
         // get least updated session's mut ref
         let key = match self.lru.back() {
             None => return None,
@@ -81,40 +105,27 @@ impl SessionTable {
             Some(ses) => ses,
         };
 
-        let reason = if ses.info.idle_too_long(now) {
-            Some(ExpireReason::SessionIdleTooLong)
-        } else if ses.info.too_much_packets(cfg.ses_max_packets as u32) {
-            Some(ExpireReason::TooMuchPackets)
-        } else {
-            let timeout = match key.trans_proto {
-                Protocol::TCP => ses.info.timeout(cfg.tcp_timeout as c_long, now as c_long),
-                Protocol::UDP => ses.info.timeout(cfg.udp_timeout as c_long, now as c_long),
-                Protocol::SCTP => ses.info.timeout(cfg.sctp_timeout as c_long, now as c_long),
-                _ => ses
-                    .info
-                    .timeout(cfg.default_timeout as c_long, now as c_long),
-            };
-            if timeout {
-                Some(ExpireReason::Timeout)
-            } else {
-                None
-            }
+        let timeout = match key.trans_proto {
+            Protocol::TCP => ses.info.timeout(self.tcp_timeout as c_long, now as c_long),
+            Protocol::UDP => ses.info.timeout(self.udp_timeout as c_long, now as c_long),
+            Protocol::SCTP => ses.info.timeout(self.sctp_timeout as c_long, now as c_long),
+            _ => ses
+                .info
+                .timeout(self.default_timeout as c_long, now as c_long),
         };
-
-        match reason {
-            None => None,
-            Some(r) => {
-                let key = match self.lru.pop_back() {
-                    None => unreachable!("Here lru always pops out a value"),
-                    Some((key, _)) => key,
-                };
-                let ses = match self.raw.remove(&key) {
-                    None => unreachable!("Here hashmap always return Some"),
-                    Some(ses) => ses,
-                };
-                Some((r, key, ses))
-            }
+        if !timeout {
+            return None;
         }
+
+        let key = match self.lru.pop_back() {
+            None => unreachable!("Here lru always pops out a value"),
+            Some((key, _)) => key,
+        };
+        let ses = match self.raw.remove(&key) {
+            None => unreachable!("Here hashmap always return Some"),
+            Some(ses) => ses,
+        };
+        Some((key, ses))
     }
 }
 
@@ -156,6 +167,13 @@ impl PktThread {
             Ok(scratch) => scratch,
             Err(_) => todo!(),
         };
+
+        self.session_table.tcp_timeout = cfg.tcp_timeout;
+        self.session_table.udp_timeout = cfg.udp_timeout;
+        self.session_table.sctp_timeout = cfg.sctp_timeout;
+        self.session_table.default_timeout = cfg.default_timeout;
+        self.session_table.ses_max_packets = cfg.ses_max_packets as usize;
+
         println!("{} started", self.name());
 
         while !self.exit.load(Ordering::Relaxed) {
@@ -173,35 +191,38 @@ impl PktThread {
 
             let key = PacketHashKey::from(pkt.as_ref());
 
-            match self.session_table.expire(&cfg, now) {
+            match self.session_table.timeout_expire(now) {
                 None => {}
-                Some((reason, key, mut ses)) => match reason {
-                    ExpireReason::SessionIdleTooLong | ExpireReason::TooMuchPackets => {
-                        for (_, processor) in ses.processors.iter_mut() {
-                            processor.mid_save(ses.info.as_mut());
-                        }
-                        let mut info_new = Box::new(Session::new());
-                        info_new.src_direction = ses.info.src_direction;
-                        info_new.start_time = ses.info.start_time.clone();
-                        info_new.save_time = ses.info.save_time + cfg.ses_save_timeout as u64;
-                        let info = Arc::new(std::mem::replace(&mut ses.info, info_new));
-                        for sender in &self.senders {
-                            sender.try_send(info.clone()).unwrap();
-                        }
-                        ses.info.mid_save_reset(now + cfg.ses_save_timeout as u64);
-                        self.session_table.insert(key, ses);
+                Some((_, mut ses)) => {
+                    for (_, processor) in ses.processors.iter_mut() {
+                        processor.save(ses.info.as_mut());
                     }
-                    ExpireReason::Timeout => {
-                        for (_, processor) in ses.processors.iter_mut() {
-                            processor.save(ses.info.as_mut());
-                        }
-                        let info =
-                            Arc::new(std::mem::replace(&mut ses.info, Box::new(Session::new())));
-                        for sender in &self.senders {
-                            sender.try_send(info.clone()).unwrap();
-                        }
+                    let info = Arc::new(std::mem::replace(&mut ses.info, Box::new(Session::new())));
+                    for sender in &self.senders {
+                        sender.try_send(info.clone()).unwrap();
                     }
-                },
+                }
+            };
+
+            match self.session_table.mid_save_expire(now) {
+                None => {}
+                Some((key, mut ses)) => {
+                    for (_, processor) in ses.processors.iter_mut() {
+                        processor.mid_save(ses.info.as_mut());
+                    }
+                    let mut info_new = Box::new(Session::new());
+                    info_new.add_field(&"node", json!(cfg.node));
+                    info_new.src_direction = ses.info.src_direction;
+                    info_new.start_time = ses.info.start_time.clone();
+                    info_new.save_time = ses.info.save_time + cfg.ses_save_timeout as u64;
+                    info_new.timestamp = TimeVal::new(*pkt.ts());
+                    let info = Arc::new(std::mem::replace(&mut ses.info, info_new));
+                    for sender in &self.senders {
+                        sender.try_send(info.clone()).unwrap();
+                    }
+                    ses.info.mid_save_reset(now + cfg.ses_save_timeout as u64);
+                    self.session_table.insert(key, ses);
+                }
             };
 
             match self.session_table.get_mut(&key) {
