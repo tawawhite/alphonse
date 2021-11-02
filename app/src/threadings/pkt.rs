@@ -247,6 +247,20 @@ impl PktThread {
             self.session_table.insert(key, ses);
         }
 
+        let session_table = std::mem::replace(
+            &mut self.session_table.raw,
+            FnvHashMap::with_hasher(FnvBuildHasher::default()),
+        );
+        for (_, mut ses) in session_table {
+            for (_, processor) in ses.processors.iter_mut() {
+                processor.save(ses.info.as_mut());
+            }
+            let info = Arc::new(std::mem::replace(&mut ses.info, Box::new(Session::new())));
+            for sender in &self.senders {
+                sender.try_send(info.clone()).unwrap();
+            }
+        }
+
         println!("{} exit", self.name());
 
         Ok(())
