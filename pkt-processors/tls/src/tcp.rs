@@ -20,7 +20,7 @@ impl TlsProcessor {
         let dir = pkt.direction() as u8 as usize;
         if self.tcp_reorder[dir].full() {
             let pkts = self.tcp_reorder[dir].get_interval_pkts();
-            self.reassemble_and_parse(pkts);
+            self.reassemble_and_parse(pkts, pkt.direction());
         }
 
         self.tcp_reorder[dir].insert_and_reorder(pkt.clone_box());
@@ -28,38 +28,31 @@ impl TlsProcessor {
         Ok(())
     }
 
-    pub fn reassemble_and_parse(&mut self, pkts: Vec<Box<dyn Packet>>) {
-        for pkt in pkts {
-            let dir = pkt.direction() as u8 as usize;
-            let mut _buf = vec![];
-            let mut buf = if self.buffer[dir].len() > 0 {
-                if self.buffer[dir].len() + pkt.payload().len() > 16_777_216 {
-                    // Tls record overflow
+    pub fn reassemble_and_parse(&mut self, pkts: Vec<Box<dyn Packet>>, dir: Direction) {
+        let payloads = pkts
+            .iter()
+            .map(|p| p.payload())
+            .collect::<Vec<_>>()
+            .join(&[] as &[u8]);
+
+        let mut payloads: &[u8] = &payloads;
+        while !payloads.is_empty() {
+            let (b, result) = match parse_tls_plaintext(&payloads) {
+                Ok(r) => r,
+                Err(TlsErr::Incomplete(_)) => {
+                    let dir = dir as usize;
+                    self.buffer[dir].extend_from_slice(&payloads);
                     return;
                 }
-
-                // If there are bytes left from last packet, prepend them to current packet's payloads
-                _buf = self.buffer[dir].split_off(0);
-                _buf.extend_from_slice(pkt.payload());
-                _buf.as_slice()
-            } else {
-                pkt.payload()
+                _ => return,
             };
 
-            while !buf.is_empty() {
-                let (b, result) = match parse_tls_plaintext(buf) {
-                    Ok(r) => r,
-                    Err(TlsErr::Incomplete(_)) => {
-                        self.buffer[dir].extend_from_slice(buf);
-                        break;
-                    }
-                    _ => break,
-                };
-
-                self.handle_tls_parse_result(pkt.direction(), result);
-                buf = b;
-            }
+            self.handle_tls_parse_result(dir, result);
+            payloads = b;
         }
+
+        let dir = dir as usize;
+        self.buffer[dir] = payloads.to_vec();
     }
 
     fn handle_tls_parse_result(&mut self, dir: Direction, result: TlsPlaintext) {

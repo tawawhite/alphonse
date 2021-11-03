@@ -131,7 +131,7 @@ impl Processor for TlsProcessor {
         _rule: Option<&matched::Rule>,
         ses: &mut Session,
     ) -> Result<()> {
-        if self.has_change_cipher_spec {
+        if self.has_change_cipher_spec || pkt.payload().len() == 0 {
             return Ok(());
         }
 
@@ -147,10 +147,10 @@ impl Processor for TlsProcessor {
 
     fn save(&mut self, ses: &mut Session) {
         let pkts = self.tcp_reorder[0].get_all_pkts();
-        self.reassemble_and_parse(pkts);
+        self.reassemble_and_parse(pkts, Direction::Right);
 
         let pkts = self.tcp_reorder[1].get_all_pkts();
-        self.reassemble_and_parse(pkts);
+        self.reassemble_and_parse(pkts, Direction::Left);
 
         for cert in &self.certs {
             if cert.ca {
